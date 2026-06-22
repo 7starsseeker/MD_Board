@@ -69,26 +69,6 @@ function loadData() {
   } catch (e) {
     console.error('读取数据文件失败:', e.message);
   }
-
-  // 如果仍无数据，尝试加载内置示例数据
-  if (!data.matches || data.matches.length === 0) {
-    const bundledPath = path.join(__dirname, 'example-data.json');
-    try {
-      if (fs.existsSync(bundledPath)) {
-        const bundled = JSON.parse(fs.readFileSync(bundledPath, 'utf-8'));
-        if (bundled.matches && bundled.matches.length > 0) {
-          data = bundled;
-          if (!data.deckPresets) data.deckPresets = [];
-          if (!data.myDeckPresets) data.myDeckPresets = [];
-          if (!data.cycleConfig) data.cycleConfig = getDefaultCycleConfig();
-          saveData();
-          console.log('已加载内置示例数据 (' + bundled.matches.length + ' 条对局)');
-        }
-      }
-    } catch (e) {
-      console.error('加载内置示例数据失败:', e.message);
-    }
-  }
 }
 
 function saveData() {
