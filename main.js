@@ -3,7 +3,16 @@ const path = require('path');
 const fs = require('fs');
 
 // ── 数据管理 ──────────────────────────────────────────────────────────────
-const DATA_FILE = path.join(__dirname, 'data', 'stats.json');
+function getDataDir() {
+  // 便携版：存在 exe 同目录下
+  if (process.env.PORTABLE_EXECUTABLE_DIR) {
+    return path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'data');
+  }
+  // 开发模式 / 已安装版
+  return path.join(__dirname, 'data');
+}
+
+const DATA_FILE = path.join(getDataDir(), 'stats.json');
 
 let data = { matches: [], version: 2, deckPresets: [] };
 
@@ -128,7 +137,7 @@ function computeStats() {
 // ── 窗口管理 ──────────────────────────────────────────────────────────────
 let displayWin = null;
 let controlWin = null;
-const WINDOW_STATE_FILE = path.join(__dirname, 'data', 'window-state.json');
+const WINDOW_STATE_FILE = path.join(getDataDir(), 'window-state.json');
 
 function loadWindowState() {
   try {
