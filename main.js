@@ -1,27 +1,51 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
 // ── 数据管理 ──────────────────────────────────────────────────────────────
-function getDataDir() {
-  // 便携版：存在 exe 同目录下
+
+/** 运行时的数据目录（系统临时目录） */
+function getRuntimeDir() {
+  return path.join(app.getPath('temp'), 'md-stats-data');
+}
+
+/** 持久化数据目录（exe 同级或项目本地） */
+function getPersistDir() {
   if (process.env.PORTABLE_EXECUTABLE_DIR) {
     return path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'data');
   }
-  // 开发模式 / 已安装版
   return path.join(__dirname, 'data');
 }
 
-const DATA_FILE = path.join(getDataDir(), 'stats.json');
+const RUNTIME_DATA = () => path.join(getRuntimeDir(), 'stats.json');
+const RUNTIME_WSTATE = () => path.join(getRuntimeDir(), 'window-state.json');
 
 let data = { matches: [], version: 2, deckPresets: [] };
 
+function ensureDir(dir) {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+/** 加载数据：优先从持久化目录复制，再读运行目录 */
 function loadData() {
+  const persistDir = getPersistDir();
+  const runtimeDir = getRuntimeDir();
+  ensureDir(runtimeDir);
+
+  // 如果有持久化数据，复制到运行目录
+  const persistFile = path.join(persistDir, 'stats.json');
+  const persistWs = path.join(persistDir, 'window-state.json');
+  if (fs.existsSync(persistFile)) {
+    try { fs.copyFileSync(persistFile, RUNTIME_DATA()); } catch(e) {}
+    if (fs.existsSync(persistWs)) {
+      try { fs.copyFileSync(persistWs, RUNTIME_WSTATE()); } catch(e) {}
+    }
+  }
+
+  // 从运行目录读取
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-      data = JSON.parse(raw);
-      // 迁移旧版本
+    if (fs.existsSync(RUNTIME_DATA())) {
+      data = JSON.parse(fs.readFileSync(RUNTIME_DATA(), 'utf-8'));
       if (!data.deckPresets) data.deckPresets = [];
     }
   } catch (e) {
@@ -31,11 +55,28 @@ function loadData() {
 
 function saveData() {
   try {
-    const dir = path.dirname(DATA_FILE);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    ensureDir(getRuntimeDir());
+    fs.writeFileSync(RUNTIME_DATA(), JSON.stringify(data, null, 2), 'utf-8');
   } catch (e) {
     console.error('保存数据文件失败:', e.message);
+  }
+}
+
+/** 将运行时数据持久化到 exe 同级目录 */
+function persistData() {
+  const persistDir = getPersistDir();
+  const runtimeDir = getRuntimeDir();
+  ensureDir(persistDir);
+  try {
+    fs.copyFileSync(RUNTIME_DATA(), path.join(persistDir, 'stats.json'));
+    const wsFile = RUNTIME_WSTATE();
+    if (fs.existsSync(wsFile)) {
+      fs.copyFileSync(wsFile, path.join(persistDir, 'window-state.json'));
+    }
+    return true;
+  } catch (e) {
+    console.error('持久化数据失败:', e.message);
+    return false;
   }
 }
 
@@ -137,7 +178,7 @@ function computeStats() {
 // ── 窗口管理 ──────────────────────────────────────────────────────────────
 let displayWin = null;
 let controlWin = null;
-const WINDOW_STATE_FILE = path.join(getDataDir(), 'window-state.json');
+const WINDOW_STATE_FILE = path.join(getRuntimeDir(), 'window-state.json');
 
 function loadWindowState() {
   try {
@@ -258,6 +299,22 @@ function createControlWindow() {
     saveWindowState({ controlWidth: w, controlHeight: h, controlX: x, controlY: y });
   });
 
+  controlWin.on('close', (event) => {
+    // 便携版：询问是否保存数据
+    if (process.env.PORTABLE_EXECUTABLE_DIR) {
+      const choice = dialog.showMessageBoxSync(controlWin, {
+        type: 'question',
+        buttons: ['保存并退出', '直接退出', '取消'],
+        defaultId: 0,
+        cancelId: 2,
+        title: 'MD_Board',
+        message: '是否将对局数据保存到 exe 同级目录？',
+        detail: '保存后下次启动时自动加载。取消则仅保留在系统临时目录。'
+      });
+      if (choice === 2) { event.preventDefault(); return; }  // 取消
+      if (choice === 0) persistData();
+    }
+  });
   controlWin.on('closed', () => { app.quit(); });
 }
 
@@ -334,6 +391,15 @@ ipcMain.handle('stats:reset-matches', () => {
   saveData();
   notifyWindows();
   return { success: true };
+});
+
+// ── 数据持久化（便携版用） ───────────────────────────────────────────────
+ipcMain.handle('stats:persist-data', () => {
+  return { success: persistData() };
+});
+
+ipcMain.handle('stats:is-portable', () => {
+  return !!process.env.PORTABLE_EXECUTABLE_DIR;
 });
 
 // ── 预设卡组管理 ─────────────────────────────────────────────────────────

@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld('mdStats', {
   updateMatch: (id, updates) => ipcRenderer.invoke('stats:update-match', { id, updates }),
   deleteMatch: (id) => ipcRenderer.invoke('stats:delete-match', id),
   resetMatches: () => ipcRenderer.invoke('stats:reset-matches'),
+  persistData: () => ipcRenderer.invoke('stats:persist-data'),
+  isPortable: () => ipcRenderer.invoke('stats:is-portable'),
 
   // ── 导入/导出 ──
   exportJSON: () => ipcRenderer.invoke('stats:export-json'),

@@ -1,7 +1,6 @@
 node_modules/
 data/
-release/*.exe
-release/builder-debug.yml
+release/
 .DS_Store
 Thumbs.db
 build-log.txt

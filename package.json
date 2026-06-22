@@ -23,7 +23,8 @@
       "data/**/*"
     ],
     "win": {
-      "target": "portable"
+      "target": "portable",
+      "icon": "assets/icon.png"
     },
     "portable": {
       "artifactName": "MD_Board_${version}_portable.exe"
