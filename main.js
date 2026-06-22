@@ -558,21 +558,7 @@ function createControlWindow() {
 
   controlWin.on('close', (event) => {
     if (hasPersistDir()) {
-      // 已有持久目录：静默自动保存（源码模式或已保存过的 exe）
       persistData();
-    } else if (data.matches && data.matches.length > 0) {
-      // 有数据但尚无持久目录：询问是否保存
-      const choice = dialog.showMessageBoxSync(controlWin, {
-        type: 'question',
-        buttons: ['保存并退出', '直接退出', '取消'],
-        defaultId: 0,
-        cancelId: 2,
-        title: 'MD_Board',
-        message: '是否将对局数据保存到本地目录？',
-        detail: '保存后下次启动时自动加载。取消则仅保留在系统临时目录。'
-      });
-      if (choice === 2) { event.preventDefault(); return; }  // 取消
-      if (choice === 0) persistData();
     }
   });
   controlWin.on('closed', () => { app.quit(); });
@@ -887,11 +873,41 @@ ipcMain.handle('cycle:open-window', () => {
   });
 });
 
+// ── 启动提示（便携版数据说明）────────────────────────────────────────
+const TIP_DISMISSED_FILE = () => path.join(getRuntimeDir(), '.tip-dismissed');
+
+function showStartupTip() {
+  // 尚无持久目录时提示（便携版首次运行）
+  if (hasPersistDir()) return;
+  try {
+    if (fs.existsSync(TIP_DISMISSED_FILE())) return;
+  } catch(e) { return; }
+
+  const choice = dialog.showMessageBoxSync({
+    type: 'info',
+    buttons: ['知道了，不再提示', '知道了'],
+    defaultId: 1,
+    title: 'MD_Board',
+    message: '数据存储说明',
+    detail: '当前为便携版（单文件 exe）运行模式，\n\n' +
+      '所有对局数据默认保存在系统临时目录中。\n' +
+      '如需保存数据到 exe 同级目录以便下次启动自动加载，\n' +
+      '请使用控制面板的「导出」和「导入」功能手动备份。'
+  });
+  if (choice === 0) {
+    // 不再提示
+    try {
+      fs.writeFileSync(TIP_DISMISSED_FILE(), '', 'utf-8');
+    } catch(e) {}
+  }
+}
+
 // ── 应用生命周期 ──────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   loadData();
   createDisplayWindow();
   createControlWindow();
+  showStartupTip();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
