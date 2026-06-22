@@ -165,6 +165,8 @@ function computeStats() {
 
   // ── 互卡统计 ──
   const bothStuck = matches.filter(m => m.bothStuck).length;
+  // 有效卡手 = 自己卡手 或 双方都动不了（同一场只计一次）
+  const totalCantPlay = matches.filter(m => m.cantPlay || m.bothStuck).length;
 
   // ── 掉线 / 超时 ──
   const disconnect = matches.filter(m => m.disconnect).length;
@@ -337,7 +339,8 @@ function computeStats() {
     },
     handState: {
       cantPlay, cantPlayGarnet, cantPlayDuplicate, cantPlayHT,
-      cantPlayRate: total > 0 ? ((cantPlay / total) * 100).toFixed(1) : '0.0',
+      totalCantPlay,
+      cantPlayRate: total > 0 ? ((totalCantPlay / total) * 100).toFixed(1) : '0.0',
       bothStuck,
       bothStuckRate: total > 0 ? ((bothStuck / total) * 100).toFixed(1) : '0.0'
     },

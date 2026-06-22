@@ -408,7 +408,7 @@
       },
       {
         "type": "coinRate",
-        "enabled": false,
+        "enabled": true,
         "label": "硬币统计"
       },
       {

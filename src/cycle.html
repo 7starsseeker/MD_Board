@@ -42,7 +42,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 10px 14px;
+      padding: 6px 10px;
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.45s ease, transform 0.45s ease;
@@ -64,32 +64,32 @@
 
     /* ── 各个统计项的样式 ── */
     .cycle-slide .big-value {
-      font-size: 48px;
+      font-size: 80px;
       font-weight: 800;
       font-family: var(--font-mono);
-      line-height: 1.1;
+      line-height: 1;
       text-align: center;
     }
     .cycle-slide .big-value .pct {
-      font-size: 28px;
+      font-size: 44px;
       color: var(--text-dim);
     }
     .cycle-slide .big-label {
-      font-size: 14px;
+      font-size: 22px;
       color: var(--text-dim);
-      margin-top: 4px;
+      margin-top: 6px;
       text-align: center;
     }
     .cycle-slide .sub-line {
-      font-size: 11px;
+      font-size: 16px;
       color: #a0a0b8;
-      margin-top: 2px;
+      margin-top: 3px;
       text-align: center;
     }
 
     .cycle-slide .double-row {
       display: flex;
-      gap: 20px;
+      gap: 24px;
       align-items: center;
       justify-content: center;
     }
@@ -97,18 +97,18 @@
       text-align: center;
     }
     .cycle-slide .double-row .col .dv {
-      font-size: 32px;
+      font-size: 52px;
       font-weight: 800;
       font-family: var(--font-mono);
     }
     .cycle-slide .double-row .col .dl {
-      font-size: 11px;
+      font-size: 16px;
       color: var(--text-dim);
     }
 
     .cycle-slide .triple-row {
       display: flex;
-      gap: 16px;
+      gap: 20px;
       align-items: center;
       justify-content: center;
       flex-wrap: wrap;
@@ -118,12 +118,12 @@
       min-width: 60px;
     }
     .cycle-slide .triple-row .col .dv {
-      font-size: 26px;
+      font-size: 42px;
       font-weight: 800;
       font-family: var(--font-mono);
     }
     .cycle-slide .triple-row .col .dl {
-      font-size: 11px;
+      font-size: 15px;
       color: #a0a0b8;
     }
 
@@ -164,12 +164,12 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 3px 8px;
+      padding: 4px 8px;
       -webkit-app-region: drag;
       flex-shrink: 0;
     }
     .title-bar .title {
-      font-size: 11px;
+      font-size: 13px;
       color: var(--text-dim);
       font-weight: 600;
     }
@@ -183,7 +183,7 @@
       border: none;
       color: #555;
       cursor: pointer;
-      font-size: 10px;
+      font-size: 12px;
       padding: 1px 5px;
       border-radius: 3px;
       transition: all 0.15s;
@@ -197,11 +197,11 @@
       justify-content: center;
       height: 100%;
       color: var(--text-dim);
-      font-size: 13px;
+      font-size: 18px;
       text-align: center;
       padding: 20px;
     }
-    .empty-state .emoji { font-size: 28px; display: block; margin-bottom: 6px; }
+    .empty-state .emoji { font-size: 42px; display: block; margin-bottom: 8px; }
   </style>
 </head>
 <body>
@@ -216,7 +216,7 @@
     <div class="cycle-viewport" id="viewport">
       <div class="empty-state" id="empty-state">
         <span class="emoji">🎴</span>暂无数据<br>
-        <span style="font-size:10px;opacity:0.6">从控制面板选择要循环的统计项</span>
+        <span style="font-size:14px;opacity:0.6">从控制面板选择要循环的统计项</span>
       </div>
     </div>
   </div>
@@ -271,14 +271,14 @@
           subLabel: '先后手胜率对比',
           html: '<div class="double-row">' +
                   '<div class="col"><div class="dv" style="color:#4cd964">' + gf.wins + '</div><div class="dl">先手胜</div>' +
-                  '<div style="font-size:11px;color:#64c8ff;font-weight:700">' + gf.winRate + '%</div></div>' +
+                  '<div style="font-size:15px;color:#64c8ff;font-weight:700">' + gf.winRate + '%</div></div>' +
                   '<div class="col"><div class="dv" style="color:#ff3b30">' + gf.losses + '</div><div class="dl">先手负</div>' +
-                  '<div style="font-size:11px;color:#ff6b62;font-weight:700">' + gfLossRate + '%</div></div>' +
-                  '<div style="width:1px;height:50px;background:rgba(255,255,255,0.08)"></div>' +
+                  '<div style="font-size:15px;color:#ff6b62;font-weight:700">' + gfLossRate + '%</div></div>' +
+                  '<div style="width:1px;height:70px;background:rgba(255,255,255,0.08)"></div>' +
                   '<div class="col"><div class="dv" style="color:#4cd964">' + gs.wins + '</div><div class="dl">后手胜</div>' +
-                  '<div style="font-size:11px;color:#ff9632;font-weight:700">' + gs.winRate + '%</div></div>' +
+                  '<div style="font-size:15px;color:#ff9632;font-weight:700">' + gs.winRate + '%</div></div>' +
                   '<div class="col"><div class="dv" style="color:#ff3b30">' + gs.losses + '</div><div class="dl">后手负</div>' +
-                  '<div style="font-size:11px;color:#ff6b62;font-weight:700">' + gsLossRate + '%</div></div>' +
+                  '<div style="font-size:15px;color:#ff6b62;font-weight:700">' + gsLossRate + '%</div></div>' +
                 '</div>' +
                 '<div class="big-label">先手 vs 后手</div>'
         };
@@ -299,7 +299,7 @@
         return {
           label: st.count + emoji,
           subLabel: isWin ? '连胜' : '连败',
-          html: '<div class="big-value" style="color:' + color + '">' + st.count + ' <span style="font-size:32px">' + emoji + '</span></div>' +
+          html: '<div class="big-value" style="color:' + color + '">' + st.count + ' <span style="font-size:50px">' + emoji + '</span></div>' +
                 '<div class="big-label"' + (isWin ? '' : '') + '>' + (isWin ? '连胜中！' : '连败中...') + '</div>'
         };
       };
@@ -403,7 +403,7 @@
           subLabel: '卡手率',
           html: '<div class="big-value" style="color:' + (cp > 20 ? '#ff3b30' : '#ffd700') + '">' + fmt(hs.cantPlayRate) + '<span class="pct">%</span></div>' +
                 '<div class="big-label">卡手率</div>' +
-                '<div class="sub-line">卡手 ' + hs.cantPlay + ' 次 · 互卡 ' + hs.bothStuck + ' 次</div>'
+                '<div class="sub-line">合计 ' + hs.totalCantPlay + ' 次（自己 ' + hs.cantPlay + ' · 互卡 ' + hs.bothStuck + '）</div>'
         };
       };
 
@@ -482,11 +482,11 @@
       RENDERERS.myDeckStats = function(s) {
         var decks = s.myDeckStats;
         if (!decks || decks.length === 0) {
-          return { label: '—', subLabel: '暂无卡组数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无卡组数据</div>' };
+          return { label: '—', subLabel: '暂无卡组数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label" style="font-size:16px">暂无卡组数据</div>' };
         }
         var top = decks.slice(0, 3);
         var list = top.map(function(d) {
-          return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:280px;padding:2px 0;font-size:12px">' +
+          return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:290px;padding:4px 0;font-size:20px">' +
             '<span style="color:var(--text-bright)">' + d.deck + '</span>' +
             '<span><span style="color:#4cd964;font-weight:700;font-family:var(--font-mono)">' + d.wins + '</span>' +
             '<span style="color:var(--text-dim)">/</span>' +
@@ -497,18 +497,18 @@
           label: decks.length + ' 套卡组',
           subLabel: '自用卡组胜率',
           html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%">' + list + '</div>' +
-                '<div class="big-label" style="margin-top:4px">自用卡组胜率</div>'
+                '<div class="big-label" style="margin-top:4px;font-size:16px">自用卡组胜率</div>'
         };
       };
 
       RENDERERS.oppDeckStats = function(s) {
         var decks = s.deckStats;
         if (!decks || decks.length === 0) {
-          return { label: '—', subLabel: '暂无对手卡组数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无对手数据</div>' };
+          return { label: '—', subLabel: '暂无对手卡组数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label" style="font-size:16px">暂无对手数据</div>' };
         }
         var top = decks.slice(0, 3);
         var list = top.map(function(d) {
-          return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:280px;padding:2px 0;font-size:12px">' +
+          return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:290px;padding:4px 0;font-size:20px">' +
             '<span style="color:var(--text-bright)">' + d.deck + '</span>' +
             '<span><span style="color:#4cd964;font-weight:700;font-family:var(--font-mono)">' + d.wins + '</span>' +
             '<span style="color:var(--text-dim)">/</span>' +
@@ -519,18 +519,18 @@
           label: decks.length + ' 种对手',
           subLabel: '对战卡组胜率',
           html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%">' + list + '</div>' +
-                '<div class="big-label" style="margin-top:4px">对战卡组胜率</div>'
+                '<div class="big-label" style="margin-top:4px;font-size:16px">对战卡组胜率</div>'
         };
       };
 
       RENDERERS.matchupStats = function(s) {
         var matchups = s.matchupStats;
         if (!matchups || matchups.length === 0) {
-          return { label: '—', subLabel: '暂无交叉数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无交叉数据</div>' };
+          return { label: '—', subLabel: '暂无交叉数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label" style="font-size:16px">暂无交叉数据</div>' };
         }
         var top = matchups.slice(0, 3);
         var list = top.map(function(m) {
-          return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:280px;padding:2px 0;font-size:11px">' +
+          return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:290px;padding:4px 0;font-size:20px">' +
             '<span style="color:var(--text-bright)">' + m.myDeck + '</span>' +
             '<span style="color:var(--text-dim)">vs</span>' +
             '<span style="color:var(--text)">' + m.opponentDeck + '</span>' +
@@ -540,7 +540,7 @@
           label: matchups.length + ' 组对阵',
           subLabel: '自用 vs 对手交叉胜率',
           html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%">' + list + '</div>' +
-                '<div class="big-label" style="margin-top:4px">对阵交叉统计</div>'
+                '<div class="big-label" style="margin-top:4px;font-size:16px">对阵交叉统计</div>'
         };
       };
 
