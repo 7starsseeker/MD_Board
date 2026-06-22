@@ -129,24 +129,6 @@ npm start
 
 ---
 
-## 打包发布
-
-```bash
-cd md-stats
-npm run pack
-```
-
-生成 `release/MD_Board_x.x.x_portable.exe`。  
-发布新版本：
-
-```bash
-git tag vX.Y.Z
-git push origin vX.Y.Z
-# 在 GitHub Releases 页面上传 exe 附件
-```
-
----
-
 ## 技术栈
 
 - [Electron](https://www.electronjs.org/) — 跨平台桌面应用框架
