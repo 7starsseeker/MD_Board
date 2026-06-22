@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MD Stats - 图表窗口</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="../lib/chart.min.js"></script>
+  <script src="charts.js"></script>
+  <style>
+    body {
+      background: transparent;
+      display: flex;
+      align-items: flex-start;
+      height: 100vh;
+      padding: 3px;
+      overflow: hidden;
+    }
+    .overlay {
+      background: rgba(8, 8, 16, 0.97);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: var(--radius);
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+      position: relative;
+      -webkit-app-region: drag;
+      display: flex;
+      flex-direction: column;
+    }
+    .title-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px 4px;
+      -webkit-app-region: drag;
+      flex-shrink: 0;
+    }
+    .title-bar .title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.5px;
+    }
+    .title-bar .title-actions {
+      display: flex;
+      gap: 4px;
+      -webkit-app-region: no-drag;
+    }
+    .title-bar .title-actions button {
+      background: none;
+      border: none;
+      color: #aaa;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+    .title-bar .title-actions button:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .title-bar .title-actions .close-btn:hover { color: #ff4444; }
+
+    .chart-viewport {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      -webkit-app-region: no-drag;
+      padding: 0 8px 8px;
+    }
+    .chart-slide {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    .chart-slide.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .chart-slide.slide-in-right {
+      transform: translateX(40px);
+    }
+    .chart-slide.slide-in-left {
+      transform: translateX(-40px);
+    }
+    .chart-slide.active {
+      transform: translateX(0);
+    }
+    .chart-slide .chart-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-bright);
+      text-align: center;
+      margin-bottom: 6px;
+      flex-shrink: 0;
+    }
+    .chart-slide .chart-sub {
+      font-size: 10px;
+      color: var(--text-dim);
+      text-align: center;
+      margin-bottom: 4px;
+      flex-shrink: 0;
+    }
+    .chart-slide .chart-canvas-wrap {
+      flex: 1;
+      position: relative;
+      min-height: 0;
+    }
+    .chart-slide .chart-canvas-wrap canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .nav-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 4px 8px 6px;
+      flex-shrink: 0;
+      -webkit-app-region: no-drag;
+    }
+    .nav-bar .nav-btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 11px;
+      padding: 2px 10px;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+    .nav-bar .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .nav-bar .nav-indicator {
+      font-size: 10px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+    .nav-bar .nav-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    .nav-bar .nav-dot.active { background: var(--accent); transform: scale(1.3); }
+    .nav-bar .nav-dot:hover { background: rgba(255,200,50,0.5); }
+
+    .empty-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-dim);
+      font-size: 13px;
+      text-align: center;
+      padding: 20px;
+    }
+    .empty-state .emoji { font-size: 28px; display: block; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <div class="overlay" id="app">
+    <!-- 标题栏 -->
+    <div class="title-bar">
+      <span class="title">📈 图表</span>
+      <div class="title-actions">
+        <button id="btn-prev" title="上一个">◀</button>
+        <button id="btn-next" title="下一个">▶</button>
+        <button class="close-btn" id="btn-close" title="关闭">✕</button>
+      </div>
+    </div>
+
+    <!-- 图表区域 -->
+    <div class="chart-viewport" id="chart-viewport">
+      <div class="empty-state" id="empty-state">
+        <span class="emoji">📊</span>
+        暂无数据<br>
+        <span style="font-size:10px;opacity:0.6">录入对局后自动显示图表</span>
+      </div>
+    </div>
+
+    <!-- 导航栏 -->
+    <div class="nav-bar" id="nav-bar" style="display:none">
+      <span class="nav-indicator" id="nav-indicator">1 / 8</span>
+      <div id="nav-dots"></div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      var api = window.mdStats;
+      if (!api) { document.body.innerHTML = '<div style="padding:40px;text-align:center;color:#ff3b30">API 加载失败</div>'; return; }
+
+      // ═══ 图表配置 ═══
+      var CHART_DEFS = [
+        { id: 'win-pie', label: '胜负分布', sub: '总对局胜负平异常占比', render: renderWinPie },
+        { id: 'first-second', label: '先后手对比', sub: '先手 vs 后手胜负', render: renderFirstSecondBar },
+        { id: 'handtrap', label: '手坑分布', sub: '各类手坑被吃比例', render: renderHandtrapPie },
+        { id: 'endboard', label: '先手终场', sub: '终场质量分布', render: renderEndboardPie },
+        { id: 'breakboard', label: '后手突破', sub: '突破成功/失败/投降', render: renderBreakBoardPie },
+        { id: 'trend', label: '胜率趋势', sub: '累计胜率变化', render: renderWinTrendLine },
+        { id: 'deck-bar', label: '卡组胜率', sub: '各卡组胜率排行', render: renderDeckBar },
+        { id: 'streak', label: '连胜状态', sub: '当前连胜/连败', render: renderStreakGauge }
+      ];
+
+      var currentIndex = 0;
+      var stats = null;
+
+      // ═══ 构建图表 DOM ═══
+      function buildSlides() {
+        var vp = document.getElementById('chart-viewport');
+        var empty = document.getElementById('empty-state');
+        empty.style.display = 'none';
+
+        CHART_DEFS.forEach(function(def, i) {
+          var slide = document.createElement('div');
+          slide.className = 'chart-slide' + (i === 0 ? ' active' : '');
+          slide.id = 'slide-' + def.id;
+
+          var label = document.createElement('div');
+          label.className = 'chart-label';
+          label.textContent = def.label;
+          slide.appendChild(label);
+
+          var sub = document.createElement('div');
+          sub.className = 'chart-sub';
+          sub.textContent = def.sub;
+          slide.appendChild(sub);
+
+          var wrap = document.createElement('div');
+          wrap.className = 'chart-canvas-wrap';
+
+          var canvas = document.createElement('canvas');
+          canvas.id = 'chart-w-' + def.id;
+          wrap.appendChild(canvas);
+          slide.appendChild(wrap);
+
+          vp.appendChild(slide);
+        });
+
+        // 导航圆点
+        var dotsEl = document.getElementById('nav-dots');
+        dotsEl.innerHTML = '';
+        CHART_DEFS.forEach(function(def, i) {
+          var dot = document.createElement('span');
+          dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+          dot.dataset.index = i;
+          dot.addEventListener('click', function() { goTo(parseInt(this.dataset.index)); });
+          dotsEl.appendChild(dot);
+        });
+      }
+
+      // ═══ 切换 ═══
+      function goTo(index) {
+        if (index < 0) index = CHART_DEFS.length - 1;
+        if (index >= CHART_DEFS.length) index = 0;
+        if (index === currentIndex) return;
+
+        var direction = index > currentIndex ? 'right' : 'left';
+        var oldIndex = currentIndex;
+        currentIndex = index;
+
+        var oldSlide = document.getElementById('slide-' + CHART_DEFS[oldIndex].id);
+        var newSlide = document.getElementById('slide-' + CHART_DEFS[currentIndex].id);
+
+        // 设置新 slide 的进入方向
+        newSlide.className = 'chart-slide slide-in-' + direction;
+        // 强制 reflow
+        void newSlide.offsetWidth;
+        newSlide.classList.add('active');
+        newSlide.className = 'chart-slide active';
+
+        oldSlide.className = 'chart-slide';
+        oldSlide.classList.remove('active');
+
+        updateNav();
+        renderCurrentChart();
+      }
+
+      function next() { goTo(currentIndex + 1); }
+      function prev() { goTo(currentIndex - 1); }
+
+      function updateNav() {
+        document.getElementById('nav-indicator').textContent = (currentIndex + 1) + ' / ' + CHART_DEFS.length;
+        document.querySelectorAll('.nav-dot').forEach(function(dot, i) {
+          dot.classList.toggle('active', i === currentIndex);
+        });
+      }
+
+      // ═══ 渲染当前图表 ═══
+      function renderCurrentChart() {
+        if (!stats) return;
+        var def = CHART_DEFS[currentIndex];
+        var canvas = document.getElementById('chart-w-' + def.id);
+        if (!canvas) return;
+        ChartManager.render('standalone-' + def.id, canvas, def.render, stats);
+      }
+
+      function renderAllCharts() {
+        if (!stats) return;
+        CHART_DEFS.forEach(function(def) {
+          var canvas = document.getElementById('chart-w-' + def.id);
+          if (!canvas) return;
+          ChartManager.render('standalone-' + def.id, canvas, def.render, stats);
+        });
+      }
+
+      // ═══ 数据更新 ═══
+      function updateDisplay(newStats) {
+        stats = newStats;
+        if (!stats || stats.total === 0) {
+          document.getElementById('empty-state').style.display = '';
+          document.querySelectorAll('.chart-slide').forEach(function(s) { s.style.display = 'none'; });
+          document.getElementById('nav-bar').style.display = 'none';
+          ChartManager.destroyAll();
+          return;
+        }
+
+        document.getElementById('empty-state').style.display = 'none';
+        document.querySelectorAll('.chart-slide').forEach(function(s) { s.style.display = ''; });
+        document.getElementById('nav-bar').style.display = '';
+
+        if (document.querySelectorAll('.chart-slide').length === 0) buildSlides();
+        renderAllCharts();
+        updateNav();
+      }
+
+      // ═══ 关闭 / 键盘 ═══
+      document.getElementById('btn-close').addEventListener('click', function() { window.close(); });
+      document.getElementById('btn-prev').addEventListener('click', prev);
+      document.getElementById('btn-next').addEventListener('click', next);
+
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') prev();
+        else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next();
+        else if (e.key === 'Escape') window.close();
+      });
+
+      // ═══ 启动 ═══
+      api.getStats().then(updateDisplay);
+      api.onStatsUpdate(function() { api.getStats().then(updateDisplay); });
+    })();
+  </script>
+</body>
+</html>

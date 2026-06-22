@@ -25,7 +25,7 @@ function hasPersistDir() {
   return fs.existsSync(getPersistDir());
 }
 
-let data = { matches: [], version: 3, deckPresets: [], myDeckPresets: [] };
+let data = { matches: [], version: 4, deckPresets: [], myDeckPresets: [], cycleConfig: null };
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -57,6 +57,12 @@ function loadData() {
       if (data.version === 2) {
         data.version = 3;
         data.myDeckPresets = [];
+        saveData();
+      }
+      // 从 v3 迁移到 v4
+      if (data.version === 3) {
+        data.version = 4;
+        data.cycleConfig = getDefaultCycleConfig();
         saveData();
       }
     }
@@ -581,6 +587,36 @@ ipcMain.handle('stats:open-window', () => {
   statsWin.on('closed', () => { statsWin = null; });
 });
 
+// ── 独立图表窗口 ─────────────────────────────────────────────────────────
+let chartWin = null;
+
+ipcMain.handle('chart:open-window', () => {
+  if (chartWin && !chartWin.isDestroyed()) {
+    chartWin.focus();
+    return;
+  }
+
+  chartWin = new BrowserWindow({
+    width: 500,
+    height: 420,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: true,
+    skipTaskbar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  chartWin.loadFile(path.join(__dirname, 'src', 'chart.html'));
+  chartWin.setVisibleOnAllWorkspaces(true);
+
+  chartWin.on('closed', () => { chartWin = null; });
+});
+
 // ── IPC 处理 ──────────────────────────────────────────────────────────────
 function notifyWindows() {
   const stats = computeStats();
@@ -592,6 +628,12 @@ function notifyWindows() {
   }
   if (statsWin && !statsWin.isDestroyed()) {
     statsWin.webContents.send('stats-updated', stats);
+  }
+  if (chartWin && !chartWin.isDestroyed()) {
+    chartWin.webContents.send('stats-updated', stats);
+  }
+  if (cycleWin && !cycleWin.isDestroyed()) {
+    cycleWin.webContents.send('stats-updated', stats);
   }
 }
 
@@ -736,6 +778,83 @@ ipcMain.handle('mydeck:rename', (event, { oldName, newName }) => {
   data.myDeckPresets[idx] = n;
   saveData();
   return { success: true, presets: data.myDeckPresets };
+});
+
+// ── 循环显示面板配置 ────────────────────────────────────────────────
+function getDefaultCycleConfig() {
+  return {
+    duration: 5,
+    items: [
+      { type: 'winRate', enabled: true, label: '总胜率' },
+      { type: 'record', enabled: true, label: '胜负记录' },
+      { type: 'firstSecond', enabled: true, label: '先后手对比' },
+      { type: 'streak', enabled: true, label: '连胜/连败' },
+      { type: 'handtrapRate', enabled: true, label: '吃G率' },
+      { type: 'coinRate', enabled: true, label: '硬币率' },
+      { type: 'totalMatches', enabled: true, label: '总场次' }
+    ]
+  };
+}
+
+ipcMain.handle('cycle:get-config', () => {
+  if (!data.cycleConfig) data.cycleConfig = getDefaultCycleConfig();
+  return JSON.parse(JSON.stringify(data.cycleConfig));
+});
+
+ipcMain.handle('cycle:save-config', (event, config) => {
+  data.cycleConfig = config;
+  saveData();
+  // 通知 cycle 窗口更新
+  if (cycleWin && !cycleWin.isDestroyed()) {
+    cycleWin.webContents.send('cycle:config-updated', config);
+  }
+  return { success: true };
+});
+
+// ── 循环显示面板窗口 ─────────────────────────────────────────────────
+let cycleWin = null;
+
+ipcMain.handle('cycle:open-window', () => {
+  if (cycleWin && !cycleWin.isDestroyed()) {
+    cycleWin.focus();
+    return;
+  }
+
+  const state = loadWindowState();
+
+  cycleWin = new BrowserWindow({
+    width: state.cycleWidth || 320,
+    height: state.cycleHeight || 200,
+    x: state.cycleX || 500,
+    y: state.cycleY || 100,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: true,
+    skipTaskbar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  cycleWin.loadFile(path.join(__dirname, 'src', 'cycle.html'));
+  cycleWin.setVisibleOnAllWorkspaces(true);
+
+  cycleWin.on('closed', () => { cycleWin = null; });
+
+  // 保存窗口状态
+  cycleWin.on('resize', () => {
+    const [w, h] = cycleWin.getSize();
+    const [x, y] = cycleWin.getPosition();
+    saveWindowState({ cycleWidth: w, cycleHeight: h, cycleX: x, cycleY: y });
+  });
+  cycleWin.on('move', () => {
+    const [x, y] = cycleWin.getPosition();
+    const [w, h] = cycleWin.getSize();
+    saveWindowState({ cycleWidth: w, cycleHeight: h, cycleX: x, cycleY: y });
+  });
 });
 
 // ── 应用生命周期 ──────────────────────────────────────────────────────────

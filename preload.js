@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('mdStats', {
   persistData: () => ipcRenderer.invoke('stats:persist-data'),
   isPortable: () => ipcRenderer.invoke('stats:is-portable'),
   openStatsWindow: () => ipcRenderer.invoke('stats:open-window'),
+  openChartWindow: () => ipcRenderer.invoke('chart:open-window'),
 
   // ── 导入/导出 ──
   exportJSON: () => ipcRenderer.invoke('stats:export-json'),
@@ -23,6 +24,16 @@ contextBridge.exposeInMainWorld('mdStats', {
     const handler = (event, stats) => callback(stats);
     ipcRenderer.on('stats-updated', handler);
     return () => ipcRenderer.removeListener('stats-updated', handler);
+  },
+
+  // ── 循环显示面板 ──
+  openCycleWindow: () => ipcRenderer.invoke('cycle:open-window'),
+  getCycleConfig: () => ipcRenderer.invoke('cycle:get-config'),
+  saveCycleConfig: (config) => ipcRenderer.invoke('cycle:save-config', config),
+  onCycleConfigUpdate: (callback) => {
+    const handler = (event, config) => callback(config);
+    ipcRenderer.on('cycle:config-updated', handler);
+    return () => ipcRenderer.removeListener('cycle:config-updated', handler);
   },
 
   // ── 对手卡组预设管理 ──

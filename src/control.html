@@ -102,6 +102,7 @@
     <h1>🎴 MD Stats</h1>
     <div class="header-actions">
       <button class="btn btn-sm" id="btn-open-stats">📊 详细统计</button>
+      <button class="btn btn-sm" id="btn-open-chart">📈 图表</button>
       <button class="btn btn-sm" id="btn-export">📤 导出</button>
       <button class="btn btn-sm" id="btn-import">📥 导入</button>
       <button class="btn btn-sm" id="btn-reset">🗑 重置</button>
@@ -338,6 +339,48 @@
   <div class="card" id="mydeck-stats-card" style="display:none">
     <div class="card-title">🃏 自用卡组统计</div>
     <div id="mydeck-stats-content"></div>
+  </div>
+
+  <!-- ═══ 循环显示面板控制 ═══ -->
+  <div class="card" id="cycle-panel-card">
+    <div class="card-title">🔄 循环显示面板</div>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">
+      独立无边框窗口，按设定的间隔循环切换显示各项统计数据。
+    </p>
+    <div class="form-row">
+      <button class="btn btn-primary" id="btn-open-cycle" style="flex:1">🔄 打开循环面板</button>
+      <button class="btn btn-sm" id="btn-cycle-settings" style="flex:0 0 auto">⚙ 设置</button>
+    </div>
+  </div>
+
+  <!-- ═══ 循环面板设置弹窗 ═══ -->
+  <div class="modal-overlay" id="modal-cycle-settings">
+    <div class="modal-box" style="max-width:420px">
+      <h2>⚙ 循环面板设置</h2>
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:12px">
+        选择要在面板中循环显示的内容，以及每项显示时长。
+      </p>
+
+      <label style="font-size:12px;color:var(--text-dim);margin-bottom:6px">每项显示时长</label>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
+        <input type="range" id="cycle-duration-range" min="2" max="15" value="5" step="1" style="flex:1">
+        <span id="cycle-duration-label" style="font-size:14px;font-weight:700;font-family:var(--font-mono);color:var(--accent);min-width:40px;text-align:center">5s</span>
+      </div>
+
+      <label style="font-size:12px;color:var(--text-dim);margin-bottom:6px">选择要循环的项目</label>
+      <div id="cycle-items-list" style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px">
+        <!-- 动态生成 -->
+      </div>
+
+      <div class="modal-actions" style="margin-top:14px">
+        <div style="display:flex;gap:4px;flex:1">
+          <button class="btn btn-sm" id="cycle-select-all">全选</button>
+          <button class="btn btn-sm" id="cycle-deselect-all">清空</button>
+        </div>
+        <button class="btn btn-primary" id="cycle-save-settings" style="flex:1">✓ 保存</button>
+        <button class="btn" id="cycle-close-settings">取消</button>
+      </div>
+    </div>
   </div>
 
   <!-- ═══ 对局记录 ═══ -->
@@ -1025,6 +1068,103 @@
 
     document.getElementById('btn-open-stats').addEventListener('click', function() {
       api.openStatsWindow();
+    });
+
+    document.getElementById('btn-open-chart').addEventListener('click', function() {
+      api.openChartWindow();
+    });
+
+    // ═══ 循环显示面板 ═══
+    document.getElementById('btn-open-cycle').addEventListener('click', function() {
+      api.openCycleWindow();
+    });
+
+    // 循环面板设置
+    var cycleConfig = null;
+
+    var CYCLE_ITEM_DEFS = [
+      { type: 'winRate', label: '总胜率', desc: '当前胜率百分比' },
+      { type: 'record', label: '胜负记录', desc: '胜负平异常各场数量' },
+      { type: 'firstSecond', label: '先后手对比', desc: '先手 vs 后手胜率' },
+      { type: 'streak', label: '连胜/连败', desc: '当前连胜或连败次数' },
+      { type: 'handtrapRate', label: '手坑统计', desc: '吃G率 / 陨石率' },
+      { type: 'coinRate', label: '硬币统计', desc: '猜硬币胜率' },
+      { type: 'totalMatches', label: '总场次', desc: '对局总场数量' }
+    ];
+
+    function renderCycleSettings(config) {
+      document.getElementById('cycle-duration-range').value = config.duration || 5;
+      document.getElementById('cycle-duration-label').textContent = (config.duration || 5) + 's';
+
+      var list = document.getElementById('cycle-items-list');
+      list.innerHTML = '';
+      CYCLE_ITEM_DEFS.forEach(function(def) {
+        var item = config.items ? config.items.find(function(i) { return i.type === def.type; }) : null;
+        var enabled = item ? item.enabled : true;
+        var label = item ? item.label : def.label;
+
+        var row = document.createElement('div');
+        row.className = 'checkbox-row';
+        row.style.padding = '6px 4px';
+        row.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
+
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = enabled;
+        cb.dataset.type = def.type;
+
+        var lbl = document.createElement('label');
+        lbl.style.flex = '1';
+        lbl.innerHTML = '<strong>' + def.label + '</strong> <span style="font-size:11px;color:var(--text-dim)">' + def.desc + '</span>';
+
+        row.appendChild(cb);
+        row.appendChild(lbl);
+        list.appendChild(row);
+      });
+    }
+
+    document.getElementById('btn-cycle-settings').addEventListener('click', async function() {
+      if (!cycleConfig) cycleConfig = await api.getCycleConfig();
+      renderCycleSettings(cycleConfig);
+      document.getElementById('modal-cycle-settings').classList.add('show');
+    });
+
+    document.getElementById('cycle-close-settings').addEventListener('click', function() {
+      document.getElementById('modal-cycle-settings').classList.remove('show');
+    });
+
+    // 时长滑块
+    document.getElementById('cycle-duration-range').addEventListener('input', function() {
+      document.getElementById('cycle-duration-label').textContent = this.value + 's';
+    });
+
+    // 全选/清空
+    document.getElementById('cycle-select-all').addEventListener('click', function() {
+      document.querySelectorAll('#cycle-items-list input[type=checkbox]').forEach(function(cb) { cb.checked = true; });
+    });
+    document.getElementById('cycle-deselect-all').addEventListener('click', function() {
+      document.querySelectorAll('#cycle-items-list input[type=checkbox]').forEach(function(cb) { cb.checked = false; });
+    });
+
+    // 保存
+    document.getElementById('cycle-save-settings').addEventListener('click', async function() {
+      var items = [];
+      document.querySelectorAll('#cycle-items-list input[type=checkbox]').forEach(function(cb) {
+        var def = CYCLE_ITEM_DEFS.find(function(d) { return d.type === cb.dataset.type; });
+        if (!def) return;
+        items.push({
+          type: def.type,
+          enabled: cb.checked,
+          label: def.label
+        });
+      });
+      var config = {
+        duration: parseInt(document.getElementById('cycle-duration-range').value) || 5,
+        items: items
+      };
+      cycleConfig = config;
+      await api.saveCycleConfig(config);
+      document.getElementById('modal-cycle-settings').classList.remove('show');
     });
 
     document.getElementById('btn-export').addEventListener('click', async function() {

@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MD Stats - 循环显示</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      background: transparent;
+      display: flex;
+      align-items: stretch;
+      height: 100vh;
+      padding: 3px;
+      overflow: hidden;
+      margin: 0;
+    }
+    .overlay {
+      background: rgba(8, 8, 16, 0.97);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: var(--radius);
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+      position: relative;
+      -webkit-app-region: drag;
+      display: flex;
+      flex-direction: column;
+    }
+    .cycle-viewport {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      -webkit-app-region: no-drag;
+    }
+    .cycle-slide {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 14px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.45s ease, transform 0.45s ease;
+    }
+    .cycle-slide.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .cycle-slide.slide-next {
+      transform: translateX(50px);
+    }
+    .cycle-slide.slide-prev {
+      transform: translateX(-50px);
+    }
+    .cycle-slide.active.slide-next,
+    .cycle-slide.active.slide-prev {
+      transform: translateX(0);
+    }
+
+    /* ── 各个统计项的样式 ── */
+    .cycle-slide .big-value {
+      font-size: 48px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      line-height: 1.1;
+      text-align: center;
+    }
+    .cycle-slide .big-value .pct {
+      font-size: 28px;
+      color: var(--text-dim);
+    }
+    .cycle-slide .big-label {
+      font-size: 14px;
+      color: var(--text-dim);
+      margin-top: 4px;
+      text-align: center;
+    }
+    .cycle-slide .sub-line {
+      font-size: 11px;
+      color: #666680;
+      margin-top: 2px;
+      text-align: center;
+    }
+
+    .cycle-slide .double-row {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      justify-content: center;
+    }
+    .cycle-slide .double-row .col {
+      text-align: center;
+    }
+    .cycle-slide .double-row .col .dv {
+      font-size: 32px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+    }
+    .cycle-slide .double-row .col .dl {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .cycle-slide .triple-row {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .cycle-slide .triple-row .col {
+      text-align: center;
+      min-width: 60px;
+    }
+    .cycle-slide .triple-row .col .dv {
+      font-size: 26px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+    }
+    .cycle-slide .triple-row .col .dl {
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    .cycle-slide .dots-line {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      justify-content: center;
+      margin-top: 4px;
+      flex-wrap: wrap;
+    }
+    .cycle-slide .dots-line .dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .cycle-slide .dots-line .dot.win { background: #4cd964; }
+    .cycle-slide .dots-line .dot.loss { background: #ff3b30; }
+    .cycle-slide .dots-line .dot.draw { background: #ffd700; }
+    .cycle-slide .dots-line .dot.abnormal {
+      background: transparent;
+      border: 2px solid #8888a0;
+      position: relative;
+      overflow: hidden;
+    }
+    .cycle-slide .dots-line .dot.abnormal::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: linear-gradient(45deg, transparent 40%, #8888a0 40%, #8888a0 60%, transparent 60%);
+    }
+    .cycle-slide .dots-line .dot.empty { background: rgba(255,255,255,0.1); }
+
+    /* ── 导航栏 ── */
+    .title-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 3px 8px;
+      -webkit-app-region: drag;
+      flex-shrink: 0;
+    }
+    .title-bar .title {
+      font-size: 11px;
+      color: var(--text-dim);
+      font-weight: 600;
+    }
+    .title-bar .title-actions {
+      display: flex;
+      gap: 3px;
+      -webkit-app-region: no-drag;
+    }
+    .title-bar .title-actions button {
+      background: none;
+      border: none;
+      color: #555;
+      cursor: pointer;
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      transition: all 0.15s;
+    }
+    .title-bar .title-actions button:hover { color: var(--text-dim); background: rgba(255,255,255,0.06); }
+    .title-bar .title-actions .close-btn:hover { color: #ff4444; }
+
+    .empty-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-dim);
+      font-size: 13px;
+      text-align: center;
+      padding: 20px;
+    }
+    .empty-state .emoji { font-size: 28px; display: block; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <div class="overlay">
+    <div class="title-bar">
+      <span class="title">🔄 循环显示</span>
+      <div class="title-actions">
+        <button id="btn-pause" title="暂停/继续">⏸</button>
+        <button class="close-btn" id="btn-close" title="关闭">✕</button>
+      </div>
+    </div>
+    <div class="cycle-viewport" id="viewport">
+      <div class="empty-state" id="empty-state">
+        <span class="emoji">🎴</span>暂无数据<br>
+        <span style="font-size:10px;opacity:0.6">从控制面板选择要循环的统计项</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      var api = window.mdStats;
+      if (!api) { document.body.innerHTML = '<div style="padding:40px;text-align:center;color:#ff3b30">API 加载失败</div>'; return; }
+
+      var config = null;
+      var stats = null;
+      var currentIndex = 0;
+      var timer = null;
+      var paused = false;
+
+      // ═══ 渲染函数 ▸ 返回 { label, subLabel, html } ═══
+
+      var RENDERERS = {};
+
+      RENDERERS.winRate = function(s) {
+        return {
+          label: s.winRate + '%',
+          subLabel: s.wins + '胜 ' + s.losses + '负',
+          valueColor: '#64c8ff',
+          html: '<div class="big-value" style="color:#64c8ff">' + s.winRate + '<span class="pct">%</span></div>' +
+                '<div class="big-label">总胜率</div>' +
+                '<div class="sub-line">' + s.wins + '胜 ' + s.losses + '负 · ' + (s.wins + s.losses) + '局</div>'
+        };
+      };
+
+      RENDERERS.record = function(s) {
+        return {
+          label: s.wins + 'W - ' + s.losses + 'L',
+          subLabel: '总场次 ' + s.total,
+          html: '<div class="double-row">' +
+                  '<div class="col"><div class="dv" style="color:#4cd964">' + s.wins + '</div><div class="dl">胜场</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#ff3b30">' + s.losses + '</div><div class="dl">负场</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#ffd700">' + s.draws + '</div><div class="dl">平局</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#8888a0">' + s.abnormals + '</div><div class="dl">异常</div></div>' +
+                '</div>' +
+                '<div class="big-label">胜负记录</div>' +
+                '<div class="sub-line">总对局 ' + s.total + ' 场</div>'
+        };
+      };
+
+      RENDERERS.firstSecond = function(s) {
+        var gf = s.goingFirst, gs = s.goingSecond;
+        return {
+          label: '先手 ' + gf.winRate + '% / 后手 ' + gs.winRate + '%',
+          subLabel: '先后手胜率对比',
+          html: '<div class="double-row">' +
+                  '<div class="col"><div class="dv" style="color:#4cd964">' + gf.wins + '</div><div class="dl">先手胜</div>' +
+                  '<div style="font-size:11px;color:#64c8ff;font-weight:700">' + gf.winRate + '%</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#ff3b30">' + gf.losses + '</div><div class="dl">先手负</div></div>' +
+                  '<div style="width:1px;height:40px;background:rgba(255,255,255,0.08)"></div>' +
+                  '<div class="col"><div class="dv" style="color:#4cd964">' + gs.wins + '</div><div class="dl">后手胜</div>' +
+                  '<div style="font-size:11px;color:#ff9632;font-weight:700">' + gs.winRate + '%</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#ff3b30">' + gs.losses + '</div><div class="dl">后手负</div></div>' +
+                '</div>' +
+                '<div class="big-label">先手 vs 后手</div>'
+        };
+      };
+
+      RENDERERS.streak = function(s) {
+        var st = s.currentStreak;
+        if (!st || st.count === 0) {
+          return {
+            label: '—',
+            subLabel: '暂无连胜/连败',
+            html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无连胜</div>'
+          };
+        }
+        var isWin = st.type === 'win';
+        var color = isWin ? '#4cd964' : '#ff3b30';
+        var emoji = isWin ? '🔥' : '💧';
+        return {
+          label: st.count + emoji,
+          subLabel: isWin ? '连胜' : '连败',
+          html: '<div class="big-value" style="color:' + color + '">' + st.count + ' <span style="font-size:32px">' + emoji + '</span></div>' +
+                '<div class="big-label"' + (isWin ? '' : '') + '>' + (isWin ? '连胜中！' : '连败中...') + '</div>'
+        };
+      };
+
+      RENDERERS.handtrapRate = function(s) {
+        var ht = s.handtrap;
+        return {
+          label: 'G率 ' + ht.anyGRate + '%',
+          subLabel: '吃G ' + ht.gotAnyG + ' 次 / 陨石 ' + ht.gotNibiru + ' 次',
+          html: '<div class="triple-row">' +
+                  '<div class="col"><div class="dv" style="color:#ffd700">' + fmt(ht.anyGRate) + '%</div><div class="dl">吃G率</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#c864ff">' + fmt(ht.maxxcRate) + '%</div><div class="dl">增殖G</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#ff6482">' + fmt(ht.nibiruRate) + '%</div><div class="dl">陨石</div></div>' +
+                '</div>' +
+                '<div class="big-label">手坑统计</div>' +
+                '<div class="sub-line">其他手坑 ' + (ht.gotDroll + ht.gotJellyfish + ht.gotLancea + ht.gotDimension + ht.gotSmallHT) + ' 次</div>'
+        };
+      };
+
+      RENDERERS.coinRate = function(s) {
+        var c = s.coin;
+        return {
+          label: c.winRate + '%',
+          subLabel: '硬币猜中 ' + c.wins + ' / 总 ' + c.total,
+          html: '<div class="double-row">' +
+                  '<div class="col"><div class="dv" style="color:#ffd700">' + fmt(c.winRate) + '%</div><div class="dl">硬币胜率</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#4cd964">' + c.wins + '</div><div class="dl">猜中</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#ff3b30">' + c.losses + '</div><div class="dl">猜错</div></div>' +
+                '</div>' +
+                '<div class="big-label">硬币统计</div>'
+        };
+      };
+
+      RENDERERS.totalMatches = function(s) {
+        return {
+          label: s.total + '',
+          subLabel: '总对局数',
+          html: '<div class="big-value" style="color:#ffc832">' + s.total + '</div>' +
+                '<div class="big-label">总对局</div>' +
+                '<div class="sub-line">胜率 ' + s.winRate + '%</div>'
+        };
+      };
+
+      // ═══ 构建幻灯片 ═══
+      function getEnabledItems() {
+        if (!config || !config.items) return [];
+        return config.items.filter(function(item) { return item.enabled; });
+      }
+
+      function buildSlides(items) {
+        var vp = document.getElementById('viewport');
+        var empty = document.getElementById('empty-state');
+
+        // 清除旧 slides
+        document.querySelectorAll('.cycle-slide').forEach(function(el) { el.remove(); });
+
+        if (items.length === 0 || !stats || stats.total === 0) {
+          empty.style.display = '';
+          return;
+        }
+        empty.style.display = 'none';
+
+        items.forEach(function(item, i) {
+          var renderer = RENDERERS[item.type];
+          if (!renderer) return;
+
+          var slide = document.createElement('div');
+          slide.className = 'cycle-slide' + (i === 0 ? ' active' : '');
+          slide.id = 'cyc-slide-' + i;
+          slide.innerHTML = renderer(stats).html;
+          vp.appendChild(slide);
+        });
+      }
+
+      // ═══ 循环逻辑 ═══
+      function goTo(index, direction) {
+        var items = getEnabledItems();
+        if (items.length === 0) return;
+
+        if (index < 0) index = items.length - 1;
+        if (index >= items.length) index = 0;
+        if (index === currentIndex && items.length > 1) return;
+
+        var oldIndex = currentIndex;
+        currentIndex = index;
+
+        var dir = direction || (currentIndex > oldIndex ? 'next' : 'prev');
+
+        var oldSlide = document.getElementById('cyc-slide-' + oldIndex);
+        var newSlide = document.getElementById('cyc-slide-' + currentIndex);
+        if (!newSlide) return;
+
+        // 如果 oldSlide 不存在（第一次或重建后），直接激活
+        if (!oldSlide) {
+          newSlide.className = 'cycle-slide active';
+          return;
+        }
+
+        var slideClass = dir === 'next' ? 'slide-next' : 'slide-prev';
+        newSlide.className = 'cycle-slide ' + slideClass;
+        void newSlide.offsetWidth; // force reflow
+
+        oldSlide.className = 'cycle-slide';
+        newSlide.classList.add('active');
+        newSlide.className = 'cycle-slide active ' + slideClass;
+        // 移除过渡 class
+        requestAnimationFrame(function() {
+          newSlide.className = 'cycle-slide active';
+        });
+      }
+
+      function nextSlide() {
+        var items = getEnabledItems();
+        if (items.length === 0) return;
+        goTo(currentIndex + 1, 'next');
+      }
+
+      function startTimer() {
+        stopTimer();
+        if (!config || paused) return;
+        var duration = (config.duration || 5) * 1000;
+        timer = setInterval(nextSlide, duration);
+      }
+
+      function stopTimer() {
+        if (timer) { clearInterval(timer); timer = null; }
+      }
+
+      function restartTimer() {
+        if (paused) return;
+        startTimer();
+      }
+
+      // ═══ 暂停/继续 ═══
+      function togglePause() {
+        paused = !paused;
+        document.getElementById('btn-pause').textContent = paused ? '▶' : '⏸';
+        if (paused) { stopTimer(); }
+        else { startTimer(); }
+      }
+
+      // ═══ 更新全部 ═══
+      function updateDisplay(newStats) {
+        stats = newStats;
+        var items = getEnabledItems();
+        buildSlides(items);
+
+        if (items.length === 0 || !stats || stats.total === 0) {
+          stopTimer();
+          return;
+        }
+
+        // 确保当前索引有效
+        if (currentIndex >= items.length) currentIndex = 0;
+        if (document.getElementById('cyc-slide-' + currentIndex)) {
+          document.querySelectorAll('.cycle-slide').forEach(function(s) { s.classList.remove('active'); });
+          var active = document.getElementById('cyc-slide-' + currentIndex);
+          if (active) active.className = 'cycle-slide active';
+        }
+
+        startTimer();
+      }
+
+      // ═══ 配置更新 ═══
+      function onConfigUpdated(newConfig) {
+        config = newConfig;
+        updateDisplay(stats);
+      }
+
+      // ═══ 格式化 ═══
+      function fmt(v) {
+        if (v === undefined || v === null) return '0.0';
+        var n = typeof v === 'string' ? parseFloat(v) : v;
+        return isNaN(n) ? '0.0' : n.toFixed(1);
+      }
+
+      // ═══ 绑定事件 ═══
+      document.getElementById('btn-close').addEventListener('click', function() { window.close(); });
+      document.getElementById('btn-pause').addEventListener('click', togglePause);
+
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowLeft') { goTo(currentIndex - 1, 'prev'); restartTimer(); }
+        else if (e.key === 'ArrowRight') { goTo(currentIndex + 1, 'next'); restartTimer(); }
+        else if (e.key === ' ') { e.preventDefault(); togglePause(); }
+        else if (e.key === 'Escape') { window.close(); }
+      });
+
+      // ═══ 启动 ═══
+      api.getCycleConfig().then(function(cfg) {
+        config = cfg;
+        return api.getStats();
+      }).then(function(s) {
+        stats = s;
+        updateDisplay(s);
+      });
+
+      api.onStatsUpdate(function() { api.getStats().then(updateDisplay); });
+      api.onCycleConfigUpdate(onConfigUpdated);
+    })();
+  </script>
+</body>
+</html>
