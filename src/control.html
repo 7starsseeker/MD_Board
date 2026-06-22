@@ -123,6 +123,7 @@
       <button class="btn btn-sm" id="btn-export" title="导出数据" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📤</button>
       <button class="btn btn-sm" id="btn-import" title="导入数据" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📥</button>
       <button class="btn btn-sm" id="btn-reset" title="重置所有数据" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">🗑</button>
+      <button class="btn btn-sm" id="btn-about" title="关于" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">ℹ️</button>
       <button class="close-btn" id="btn-close-control" title="关闭" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:14px;padding:2px 8px;border-radius:4px">✕</button>
     </div>
   </div>
@@ -1292,6 +1293,13 @@
     api.getAll().then(renderAll);
     api.onStatsUpdate(function() { api.getAll().then(renderAll); });
 
+    document.getElementById('btn-about').addEventListener('click', function() {
+      alert(
+        'MD_Board v1.0.0\n' +
+        '作者: 7starsseeker\n' +
+        '仓库: https://github.com/7starsseeker/MD_Board'
+      );
+    });
     document.getElementById('btn-close-control').addEventListener('click', function() { window.close(); });
   </script>
 </body>
