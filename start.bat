@@ -1,3 +1,3 @@
 @echo off
 cd /d "%~dp0"
-start "" "release\MD_Board-win32-x64\MD_Board.exe"
+start "" "release\MD_Board_1.0.0_portable.exe"
