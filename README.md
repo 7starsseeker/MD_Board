@@ -134,9 +134,6 @@ npm start
 
 ---
 
-
----
-
 ## 致谢
 
 本项目的全部代码由 **Reasonix + DeepSeek** 协作生成。  
