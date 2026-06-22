@@ -5,7 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "pack": "electron-builder --win portable",
+    "pack": "electron-builder --win portable && node -e \"require('rcedit')('release/MD_Board_1.0.0_portable.exe', {icon: 'assets/icon.ico'})\"",
     "dev": "electron . --dev"
   },
   "author": "",
@@ -24,7 +24,7 @@
     ],
     "win": {
       "target": "portable",
-      "icon": "assets/icon.png"
+      "icon": "assets/icon.ico"
     },
     "portable": {
       "artifactName": "MD_Board_${version}_portable.exe"
@@ -35,6 +35,7 @@
   },
   "devDependencies": {
     "electron": "^33.0.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "rcedit": "^5.0.2"
   }
 }
