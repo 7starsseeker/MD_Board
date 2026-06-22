@@ -5,11 +5,35 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "pack": "electron-packager . MD_Board --platform=win32 --arch=x64 --out=release --overwrite --no-prune",
     "dev": "electron . --dev"
   },
   "author": "",
   "license": "MIT",
+  "build": {
+    "appId": "com.mdstats.app",
+    "productName": "MD_Board",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "data/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": null
+    },
+    "portable": {
+      "artifactName": "MD_Board_${version}_portable.exe"
+    }
+  },
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "electron-packager": "^17.1.2"
   }
 }

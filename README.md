@@ -30,22 +30,30 @@ MD_Board 是一个 Electron 桌面应用，包含两个窗口：
 
 ### 环境要求
 
-- [Node.js](https://nodejs.org/) v18 或更高版本
+- [Node.js](https://nodejs.org/) v18 或更高版本（仅开发/重新打包时需要）
 - Windows / macOS / Linux
 
-### 安装与运行
+### 快速启动（推荐）
+
+下载 `release/MD_Board-win32-x64/` 目录，运行其中的 **MD_Board.exe** 即可。  
+或双击项目目录下的 `start.bat`。
+
+### 从源码运行
 
 ```bash
-# 1. 克隆仓库
 git clone https://github.com/7starsseeker/MD_Board.git
 cd MD_Board
-
-# 2. 安装依赖
 npm install
-
-# 3. 启动
 npm start
 ```
+
+### 重新打包成 exe
+
+```bash
+npm run pack
+```
+
+打包后的 exe 位于 `release/MD_Board-win32-x64/MD_Board.exe`。
 
 ### 直播设置（B站直播姬 / OBS）
 

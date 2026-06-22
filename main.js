@@ -249,7 +249,7 @@ function createControlWindow() {
     saveWindowState({ controlWidth: w, controlHeight: h, controlX: x, controlY: y });
   });
 
-  controlWin.on('closed', () => { controlWin = null; });
+  controlWin.on('closed', () => { app.quit(); });
 }
 
 // ── IPC 处理 ──────────────────────────────────────────────────────────────
