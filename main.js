@@ -560,21 +560,20 @@ function createControlWindow() {
     if (hasPersistDir()) {
       // 已有持久目录：静默自动保存（源码模式或已保存过的 exe）
       persistData();
-    } else if (process.env.PORTABLE_EXECUTABLE_DIR) {
-      // 便携版且尚无 data/ 目录：询问是否保存
+    } else if (data.matches && data.matches.length > 0) {
+      // 有数据但尚无持久目录：询问是否保存
       const choice = dialog.showMessageBoxSync(controlWin, {
         type: 'question',
         buttons: ['保存并退出', '直接退出', '取消'],
         defaultId: 0,
         cancelId: 2,
         title: 'MD_Board',
-        message: '是否将对局数据保存到 exe 同级目录？',
+        message: '是否将对局数据保存到本地目录？',
         detail: '保存后下次启动时自动加载。取消则仅保留在系统临时目录。'
       });
       if (choice === 2) { event.preventDefault(); return; }  // 取消
       if (choice === 0) persistData();
     }
-    // 源码模式且尚无 data/（理论上不会发生）不做特殊处理
   });
   controlWin.on('closed', () => { app.quit(); });
 }
