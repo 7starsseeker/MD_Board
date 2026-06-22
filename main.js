@@ -811,7 +811,10 @@ function getDefaultCycleConfig() {
       { type: 'handtrapRate', enabled: true, label: '吃G率' },
       { type: 'coinRate', enabled: true, label: '硬币率' },
       { type: 'totalMatches', enabled: true, label: '总场次' },
-      { type: 'opponentRan', enabled: true, label: '吓跑对手' }
+      { type: 'opponentRan', enabled: true, label: '吓跑对手' },
+      { type: 'endboard', enabled: true, label: '先手终场' },
+      { type: 'breakBoard', enabled: true, label: '后手突破' },
+      { type: 'handState', enabled: true, label: '卡手率' }
     ]
   };
 }

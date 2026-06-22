@@ -360,6 +360,48 @@
         };
       };
 
+      RENDERERS.endboard = function(s) {
+        var eb = s.endboard;
+        if (!eb || eb.total === 0) {
+          return { label: '—', subLabel: '暂无先手对局', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无先手数据</div>' };
+        }
+        var nP = (eb.normal / eb.total * 100).toFixed(1);
+        return {
+          label: nP + '%',
+          subLabel: '正常终场率',
+          html: '<div class="big-value" style="color:#4cd964">' + nP + '<span class="pct">%</span></div>' +
+                '<div class="big-label">正常终场率</div>' +
+                '<div class="sub-line">妥协 ' + eb.compromised + ' · 停牌 ' + eb.stopped + ' · 投降 ' + eb.surrender + '</div>'
+        };
+      };
+
+      RENDERERS.breakBoard = function(s) {
+        var bb = s.breakBoard;
+        if (!bb || (bb.success + bb.failed) === 0) {
+          return { label: '—', subLabel: '暂无后手对局', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无后手数据</div>' };
+        }
+        var sr = (bb.success + bb.failed) > 0 ? (bb.success / (bb.success + bb.failed) * 100).toFixed(1) : '0.0';
+        return {
+          label: sr + '%',
+          subLabel: '突破成功率',
+          html: '<div class="big-value" style="color:#ff9632">' + sr + '<span class="pct">%</span></div>' +
+                '<div class="big-label">后手突破成功率</div>' +
+                '<div class="sub-line">成功 ' + bb.success + ' · 失败 ' + bb.failed + (bb.otk > 0 ? ' · OTK ' + bb.otk : '') + '</div>'
+        };
+      };
+
+      RENDERERS.handState = function(s) {
+        var hs = s.handState;
+        var cp = parseFloat(hs.cantPlayRate) || 0;
+        return {
+          label: cp + '%',
+          subLabel: '卡手率',
+          html: '<div class="big-value" style="color:' + (cp > 20 ? '#ff3b30' : '#ffd700') + '">' + fmt(hs.cantPlayRate) + '<span class="pct">%</span></div>' +
+                '<div class="big-label">卡手率</div>' +
+                '<div class="sub-line">卡手 ' + hs.cantPlay + ' 次 · 互卡 ' + hs.bothStuck + ' 次</div>'
+        };
+      };
+
       // ═══ 构建幻灯片 ═══
       function getEnabledItems() {
         if (!config || !config.items) return [];
