@@ -9,7 +9,7 @@
     "dev": "electron . --dev"
   },
   "author": "",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "build": {
     "appId": "com.mdstats.app",
     "productName": "MD_Board",
