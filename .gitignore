@@ -1,5 +1,5 @@
 node_modules/
-data/window-state.json
+data/
 release/
 .DS_Store
 Thumbs.db
