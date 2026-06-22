@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MD Stats - 详细统计</title>
   <link rel="stylesheet" href="style.css">
-  <script src="../lib/chart.min.js"></script>
-  <script src="charts.js"></script>
   <style>
     :root {
       --card-glow: rgba(255, 200, 50, 0.06);
@@ -337,6 +335,18 @@
       <div id="mistake-content"></div>
     </div>
 
+    <!-- 吓跑对手统计 -->
+    <div class="stat-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(255,200,100,0.12)">🏃</div>
+        <div>
+          <div class="card-title-text">吓跑对手情况</div>
+          <div class="card-subtitle">先手胜利时对手直接跑了</div>
+        </div>
+      </div>
+      <div id="opponent-ran-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
+    </div>
+
     <!-- 对手T0动统计 -->
     <div class="stat-card">
       <div class="card-header">
@@ -446,47 +456,6 @@
     <div id="matchup-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
   </div>
 
-  <!-- ═══ 图表区域 ═══ -->
-  <div style="margin-bottom:14px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <h2 style="font-size:16px;font-weight:700;color:var(--accent)">📈 可视化图表</h2>
-      <button class="btn btn-sm" id="btn-refresh-charts" style="padding:3px 12px;font-size:11px">🔄 刷新图表</button>
-    </div>
-    <div class="grid-2col" id="charts-grid">
-      <div class="stat-card">
-        <div class="card-header"><div class="card-icon" style="background:rgba(255,200,50,0.12)">💹</div><div><div class="card-title-text">胜负分布</div><div class="card-subtitle">总对局胜负平异常占比</div></div></div>
-        <div style="height:200px;position:relative"><canvas id="chart-win-pie"></canvas></div>
-      </div>
-      <div class="stat-card">
-        <div class="card-header"><div class="card-icon" style="background:rgba(100,200,255,0.12)">⚔️</div><div><div class="card-title-text">先后手对比</div><div class="card-subtitle">先手 vs 后手胜负柱状图</div></div></div>
-        <div style="height:200px;position:relative"><canvas id="chart-first-second"></canvas></div>
-      </div>
-      <div class="stat-card">
-        <div class="card-header"><div class="card-icon" style="background:rgba(200,100,255,0.12)">🛡️</div><div><div class="card-title-text">手坑分布</div><div class="card-subtitle">各类手坑被吃比例</div></div></div>
-        <div style="height:200px;position:relative"><canvas id="chart-handtrap"></canvas></div>
-      </div>
-      <div class="stat-card">
-        <div class="card-header"><div class="card-icon" style="background:rgba(255,200,50,0.12)">🏰</div><div><div class="card-title-text">先手终场</div><div class="card-subtitle">终场质量分布</div></div></div>
-        <div style="height:200px;position:relative"><canvas id="chart-endboard"></canvas></div>
-      </div>
-      <div class="stat-card">
-        <div class="card-header"><div class="card-icon" style="background:rgba(255,150,50,0.12)">💥</div><div><div class="card-title-text">后手突破</div><div class="card-subtitle">突破成功/失败/投降</div></div></div>
-        <div style="height:200px;position:relative"><canvas id="chart-breakboard"></canvas></div>
-      </div>
-      <div class="stat-card">
-        <div class="card-header"><div class="card-icon" style="background:rgba(100,200,255,0.12)">📈</div><div><div class="card-title-text">胜率趋势</div><div class="card-subtitle">累计胜率变化</div></div></div>
-        <div style="height:200px;position:relative"><canvas id="chart-trend"></canvas></div>
-      </div>
-      <div class="stat-card">
-        <div class="card-header"><div class="card-icon" style="background:rgba(76,217,100,0.12)">🃏</div><div><div class="card-title-text">自用卡组胜率</div><div class="card-subtitle">各卡组胜率排行</div></div></div>
-        <div style="height:200px;position:relative"><canvas id="chart-deck-bar"></canvas></div>
-      </div>
-      <div class="stat-card">
-        <div class="card-header"><div class="card-icon" style="background:rgba(255,100,100,0.12)">🔥</div><div><div class="card-title-text">连胜状态</div><div class="card-subtitle">当前连胜/连败</div></div></div>
-        <div style="height:200px;position:relative"><canvas id="chart-streak"></canvas></div>
-      </div>
-    </div>
-  </div>
 
   <script>
     (function() {
@@ -590,6 +559,27 @@
           m.byDeck.forEach(function(d) {
             html += '<div class="stat-row"><span class="label">' + d.deck + '</span><span class="value" style="font-size:11px;color:var(--text-dim)">' + d.total + ' 次</span><span style="font-size:12px;font-weight:700;font-family:var(--font-mono)">' + d.winRate + '%</span></div>';
           });
+        }
+        el.innerHTML = html;
+      }
+
+      // ═══ 吓跑对手统计 ═══
+      function renderOpponentRan(stats) {
+        var or = stats.opponentRan;
+        var el = document.getElementById('opponent-ran-content');
+        if (!or || or.total === 0) {
+          el.innerHTML = '<div style="padding:10px;text-align:center;color:var(--text-dim);font-size:12px">还没有吓跑对手的记录</div>'; return;
+        }
+        var html =
+          '<div class="stat-row"><span class="label">吓跑对手次数</span><span class="value warn">' + or.total + ' 次</span></div>' +
+          '<div class="stat-row"><span class="label">占总对局</span><span class="value">' + fmt(or.rate) + '%</span></div>';
+        if (or.byDeck && or.byDeck.length > 0) {
+          html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span style="font-size:11px;color:var(--accent);font-weight:600">按自己卡组分布</span></div>';
+          html += '<table class="deck-table"><thead><tr><th>卡组</th><th style="text-align:center">吓跑次数</th></tr></thead><tbody>';
+          or.byDeck.forEach(function(d) {
+            html += '<tr><td class="deck-name">' + d.deck + '</td><td style="text-align:center;color:#ffd700;font-weight:700">' + d.count + '</td></tr>';
+          });
+          html += '</tbody></table>';
         }
         el.innerHTML = html;
       }
@@ -786,6 +776,7 @@
         renderHandtrap(stats);
         renderHandState(stats);
         renderMistake(stats);
+        renderOpponentRan(stats);
         renderT0(stats);
         renderEndboard(stats);
         renderBreakBoard(stats);
@@ -795,28 +786,9 @@
         renderDeckTable(stats.myDeckStats, 'mydeck-content', 'W', 'L');
         renderDeckTable(stats.deckStats, 'oppdeck-content', 'W', 'L');
         renderMatchups(stats);
-        renderCharts(stats);
-
         document.getElementById('last-update').textContent = '更新于 ' + new Date().toLocaleTimeString();
       }
 
-      // ═══ 图表渲染 ═══
-      function renderCharts(stats) {
-        ChartManager.render('win-pie', document.getElementById('chart-win-pie'), renderWinPie, stats);
-        ChartManager.render('first-second', document.getElementById('chart-first-second'), renderFirstSecondBar, stats);
-        ChartManager.render('handtrap', document.getElementById('chart-handtrap'), renderHandtrapPie, stats);
-        ChartManager.render('endboard', document.getElementById('chart-endboard'), renderEndboardPie, stats);
-        ChartManager.render('breakboard', document.getElementById('chart-breakboard'), renderBreakBoardPie, stats);
-        ChartManager.render('trend', document.getElementById('chart-trend'), renderWinTrendLine, stats);
-        ChartManager.render('deck-bar', document.getElementById('chart-deck-bar'), renderDeckBar, stats);
-        ChartManager.render('streak', document.getElementById('chart-streak'), renderStreakGauge, stats);
-      }
-
-      // 刷新按钮
-      document.getElementById('btn-refresh-charts').addEventListener('click', function() {
-        ChartManager.destroyAll();
-        api.getStats().then(function(stats) { renderCharts(stats); });
-      });
 
       // ═══ 启动 ═══
       api.getStats().then(renderAll);

@@ -244,6 +244,17 @@ function computeStats() {
     else if (m.result === 'loss') mistakeByDeck[deck].losses++;
   });
 
+  // ── 吓跑对手统计 ──
+  const opponentRanMatches = matches.filter(m => m.opponentRan);
+  const opponentRanCount = opponentRanMatches.length;
+  const opponentRanByDeck = {};
+  opponentRanMatches.forEach(m => {
+    const deck = (m.myDeck || '').trim();
+    if (!deck) return;
+    if (!opponentRanByDeck[deck]) opponentRanByDeck[deck] = 0;
+    opponentRanByDeck[deck]++;
+  });
+
   // ── 自用卡组统计 ──
   const myDeckStats = {};
   matches.filter(m => m.myDeck).forEach(m => {
@@ -395,6 +406,14 @@ function computeStats() {
         .map(([deck, s]) => ({ deck, ...s,
           winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0'
         }))
+    },
+    // 吓跑对手统计
+    opponentRan: {
+      total: opponentRanCount,
+      rate: total > 0 ? ((opponentRanCount / total) * 100).toFixed(1) : '0.0',
+      byDeck: Object.entries(opponentRanByDeck)
+        .sort((a, b) => b[1] - a[1])
+        .map(([deck, count]) => ({ deck, count }))
     },
     // 趣味统计
     typhon: {
@@ -791,7 +810,8 @@ function getDefaultCycleConfig() {
       { type: 'streak', enabled: true, label: '连胜/连败' },
       { type: 'handtrapRate', enabled: true, label: '吃G率' },
       { type: 'coinRate', enabled: true, label: '硬币率' },
-      { type: 'totalMatches', enabled: true, label: '总场次' }
+      { type: 'totalMatches', enabled: true, label: '总场次' },
+      { type: 'opponentRan', enabled: true, label: '吓跑对手' }
     ]
   };
 }

@@ -276,6 +276,14 @@
           <label for="chk-t0">对手 T0 动</label>
         </div>
       </div>
+
+      <!-- 对手直接跑了（仅先手+胜时显示） -->
+      <div class="conditional-section" id="section-opponent-ran">
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-opponent-ran">
+          <label for="chk-opponent-ran">🏃 对手直接跑了</label>
+        </div>
+      </div>
     </div>
 
     <!-- 终场/突破/谁先能动 （条件显示） -->
@@ -494,6 +502,7 @@
       otk: null,
       endboardInteraction: null,
       myDeck: '',
+      opponentRan: false,
       notes: ''
     };
 
@@ -557,6 +566,7 @@
         document.getElementById('section-otk').classList.remove('visible');
         document.getElementById('section-endboard').classList.remove('visible');
         document.getElementById('section-t0').classList.remove('visible');
+        document.getElementById('section-opponent-ran').classList.remove('visible');
         return;
       }
       // 如果双方都动不了已勾选，固定显示谁先能动，隐藏其他
@@ -567,11 +577,13 @@
         document.getElementById('section-otk').classList.remove('visible');
         document.getElementById('section-endboard').classList.remove('visible');
         document.getElementById('section-t0').classList.remove('visible');
+        document.getElementById('section-opponent-ran').classList.remove('visible');
         return;
       }
       document.getElementById('section-firstmover').classList.remove('visible');
       document.getElementById('section-first').classList.toggle('visible', state.goingFirst === true);
       document.getElementById('section-t0').classList.toggle('visible', state.goingFirst === true);
+      document.getElementById('section-opponent-ran').classList.toggle('visible', state.goingFirst === true && state.result === 'win');
       document.getElementById('section-second').classList.toggle('visible', state.goingFirst === false);
       // 切换先后手时重置条件区域的选中状态
       if (state.goingFirst === true) {
@@ -649,6 +661,7 @@
     bindCheckbox('chk-dimension', 'gotDimension');
     bindCheckbox('chk-small-ht', 'gotSmallHT');
     bindCheckbox('chk-mistake', 'mistake');
+    bindCheckbox('chk-opponent-ran', 'opponentRan');
     bindCheckbox('chk-t0', 'opponentT0');
     bindCheckbox('chk-disconnect', 'disconnect');
     // 一方掉线 - 自定义级联
@@ -764,6 +777,7 @@
         gotDimension: state.gotDimension || null,
         gotSmallHT: state.gotSmallHT || null,
         mistake: state.mistake || null,
+        opponentRan: state.opponentRan || null,
         opponentT0: state.opponentT0 || null,
         disconnect: state.disconnect || null,
         disconnectWho: state.disconnectWho,
@@ -810,6 +824,7 @@
       state.cantPlayHT = false;
       state.bothStuck = false;
       state.mistake = false;
+      state.opponentRan = false;
       state.opponentT0 = false;
       state.typhonAppeared = false;
       state.typhonWho = 'opponent';
@@ -1089,7 +1104,8 @@
       { type: 'streak', label: '连胜/连败', desc: '当前连胜或连败次数' },
       { type: 'handtrapRate', label: '手坑统计', desc: '吃G率 / 陨石率' },
       { type: 'coinRate', label: '硬币统计', desc: '猜硬币胜率' },
-      { type: 'totalMatches', label: '总场次', desc: '对局总场数量' }
+      { type: 'totalMatches', label: '总场次', desc: '对局总场数量' },
+      { type: 'opponentRan', label: '吓跑对手', desc: '先手胜利时对手逃跑次数' }
     ];
 
     function renderCycleSettings(config) {

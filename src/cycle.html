@@ -340,6 +340,26 @@
         };
       };
 
+      RENDERERS.opponentRan = function(s) {
+        var or = s.opponentRan;
+        if (!or || or.total === 0) {
+          return {
+            label: '0',
+            subLabel: '还没吓跑过对手',
+            html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">还没吓跑过对手</div>'
+          };
+        }
+        var best = or.byDeck && or.byDeck.length > 0 ? or.byDeck[0] : null;
+        return {
+          label: or.total + '',
+          subLabel: '吓跑对手 ' + or.total + ' 次',
+          html: '<div class="big-value" style="color:#ffd700">' + or.total + ' 🏃</div>' +
+                '<div class="big-label">吓跑对手</div>' +
+                '<div class="sub-line">占总对局 ' + fmt(or.rate) + '%' +
+                (best ? ' · 最多: ' + best.deck + ' (' + best.count + ')' : '') + '</div>'
+        };
+      };
+
       // ═══ 构建幻灯片 ═══
       function getEnabledItems() {
         if (!config || !config.items) return [];
