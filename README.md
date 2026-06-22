@@ -81,7 +81,7 @@ npm start
 ## 数据隐私
 
 所有数据仅存储在本地计算机上，不上传任何服务器。  
-数据文件位置：`%APPDATA%/md-stats/stats.json`（Windows）
+数据文件位于程序目录下的 `data/stats.json`，可随程序文件夹一起移动，实现绿色便携。
 
 ---
 

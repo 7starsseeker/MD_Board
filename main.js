@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 // ── 数据管理 ──────────────────────────────────────────────────────────────
-const DATA_FILE = path.join(app.getPath('userData'), 'stats.json');
+const DATA_FILE = path.join(__dirname, 'data', 'stats.json');
 
 let data = { matches: [], version: 2, deckPresets: [] };
 
@@ -128,7 +128,7 @@ function computeStats() {
 // ── 窗口管理 ──────────────────────────────────────────────────────────────
 let displayWin = null;
 let controlWin = null;
-const WINDOW_STATE_FILE = path.join(app.getPath('userData'), 'window-state.json');
+const WINDOW_STATE_FILE = path.join(__dirname, 'data', 'window-state.json');
 
 function loadWindowState() {
   try {
