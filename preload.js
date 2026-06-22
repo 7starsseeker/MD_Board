@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('mdStats', {
   resetMatches: () => ipcRenderer.invoke('stats:reset-matches'),
   persistData: () => ipcRenderer.invoke('stats:persist-data'),
   isPortable: () => ipcRenderer.invoke('stats:is-portable'),
+  openStatsWindow: () => ipcRenderer.invoke('stats:open-window'),
 
   // ── 导入/导出 ──
   exportJSON: () => ipcRenderer.invoke('stats:export-json'),
@@ -24,11 +25,19 @@ contextBridge.exposeInMainWorld('mdStats', {
     return () => ipcRenderer.removeListener('stats-updated', handler);
   },
 
-  // ── 预设卡组管理 ──
+  // ── 对手卡组预设管理 ──
   presets: {
     getAll: () => ipcRenderer.invoke('presets:get-all'),
     add: (name) => ipcRenderer.invoke('presets:add', name),
     delete: (name) => ipcRenderer.invoke('presets:delete', name),
     rename: (oldName, newName) => ipcRenderer.invoke('presets:rename', { oldName, newName })
+  },
+
+  // ── 自己卡组预设管理 ──
+  myDeckPresets: {
+    getAll: () => ipcRenderer.invoke('mydeck:get-all'),
+    add: (name) => ipcRenderer.invoke('mydeck:add', name),
+    delete: (name) => ipcRenderer.invoke('mydeck:delete', name),
+    rename: (oldName, newName) => ipcRenderer.invoke('mydeck:rename', { oldName, newName })
   }
 });

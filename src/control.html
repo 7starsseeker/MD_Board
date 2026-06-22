@@ -21,11 +21,11 @@
     .btn-group-3 .btn { flex:1; font-size:12px; padding:5px 4px; }
     .submit-row { display:flex; gap:8px; margin-top:10px; }
     .submit-row .btn { flex:1; padding:9px; font-size:14px; }
-    .checkbox-group { display:flex; flex-direction:column; gap:5px; margin-bottom:8px; }
-    .checkbox-row { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; padding:3px 0; }
-    .checkbox-row input[type=checkbox] { width:16px; height:16px; accent-color:var(--accent); cursor:pointer; }
-    .checkbox-row label { font-size:13px; color:var(--text); cursor:pointer; margin:0; }
-    .sub-checkboxes { margin-left:22px; display:flex; flex-direction:column; gap:3px; padding:4px 0 6px; }
+    .checkbox-group { display:grid; grid-template-columns:1fr 1fr; gap:3px 10px; margin-bottom:8px; }
+    .checkbox-row { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; padding:2px 0; }
+    .checkbox-row input[type=checkbox] { width:16px; height:16px; accent-color:var(--accent); cursor:pointer; flex-shrink:0; }
+    .checkbox-row label { font-size:13px; color:var(--text); cursor:pointer; margin:0; white-space:nowrap; }
+    .sub-checkboxes { margin-left:22px; display:flex; flex-direction:column; gap:3px; padding:4px 0 6px; grid-column:1 / -1; }
     .sub-checkboxes .checkbox-row { font-size:12px; }
     .sub-checkboxes .checkbox-row label { font-size:12px; }
     .radio-group { display:flex; gap:8px; margin-top:3px; margin-left:22px; }
@@ -101,6 +101,7 @@
   <div class="app-header">
     <h1>🎴 MD Stats</h1>
     <div class="header-actions">
+      <button class="btn btn-sm" id="btn-open-stats">📊 详细统计</button>
       <button class="btn btn-sm" id="btn-export">📤 导出</button>
       <button class="btn btn-sm" id="btn-import">📥 导入</button>
       <button class="btn btn-sm" id="btn-reset">🗑 重置</button>
@@ -138,6 +139,18 @@
       </div>
     </div>
 
+    <!-- 自己卡组 -->
+    <div class="form-row">
+      <div class="form-group">
+        <label>自己卡组</label>
+        <div style="display:flex;gap:4px">
+          <input type="text" id="input-mydeck" placeholder="输入自己使用的卡组..." style="flex:1">
+          <button class="btn btn-sm" id="btn-manage-mydecks" style="white-space:nowrap">管理预设</button>
+        </div>
+        <div class="deck-quick-btns" id="mydeck-quick-btns"></div>
+      </div>
+    </div>
+
     <!-- 对手卡组 -->
     <div class="form-row">
       <div class="form-group">
@@ -164,7 +177,11 @@
         </div>
         <div class="checkbox-row">
           <input type="checkbox" id="chk-droll">
-          <label for="chk-droll">吃到鸟G / 水母G</label>
+          <label for="chk-droll">吃到鸟G</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-jellyfish">
+          <label for="chk-jellyfish">吃到水母G</label>
         </div>
         <div class="checkbox-row">
           <input type="checkbox" id="chk-lancea">
@@ -173,6 +190,14 @@
         <div class="checkbox-row">
           <input type="checkbox" id="chk-nibiru">
           <label for="chk-nibiru">吃到陨石</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-dimension">
+          <label for="chk-dimension">吃到大宇宙人 / 次元系</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-small-ht">
+          <label for="chk-small-ht">吃到其他手坑</label>
         </div>
         <div class="checkbox-row">
           <input type="checkbox" id="chk-disconnect">
@@ -197,10 +222,10 @@
           </div>
         </div>
 
-        <!-- 起手动不了 -->
+        <!-- 初始手牌较差/事故 -->
         <div class="checkbox-row">
           <input type="checkbox" id="chk-cant-play">
-          <label for="chk-cant-play">起手动不了</label>
+          <label for="chk-cant-play">初始手牌较差 / 事故</label>
         </div>
         <div class="sub-checkboxes" id="sub-cant-play">
           <div class="checkbox-row">
@@ -221,6 +246,33 @@
         <div class="checkbox-row">
           <input type="checkbox" id="chk-both-stuck">
           <label for="chk-both-stuck">双方都动不了</label>
+        </div>
+
+        <!-- 出牌失误 -->
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-mistake">
+          <label for="chk-mistake">出牌失误</label>
+        </div>
+
+        <!-- 提丰趣味统计 -->
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-typhon">
+          <label for="chk-typhon">对局中出现提丰</label>
+        </div>
+        <div class="sub-checkboxes" id="sub-typhon">
+          <label style="font-size:12px;color:var(--text-dim);margin:2px 0">出提丰的人：</label>
+          <div class="radio-group">
+            <label><input type="radio" name="typhon-who" value="opponent" checked> 对手</label>
+            <label><input type="radio" name="typhon-who" value="self"> 自己</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 对手T0动（仅先手时显示） -->
+      <div class="conditional-section" id="section-t0">
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-t0">
+          <label for="chk-t0">对手 T0 动</label>
         </div>
       </div>
     </div>
@@ -282,22 +334,10 @@
     </div>
   </div>
 
-  <!-- ═══ 统计概览 ═══ -->
-  <div class="card">
-    <div class="card-title">📊 统计概览</div>
-    <div class="stats-grid" id="stats-grid">
-      <div class="stat-box"><div class="stat-value neutral">0</div><div class="stat-label">总场</div></div>
-      <div class="stat-box"><div class="stat-value neutral">0.0%</div><div class="stat-label">胜率</div></div>
-      <div class="stat-box"><div class="stat-value win">0</div><div class="stat-label">胜场</div></div>
-      <div class="stat-box"><div class="stat-value loss">0</div><div class="stat-label">负场</div></div>
-    </div>
-    <div class="stats-extended" id="stats-extended"></div>
-  </div>
-
-  <!-- ═══ 卡组统计 ═══ -->
-  <div class="card">
-    <div class="card-title">🏷 对战卡组统计</div>
-    <div id="deck-stats-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
+  <!-- ═══ 自用卡组统计 ═══ -->
+  <div class="card" id="mydeck-stats-card" style="display:none">
+    <div class="card-title">🃏 自用卡组统计</div>
+    <div id="mydeck-stats-content"></div>
   </div>
 
   <!-- ═══ 对局记录 ═══ -->
@@ -319,6 +359,21 @@
       <div class="preset-list" id="preset-list"></div>
       <div class="modal-actions">
         <button class="btn" id="preset-close">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 自己卡组预设管理 ═══ -->
+  <div class="modal-overlay" id="modal-mydecks">
+    <div class="modal-box">
+      <h2>🃏 管理自用卡组预设</h2>
+      <div class="preset-add-row">
+        <input type="text" id="mydeck-new-name" placeholder="输入自己卡组名称...">
+        <button class="btn btn-sm btn-primary" id="mydeck-add-btn">添加</button>
+      </div>
+      <div class="preset-list" id="mydeck-preset-list"></div>
+      <div class="modal-actions">
+        <button class="btn" id="mydeck-close">完成</button>
       </div>
     </div>
   </div>
@@ -374,8 +429,13 @@
       opponentBigHand: false,
       gotMaxxC: false,
       gotDroll: false,
+      gotJellyfish: false,
       gotLancea: false,
       gotNibiru: false,
+      gotDimension: false,
+      gotSmallHT: false,
+      mistake: false,
+      opponentT0: false,
       disconnect: false,
       disconnectWho: null,
       timeout: false,
@@ -390,6 +450,7 @@
       brokeBoard: null,
       otk: null,
       endboardInteraction: null,
+      myDeck: '',
       notes: ''
     };
 
@@ -452,6 +513,7 @@
         document.getElementById('section-second').classList.remove('visible');
         document.getElementById('section-otk').classList.remove('visible');
         document.getElementById('section-endboard').classList.remove('visible');
+        document.getElementById('section-t0').classList.remove('visible');
         return;
       }
       // 如果双方都动不了已勾选，固定显示谁先能动，隐藏其他
@@ -461,10 +523,12 @@
         document.getElementById('section-second').classList.remove('visible');
         document.getElementById('section-otk').classList.remove('visible');
         document.getElementById('section-endboard').classList.remove('visible');
+        document.getElementById('section-t0').classList.remove('visible');
         return;
       }
       document.getElementById('section-firstmover').classList.remove('visible');
       document.getElementById('section-first').classList.toggle('visible', state.goingFirst === true);
+      document.getElementById('section-t0').classList.toggle('visible', state.goingFirst === true);
       document.getElementById('section-second').classList.toggle('visible', state.goingFirst === false);
       // 切换先后手时重置条件区域的选中状态
       if (state.goingFirst === true) {
@@ -475,7 +539,9 @@
       }
       if (state.goingFirst === false) {
         state.endboardState = null;
+        state.opponentT0 = false;
         document.querySelectorAll('#section-first .btn').forEach(function(b) { b.classList.remove('active'); });
+        document.getElementById('chk-t0').checked = false;
       }
     }
     firstBtn.addEventListener('click', updateConditionalSections);
@@ -534,8 +600,13 @@
     bindCheckbox('chk-big-hand', 'opponentBigHand');
     bindCheckbox('chk-maxxc', 'gotMaxxC');
     bindCheckbox('chk-droll', 'gotDroll');
+    bindCheckbox('chk-jellyfish', 'gotJellyfish');
     bindCheckbox('chk-lancea', 'gotLancea');
     bindCheckbox('chk-nibiru', 'gotNibiru');
+    bindCheckbox('chk-dimension', 'gotDimension');
+    bindCheckbox('chk-small-ht', 'gotSmallHT');
+    bindCheckbox('chk-mistake', 'mistake');
+    bindCheckbox('chk-t0', 'opponentT0');
     bindCheckbox('chk-disconnect', 'disconnect');
     // 一方掉线 - 自定义级联
     (function() {
@@ -588,6 +659,17 @@
       });
     })();
 
+    // 提丰
+    bindCheckbox('chk-typhon', 'typhonAppeared');
+    document.getElementById('sub-typhon').style.display = 'none';
+    document.getElementById('chk-typhon').addEventListener('change', function() {
+      document.getElementById('sub-typhon').style.display = this.checked ? 'flex' : 'none';
+      if (!this.checked) state.typhonWho = 'opponent';
+    });
+    document.querySelectorAll('input[name="typhon-who"]').forEach(function(rb) {
+      rb.addEventListener('change', function() { state.typhonWho = rb.value; });
+    });
+
     // 谁先能动
     bindGroup([
       document.getElementById('firstmover-self'),
@@ -596,6 +678,8 @@
     document.getElementById('sub-cant-play').style.display = 'none';
 
     document.getElementById('input-deck').addEventListener('input', function(e) { state.opponentDeck = e.target.value; });
+
+    document.getElementById('input-mydeck').addEventListener('input', function(e) { state.myDeck = e.target.value; });
 
     // ── 提交 ──
     document.getElementById('btn-submit').addEventListener('click', async function() {
@@ -626,12 +710,18 @@
         result: state.result,
         goingFirst: state.goingFirst,
         coinToss: state.coinToss,
+        myDeck: state.myDeck.trim() || '',
         opponentDeck: deck,
         opponentBigHand: state.opponentBigHand || null,
         gotMaxxC: state.gotMaxxC || null,
         gotDroll: state.gotDroll || null,
+        gotJellyfish: state.gotJellyfish || null,
         gotLancea: state.gotLancea || null,
         gotNibiru: state.gotNibiru || null,
+        gotDimension: state.gotDimension || null,
+        gotSmallHT: state.gotSmallHT || null,
+        mistake: state.mistake || null,
+        opponentT0: state.opponentT0 || null,
         disconnect: state.disconnect || null,
         disconnectWho: state.disconnectWho,
         timeout: state.timeout || null,
@@ -641,6 +731,8 @@
         cantPlayDuplicate: state.cantPlayDuplicate || null,
         cantPlayHT: state.cantPlayHT || null,
         bothStuck: state.bothStuck || null,
+        typhonAppeared: state.typhonAppeared || null,
+        typhonWho: state.typhonWho,
         firstMover: state.firstMover,
         endboardState: state.goingFirst ? state.endboardState : null,
         brokeBoard: !state.goingFirst ? state.brokeBoard : null,
@@ -660,8 +752,11 @@
       state.opponentBigHand = false;
       state.gotMaxxC = false;
       state.gotDroll = false;
+      state.gotJellyfish = false;
       state.gotLancea = false;
       state.gotNibiru = false;
+      state.gotDimension = false;
+      state.gotSmallHT = false;
       state.disconnect = false;
       state.disconnectWho = null;
       state.timeout = false;
@@ -671,11 +766,16 @@
       state.cantPlayDuplicate = false;
       state.cantPlayHT = false;
       state.bothStuck = false;
+      state.mistake = false;
+      state.opponentT0 = false;
+      state.typhonAppeared = false;
+      state.typhonWho = 'opponent';
       state.firstMover = null;
       state.endboardState = null;
       state.brokeBoard = null;
       state.otk = null;
       state.endboardInteraction = null;
+      // myDeck 保持上一局的录入内容
 
       // 重置所有UI
       document.querySelectorAll('.btn-group .btn').forEach(function(b) { b.classList.remove('active'); });
@@ -683,18 +783,21 @@
       document.querySelectorAll('input[type=radio]').forEach(function(r) { r.checked = false; });
       document.getElementById('input-deck').value = '';
       document.getElementById('input-deck').disabled = false;
+      // myDeck 输入框保持上一局的值
       document.getElementById('sub-cant-play').style.display = 'none';
       document.getElementById('sub-disconnect').style.display = 'none';
       document.getElementById('sub-timeout').style.display = 'none';
       document.getElementById('section-firstmover').classList.remove('visible');
       document.getElementById('section-otk').classList.remove('visible');
       document.getElementById('section-endboard').classList.remove('visible');
+      document.getElementById('section-t0').classList.remove('visible');
+      document.getElementById('chk-t0').checked = false;
       updateConditionalSections();
     }
 
     // 快捷提交
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && !e.shiftKey && e.target.tagName !== 'TEXTAREA' && e.target.id !== 'preset-new-name') {
+      if (e.key === 'Enter' && !e.shiftKey && e.target.tagName !== 'TEXTAREA' && e.target.id !== 'preset-new-name' && e.target.id !== 'mydeck-new-name') {
         document.getElementById('btn-submit').click();
       }
     });
@@ -781,36 +884,87 @@
     loadPresets();
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  渲染统计 & 对局记录
+    //  自用卡组预设管理
     // ═══════════════════════════════════════════════════════════════════════
 
-    function renderStats(stats) {
-      if (!stats) return;
-      document.getElementById('stats-grid').innerHTML =
-        '<div class="stat-box"><div class="stat-value neutral">' + stats.total + '</div><div class="stat-label">总场</div></div>' +
-        '<div class="stat-box"><div class="stat-value neutral">' + stats.winRate + '%</div><div class="stat-label">胜率</div></div>' +
-        '<div class="stat-box"><div class="stat-value win">' + stats.wins + '</div><div class="stat-label">胜场</div></div>' +
-        '<div class="stat-box"><div class="stat-value loss">' + stats.losses + '</div><div class="stat-label">负场</div></div>';
-      var streak = stats.currentStreak.type
-        ? (stats.currentStreak.type === 'win' ? '🔥 ' : '💀 ') + stats.currentStreak.count + (stats.currentStreak.type === 'win' ? '连胜' : '连败')
-        : '—';
-      document.getElementById('stats-extended').innerHTML =
-        '<span>先手 <span class="val">' + stats.goingFirst.wins + '-' + stats.goingFirst.losses + '</span> (' + stats.goingFirst.winRate + '%)</span>' +
-        '<span>后手 <span class="val">' + stats.goingSecond.wins + '-' + stats.goingSecond.losses + '</span> (' + stats.goingSecond.winRate + '%)</span>' +
-        '<span>当前 <span class="val">' + streak + '</span></span>';
+    var myDecks = [];
+
+    function loadMyDeckPresets() {
+      api.myDeckPresets.getAll().then(function(list) {
+        myDecks = list || [];
+        renderMyDeckPresetButtons();
+      });
     }
 
-    function renderDeckStats(stats) {
-      var el = document.getElementById('deck-stats-content');
-      if (!stats || !stats.deckStats || stats.deckStats.length === 0) {
-        el.innerHTML = '<span style="color:var(--text-dim);font-size:12px">暂无数据</span>'; return;
-      }
-      el.innerHTML = '<div class="deck-list">' + stats.deckStats.map(function(d) {
-        return '<span class="deck-tag">' + d.deck + ' <span class="dw">' + d.wins + 'W</span> <span class="dl">' + d.losses + 'L</span>' +
-          (d.abnormals ? ' <span style="color:#888;opacity:0.7">' + d.abnormals + 'X</span>' : '') +
-          ' <span style="opacity:0.5">' + d.winRate + '%</span></span>';
-      }).join('') + '</div>';
+    function renderMyDeckPresetButtons() {
+      var el = document.getElementById('mydeck-quick-btns');
+      el.innerHTML = '';
+      myDecks.forEach(function(name) {
+        var btn = document.createElement('button');
+        btn.className = 'btn btn-sm';
+        btn.textContent = name;
+        btn.addEventListener('click', function() {
+          state.myDeck = name;
+          document.getElementById('input-mydeck').value = name;
+        });
+        el.appendChild(btn);
+      });
     }
+
+    function renderMyDeckPresetList() {
+      var el = document.getElementById('mydeck-preset-list');
+      el.innerHTML = '';
+      myDecks.forEach(function(name) {
+        var div = document.createElement('div');
+        div.className = 'preset-item';
+        var span = document.createElement('span');
+        span.className = 'name';
+        span.textContent = name;
+        var delBtn = document.createElement('button');
+        delBtn.className = 'btn-del';
+        delBtn.textContent = '✕';
+        delBtn.addEventListener('click', async function() {
+          if (await confirmAsync('删除自用卡组预设「' + name + '」？')) {
+            var result = await api.myDeckPresets.delete(name);
+            if (result.success) {
+              myDecks = result.presets;
+              renderMyDeckPresetButtons();
+              renderMyDeckPresetList();
+            }
+          }
+        });
+        div.appendChild(span);
+        div.appendChild(delBtn);
+        el.appendChild(div);
+      });
+    }
+
+    document.getElementById('btn-manage-mydecks').addEventListener('click', function() {
+      renderMyDeckPresetList();
+      document.getElementById('modal-mydecks').classList.add('show');
+    });
+    document.getElementById('mydeck-close').addEventListener('click', function() {
+      document.getElementById('modal-mydecks').classList.remove('show');
+    });
+    document.getElementById('mydeck-add-btn').addEventListener('click', async function() {
+      var name = document.getElementById('mydeck-new-name').value.trim();
+      if (!name) return;
+      var result = await api.myDeckPresets.add(name);
+      if (!result.success) { alert(result.error); return; }
+      document.getElementById('mydeck-new-name').value = '';
+      myDecks = result.presets;
+      renderMyDeckPresetList();
+      renderMyDeckPresetButtons();
+    });
+    document.getElementById('mydeck-new-name').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') document.getElementById('mydeck-add-btn').click();
+    });
+
+    loadMyDeckPresets();
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  渲染统计 & 对局记录
+    // ═══════════════════════════════════════════════════════════════════════
 
     function renderMatches(matches) {
       var el = document.getElementById('match-list');
@@ -828,11 +982,17 @@
         else if (m.coinToss === false) extras.push('硬币负');
         if (m.gotMaxxc) extras.push('吃G');
         if (m.gotDroll) extras.push('吃鸟');
+        if (m.gotJellyfish) extras.push('水母');
         if (m.gotNibiru) extras.push('陨石');
+        if (m.gotDimension) extras.push('大宇宙');
+        if (m.gotSmallHT) extras.push('其他坑');
+        if (m.mistake) extras.push('打错');
+        if (m.opponentT0) extras.push('T0');
         if (m.disconnect) extras.push('掉线' + (m.disconnectWho === 'self' ? '(我)' : m.disconnectWho === 'opponent' ? '(对)' : ''));
         if (m.timeout) extras.push('超时' + (m.timeoutWho === 'self' ? '(我)' : m.timeoutWho === 'opponent' ? '(对)' : ''));
         if (m.cantPlay) extras.push('卡手');
         if (m.bothStuck) extras.push('互卡');
+        if (m.typhonAppeared) extras.push('提丰' + (m.typhonWho === 'self' ? '(我)' : '(对)'));
         if (m.endboardState) extras.push(m.endboardState === 'normal' ? '正常终场' : m.endboardState === 'compromised' ? '妥协' : '停牌');
         if (m.brokeBoard === true) extras.push('突破');
         else if (m.brokeBoard === false) extras.push('未突破');
@@ -856,14 +1016,16 @@
     }
 
     function renderAll(data) {
-      renderStats(data.stats);
-      renderDeckStats(data.stats);
       renderMatches(data.matches);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
     //  导入/导出/重置
     // ═══════════════════════════════════════════════════════════════════════
+
+    document.getElementById('btn-open-stats').addEventListener('click', function() {
+      api.openStatsWindow();
+    });
 
     document.getElementById('btn-export').addEventListener('click', async function() {
       document.getElementById('export-text').value = await api.exportJSON();

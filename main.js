@@ -20,7 +20,12 @@ function getPersistDir() {
 const RUNTIME_DATA = () => path.join(getRuntimeDir(), 'stats.json');
 const RUNTIME_WSTATE = () => path.join(getRuntimeDir(), 'window-state.json');
 
-let data = { matches: [], version: 2, deckPresets: [] };
+/** 持久化目录是否已存在（有 data/ 目录才启用持久模式） */
+function hasPersistDir() {
+  return fs.existsSync(getPersistDir());
+}
+
+let data = { matches: [], version: 3, deckPresets: [], myDeckPresets: [] };
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -47,6 +52,13 @@ function loadData() {
     if (fs.existsSync(RUNTIME_DATA())) {
       data = JSON.parse(fs.readFileSync(RUNTIME_DATA(), 'utf-8'));
       if (!data.deckPresets) data.deckPresets = [];
+      if (!data.myDeckPresets) data.myDeckPresets = [];
+      // 从 v2 迁移到 v3
+      if (data.version === 2) {
+        data.version = 3;
+        data.myDeckPresets = [];
+        saveData();
+      }
     }
   } catch (e) {
     console.error('读取数据文件失败:', e.message);
@@ -57,6 +69,10 @@ function saveData() {
   try {
     ensureDir(getRuntimeDir());
     fs.writeFileSync(RUNTIME_DATA(), JSON.stringify(data, null, 2), 'utf-8');
+    // 如果已有持久目录，同步写入（源码模式或已保存过的 exe）
+    if (hasPersistDir()) {
+      fs.writeFileSync(path.join(getPersistDir(), 'stats.json'), JSON.stringify(data, null, 2), 'utf-8');
+    }
   } catch (e) {
     console.error('保存数据文件失败:', e.message);
   }
@@ -80,7 +96,7 @@ function persistData() {
   }
 }
 
-// ── 统计计算 ──────────────────────────────────────────────────────────────
+// ── 统计计算（v2.0 增强版）─────────────────────────────────────────
 function computeStats() {
   const matches = data.matches || [];
   const wins = matches.filter(m => m.result === 'win').length;
@@ -124,6 +140,117 @@ function computeStats() {
     result: m.result, goingFirst: m.goingFirst, opponentDeck: m.opponentDeck || ''
   }));
 
+  // ── 手坑统计 ──
+  const gotMaxxc = matches.filter(m => m.gotMaxxc).length;
+  const gotDroll = matches.filter(m => m.gotDroll).length;
+  const gotJellyfish = matches.filter(m => m.gotJellyfish).length;
+  const gotLancea = matches.filter(m => m.gotLancea).length;
+  const gotNibiru = matches.filter(m => m.gotNibiru).length;
+  // 合并吃G（增殖的G 或 鸟G/水母G，同一场只算一次）
+  const gotAnyG = matches.filter(m => m.gotMaxxc || m.gotDroll || m.gotJellyfish).length;
+  const gotDimension = matches.filter(m => m.gotDimension).length;
+  const gotSmallHT = matches.filter(m => m.gotSmallHT).length;
+
+  // ── 卡手统计 ──
+  const cantPlay = matches.filter(m => m.cantPlay).length;
+  const cantPlayGarnet = matches.filter(m => m.cantPlayGarnet).length;
+  const cantPlayDuplicate = matches.filter(m => m.cantPlayDuplicate).length;
+  const cantPlayHT = matches.filter(m => m.cantPlayHT).length;
+
+  // ── 互卡统计 ──
+  const bothStuck = matches.filter(m => m.bothStuck).length;
+
+  // ── 掉线 / 超时 ──
+  const disconnect = matches.filter(m => m.disconnect).length;
+  const disconnectSelf = matches.filter(m => m.disconnect && m.disconnectWho === 'self').length;
+  const disconnectOpponent = matches.filter(m => m.disconnect && m.disconnectWho === 'opponent').length;
+  const timeout = matches.filter(m => m.timeout).length;
+  const timeoutSelf = matches.filter(m => m.timeout && m.timeoutWho === 'self').length;
+  const timeoutOpponent = matches.filter(m => m.timeout && m.timeoutWho === 'opponent').length;
+  // 超时 × 卡组
+  const timeoutSelfByDeck = {};
+  matches.filter(m => m.timeout && m.timeoutWho === 'self').forEach(m => {
+    const deck = (m.myDeck || '').trim();
+    if (!deck) return;
+    if (!timeoutSelfByDeck[deck]) timeoutSelfByDeck[deck] = 0;
+    timeoutSelfByDeck[deck]++;
+  });
+  const timeoutOppByDeck = {};
+  matches.filter(m => m.timeout && m.timeoutWho === 'opponent').forEach(m => {
+    const deck = (m.opponentDeck || '').trim();
+    if (!deck) return;
+    if (!timeoutOppByDeck[deck]) timeoutOppByDeck[deck] = 0;
+    timeoutOppByDeck[deck]++;
+  });
+
+  // ── 对手大牌哥 ──
+  const bigHand = matches.filter(m => m.opponentBigHand).length;
+
+  // ── 对手 T0 动 ──
+  const opponentT0 = matches.filter(m => m.opponentT0).length;
+  const opponentT0Wins = matches.filter(m => m.opponentT0 && m.result === 'win').length;
+  const opponentT0Losses = matches.filter(m => m.opponentT0 && m.result === 'loss').length;
+  // T0 × 对手卡组
+  const opponentT0ByDeck = {};
+  matches.filter(m => m.opponentT0).forEach(m => {
+    const deck = (m.opponentDeck || '').trim();
+    if (!deck || deck === '未知') return;
+    if (!opponentT0ByDeck[deck]) opponentT0ByDeck[deck] = { total: 0, wins: 0, losses: 0 };
+    opponentT0ByDeck[deck].total++;
+    if (m.result === 'win') opponentT0ByDeck[deck].wins++;
+    else if (m.result === 'loss') opponentT0ByDeck[deck].losses++;
+  });
+
+  // ── 先手终场分布（仅先手对局） ──
+  const firstMatches = matches.filter(m => m.goingFirst);
+  const endboardNormal = firstMatches.filter(m => m.endboardState === 'normal').length;
+  const endboardCompromised = firstMatches.filter(m => m.endboardState === 'compromised').length;
+  const endboardStopped = firstMatches.filter(m => m.endboardState === 'stopped').length;
+  const endboardSurrender = firstMatches.filter(m => m.endboardState === 'surrender').length;
+
+  // ── 后手突破统计（仅后手对局） ──
+  const secondMatches = matches.filter(m => !m.goingFirst);
+  const brokeYes = secondMatches.filter(m => m.brokeBoard === true || m.brokeBoard === 'true').length;
+  const brokeNo = secondMatches.filter(m => m.brokeBoard === false || m.brokeBoard === 'false').length;
+  const brokeSurrender = secondMatches.filter(m => m.brokeBoard === 'surrender').length;
+  const otkYes = secondMatches.filter(m => m.otk === true || m.otk === 'true').length;
+
+  // ── 提丰趣味统计 ──
+  const typhonMatches = matches.filter(m => m.typhonAppeared);
+  const typhonEnemyBlack = typhonMatches.filter(m => m.typhonWho === 'opponent' && m.result === 'win').length;
+  const typhonEnemyWhite = typhonMatches.filter(m => m.typhonWho === 'opponent' && m.result === 'loss').length;
+  const typhonSelfBlack = typhonMatches.filter(m => m.typhonWho === 'self' && m.result === 'loss').length;
+  const typhonSelfWhite = typhonMatches.filter(m => m.typhonWho === 'self' && m.result === 'win').length;
+
+  // ── 打错了统计 ──
+  const mistakeMatches = matches.filter(m => m.mistake);
+  const mistakeCount = mistakeMatches.length;
+  const mistakeWins = mistakeMatches.filter(m => m.result === 'win').length;
+  const mistakeLosses = mistakeMatches.filter(m => m.result === 'loss').length;
+  // 打错了 × 自用卡组
+  const mistakeByDeck = {};
+  mistakeMatches.forEach(m => {
+    const deck = (m.myDeck || '').trim();
+    if (!deck) return;
+    if (!mistakeByDeck[deck]) mistakeByDeck[deck] = { total: 0, wins: 0, losses: 0 };
+    mistakeByDeck[deck].total++;
+    if (m.result === 'win') mistakeByDeck[deck].wins++;
+    else if (m.result === 'loss') mistakeByDeck[deck].losses++;
+  });
+
+  // ── 自用卡组统计 ──
+  const myDeckStats = {};
+  matches.filter(m => m.myDeck).forEach(m => {
+    const deck = m.myDeck.trim();
+    if (!deck) return;
+    if (!myDeckStats[deck]) myDeckStats[deck] = { wins: 0, losses: 0, draws: 0, abnormals: 0, total: 0 };
+    myDeckStats[deck].total++;
+    if (m.result === 'win') myDeckStats[deck].wins++;
+    else if (m.result === 'loss') myDeckStats[deck].losses++;
+    else if (m.result === 'draw') myDeckStats[deck].draws++;
+    else if (m.result === 'abnormal') myDeckStats[deck].abnormals++;
+  });
+
   // 对手卡组统计
   const deckStats = {};
   matches.filter(m => m.opponentDeck).forEach(m => {
@@ -135,6 +262,23 @@ function computeStats() {
     else if (m.result === 'loss') deckStats[deck].losses++;
     else if (m.result === 'draw') deckStats[deck].draws++;
     else if (m.result === 'abnormal') deckStats[deck].abnormals++;
+  });
+
+  // ── 二维交叉统计：自己卡组 vs 对手卡组 ──
+  const matchupStats = {};
+  matches.forEach(m => {
+    const myDeck = (m.myDeck || '').trim();
+    const oppDeck = (m.opponentDeck || '').trim();
+    if (!myDeck || !oppDeck) return;
+    const key = myDeck + ' ⚔️ ' + oppDeck;
+    if (!matchupStats[key]) {
+      matchupStats[key] = { myDeck, opponentDeck: oppDeck, wins: 0, losses: 0, draws: 0, abnormals: 0, total: 0 };
+    }
+    matchupStats[key].total++;
+    if (m.result === 'win') matchupStats[key].wins++;
+    else if (m.result === 'loss') matchupStats[key].losses++;
+    else if (m.result === 'draw') matchupStats[key].draws++;
+    else if (m.result === 'abnormal') matchupStats[key].abnormals++;
   });
 
   const playable = wins + losses;
@@ -166,10 +310,98 @@ function computeStats() {
     },
     currentStreak: { type: streakType, count: streakCount },
     last10,
+    // 新 v2.0 统计 ────────────────────────────────────────────────
+    handtrap: {
+      total: gotMaxxc + gotDroll + gotJellyfish + gotLancea + gotNibiru + gotDimension + gotSmallHT,
+      gotMaxxc, gotDroll, gotJellyfish, gotLancea, gotNibiru, gotAnyG, gotDimension, gotSmallHT,
+      maxxcRate: total > 0 ? ((gotMaxxc / total) * 100).toFixed(1) : '0.0',
+      anyGRate: total > 0 ? ((gotAnyG / total) * 100).toFixed(1) : '0.0',
+      nibiruRate: total > 0 ? ((gotNibiru / total) * 100).toFixed(1) : '0.0'
+    },
+    handState: {
+      cantPlay, cantPlayGarnet, cantPlayDuplicate, cantPlayHT,
+      cantPlayRate: total > 0 ? ((cantPlay / total) * 100).toFixed(1) : '0.0',
+      bothStuck,
+      bothStuckRate: total > 0 ? ((bothStuck / total) * 100).toFixed(1) : '0.0'
+    },
+    connectivity: {
+      disconnect, disconnectSelf, disconnectOpponent,
+      disconnectRate: total > 0 ? ((disconnect / total) * 100).toFixed(1) : '0.0',
+      timeout, timeoutSelf, timeoutOpponent,
+      timeoutRate: total > 0 ? ((timeout / total) * 100).toFixed(1) : '0.0',
+      timeoutSelfByDeck: Object.entries(timeoutSelfByDeck)
+        .sort((a, b) => b[1] - a[1])
+        .map(([deck, count]) => ({ deck, count })),
+      timeoutOppByDeck: Object.entries(timeoutOppByDeck)
+        .sort((a, b) => b[1] - a[1])
+        .map(([deck, count]) => ({ deck, count }))
+    },
+    bigHand,
+    opponentT0: {
+      total: opponentT0,
+      wins: opponentT0Wins,
+      losses: opponentT0Losses,
+      winRate: (opponentT0Wins + opponentT0Losses) > 0 ? ((opponentT0Wins / (opponentT0Wins + opponentT0Losses)) * 100).toFixed(1) : '0.0',
+      byDeck: Object.entries(opponentT0ByDeck)
+        .sort((a, b) => b[1].total - a[1].total)
+        .map(([deck, s]) => ({ deck, ...s,
+          winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0'
+        }))
+    },
+    endboard: {
+      total: firstMatches.length,
+      normal: endboardNormal,
+      compromised: endboardCompromised,
+      stopped: endboardStopped,
+      surrender: endboardSurrender,
+      normalRate: firstMatches.length > 0 ? ((endboardNormal / firstMatches.length) * 100).toFixed(1) : '0.0'
+    },
+    breakBoard: {
+      total: secondMatches.length,
+      success: brokeYes,
+      failed: brokeNo,
+      surrender: brokeSurrender,
+      successRate: (brokeYes + brokeNo) > 0 ? ((brokeYes / (brokeYes + brokeNo)) * 100).toFixed(1) : '0.0',
+      otk: otkYes,
+      otkRate: brokeYes > 0 ? ((otkYes / brokeYes) * 100).toFixed(1) : '0.0'
+    },
+    myDeckStats: Object.entries(myDeckStats)
+      .sort((a, b) => b[1].total - a[1].total)
+      .map(([deck, s]) => ({
+        deck, ...s,
+        winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0'
+      })),
     deckStats: Object.entries(deckStats)
       .sort((a, b) => b[1].total - a[1].total)
       .map(([deck, s]) => ({
         deck, ...s,
+        winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0'
+      })),
+    // 打错了统计
+    mistake: {
+      total: mistakeCount,
+      rate: total > 0 ? ((mistakeCount / total) * 100).toFixed(1) : '0.0',
+      wins: mistakeWins,
+      losses: mistakeLosses,
+      winRate: (mistakeWins + mistakeLosses) > 0 ? ((mistakeWins / (mistakeWins + mistakeLosses)) * 100).toFixed(1) : '0.0',
+      byDeck: Object.entries(mistakeByDeck)
+        .sort((a, b) => b[1].total - a[1].total)
+        .map(([deck, s]) => ({ deck, ...s,
+          winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0'
+        }))
+    },
+    // 趣味统计
+    typhon: {
+      total: typhonMatches.length,
+      enemyBlack: typhonEnemyBlack,
+      enemyWhite: typhonEnemyWhite,
+      selfBlack: typhonSelfBlack,
+      selfWhite: typhonSelfWhite
+    },
+    matchupStats: Object.entries(matchupStats)
+      .sort((a, b) => b[1].total - a[1].total)
+      .map(([key, s]) => ({
+        myDeck: s.myDeck, opponentDeck: s.opponentDeck, ...s,
         winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0'
       }))
   };
@@ -199,8 +431,8 @@ function createDisplayWindow() {
   const state = loadWindowState();
 
   displayWin = new BrowserWindow({
-    width: state.displayWidth || 340,
-    height: state.displayHeight || 130,
+    width: state.displayWidth || 376,
+    height: state.displayHeight || 152,
     x: state.displayX || 100,
     y: state.displayY || 100,
     frame: false,
@@ -300,8 +532,11 @@ function createControlWindow() {
   });
 
   controlWin.on('close', (event) => {
-    // 便携版：询问是否保存数据
-    if (process.env.PORTABLE_EXECUTABLE_DIR) {
+    if (hasPersistDir()) {
+      // 已有持久目录：静默自动保存（源码模式或已保存过的 exe）
+      persistData();
+    } else if (process.env.PORTABLE_EXECUTABLE_DIR) {
+      // 便携版且尚无 data/ 目录：询问是否保存
       const choice = dialog.showMessageBoxSync(controlWin, {
         type: 'question',
         buttons: ['保存并退出', '直接退出', '取消'],
@@ -314,9 +549,37 @@ function createControlWindow() {
       if (choice === 2) { event.preventDefault(); return; }  // 取消
       if (choice === 0) persistData();
     }
+    // 源码模式且尚无 data/（理论上不会发生）不做特殊处理
   });
   controlWin.on('closed', () => { app.quit(); });
 }
+
+// ── 详细统计窗口 ─────────────────────────────────────────────────────────
+let statsWin = null;
+
+ipcMain.handle('stats:open-window', () => {
+  if (statsWin && !statsWin.isDestroyed()) {
+    statsWin.focus();
+    return;
+  }
+
+  statsWin = new BrowserWindow({
+    width: 800,
+    height: 640,
+    frame: true,
+    resizable: true,
+    title: 'MD Stats - 详细统计',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  statsWin.loadFile(path.join(__dirname, 'src', 'stats.html'));
+
+  statsWin.on('closed', () => { statsWin = null; });
+});
 
 // ── IPC 处理 ──────────────────────────────────────────────────────────────
 function notifyWindows() {
@@ -326,6 +589,9 @@ function notifyWindows() {
   }
   if (controlWin && !controlWin.isDestroyed()) {
     controlWin.webContents.send('stats-updated', stats);
+  }
+  if (statsWin && !statsWin.isDestroyed()) {
+    statsWin.webContents.send('stats-updated', stats);
   }
 }
 
@@ -435,6 +701,41 @@ ipcMain.handle('presets:rename', (event, { oldName, newName }) => {
   data.deckPresets[idx] = n;
   saveData();
   return { success: true, presets: data.deckPresets };
+});
+
+// ── 自用卡组预设管理 ─────────────────────────────────────────────────
+ipcMain.handle('mydeck:get-all', () => {
+  return (data.myDeckPresets || []);
+});
+
+ipcMain.handle('mydeck:add', (event, name) => {
+  const n = name.trim();
+  if (!n) return { success: false, error: '名称不能为空' };
+  if (!data.myDeckPresets) data.myDeckPresets = [];
+  if (data.myDeckPresets.includes(n)) return { success: false, error: '已存在' };
+  data.myDeckPresets.push(n);
+  saveData();
+  return { success: true, presets: data.myDeckPresets };
+});
+
+ipcMain.handle('mydeck:delete', (event, name) => {
+  if (!data.myDeckPresets) return { success: false };
+  const idx = data.myDeckPresets.indexOf(name);
+  if (idx === -1) return { success: false, error: '未找到' };
+  data.myDeckPresets.splice(idx, 1);
+  saveData();
+  return { success: true, presets: data.myDeckPresets };
+});
+
+ipcMain.handle('mydeck:rename', (event, { oldName, newName }) => {
+  if (!data.myDeckPresets) return { success: false };
+  const idx = data.myDeckPresets.indexOf(oldName);
+  if (idx === -1) return { success: false, error: '未找到' };
+  const n = newName.trim();
+  if (!n) return { success: false, error: '名称不能为空' };
+  data.myDeckPresets[idx] = n;
+  saveData();
+  return { success: true, presets: data.myDeckPresets };
 });
 
 // ── 应用生命周期 ──────────────────────────────────────────────────────────

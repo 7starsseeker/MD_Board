@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MD Stats - 详细统计</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    :root {
+      --card-glow: rgba(255, 200, 50, 0.06);
+      --bar-bg: rgba(255,255,255,0.06);
+    }
+    body {
+      background: #0d0d1a;
+      padding: 20px;
+      overflow-y: auto;
+      user-select: text;
+      height: 100vh;
+    }
+
+    /* 标题栏 */
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 22px;
+    }
+    .page-header h1 {
+      font-size: 22px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #ffc832, #ff8c00);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 1px;
+    }
+    .page-header .subtitle {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    /* 概览大数字行 */
+    .hero-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .hero-box {
+      background: linear-gradient(145deg, rgba(25,25,45,0.9), rgba(15,15,30,0.9));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 12px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-box::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .hero-box.total::before { background: linear-gradient(90deg, #ffc832, #ff8c00); }
+    .hero-box.wins-box::before { background: linear-gradient(90deg, #4cd964, #34c759); }
+    .hero-box.losses-box::before { background: linear-gradient(90deg, #ff3b30, #ff6b62); }
+    .hero-box.draws-box::before { background: linear-gradient(90deg, #ffd700, #ffaa00); }
+    .hero-box.rate-box::before { background: linear-gradient(90deg, #64c8ff, #5e5ce6); }
+    .hero-box .val {
+      font-size: 30px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      line-height: 1.2;
+    }
+    .hero-box .lbl {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .hero-box.total .val { color: #ffc832; }
+    .hero-box.wins-box .val { color: #4cd964; }
+    .hero-box.losses-box .val { color: #ff3b30; }
+    .hero-box.draws-box .val { color: #ffd700; }
+    .hero-box.rate-box .val { color: #64c8ff; }
+
+    /* 两列网格 */
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 700px) { .grid-2col { grid-template-columns: 1fr; } }
+
+    /* 统计卡片 */
+    .stat-card {
+      background: linear-gradient(145deg, rgba(22,22,42,0.95), rgba(14,14,28,0.95));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .stat-card .card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .stat-card .card-icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+    .stat-card .card-title-text {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-bright);
+    }
+    .stat-card .card-subtitle {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    /* 统计条目行 */
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-row .label { color: var(--text-dim); }
+    .stat-row .value { font-weight: 700; font-family: var(--font-mono); color: var(--text-bright); }
+    .stat-row .value.good { color: #4cd964; }
+    .stat-row .value.bad { color: #ff3b30; }
+    .stat-row .value.warn { color: #ffc832; }
+    .stat-row .value.info { color: #64c8ff; }
+
+    /* 进度条 */
+    .bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .bar-track {
+      width: 100px;
+      height: 6px;
+      background: var(--bar-bg);
+      border-radius: 3px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.6s ease;
+    }
+    .bar-fill.green { background: linear-gradient(90deg, #4cd964, #34c759); }
+    .bar-fill.red { background: linear-gradient(90deg, #ff3b30, #ff6b62); }
+    .bar-fill.gold { background: linear-gradient(90deg, #ffc832, #ff8c00); }
+    .bar-fill.blue { background: linear-gradient(90deg, #64c8ff, #5e5ce6); }
+    .bar-fill.purple { background: linear-gradient(90deg, #c864ff, #af52de); }
+
+    /* 小标签 */
+    .tag-group { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+    .stat-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(255,255,255,0.05);
+    }
+    .stat-tag .tw { color: #4cd964; }
+    .stat-tag .tl { color: #ff3b30; }
+
+    /* 连胜连败 */
+    .streak-display {
+      text-align: center;
+      padding: 10px 0;
+    }
+    .streak-display .streak-emoji { font-size: 36px; }
+    .streak-display .streak-count {
+      font-size: 28px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+    }
+    .streak-display .streak-label { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+
+    /* 最近10场 dots 大号版 */
+    .dots-large {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      margin-top: 8px;
+    }
+    .dots-large .dot {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .dots-large .dot:hover { transform: scale(1.3); }
+    .dots-large .dot.win { background: #4cd964; box-shadow: 0 0 8px rgba(76,217,100,0.4); }
+    .dots-large .dot.loss { background: #ff3b30; box-shadow: 0 0 8px rgba(255,59,48,0.4); }
+    .dots-large .dot.draw { background: #ffd700; box-shadow: 0 0 8px rgba(255,215,0,0.3); }
+    .dots-large .dot.abnormal {
+      background: transparent;
+      border: 2px solid #8888a0;
+      position: relative;
+      overflow: hidden;
+    }
+    .dots-large .dot.abnormal::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: linear-gradient(45deg, transparent 40%, #8888a0 40%, #8888a0 60%, transparent 60%);
+    }
+    .dots-large .dot.empty { background: rgba(255,255,255,0.08); }
+
+    /* 卡组统计表格 */
+    .deck-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+    .deck-table th {
+      text-align: left;
+      padding: 4px 6px;
+      color: var(--text-dim);
+      font-weight: 600;
+      font-size: 11px;
+      border-bottom: 1px solid var(--border);
+    }
+    .deck-table td {
+      padding: 5px 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .deck-table .deck-name { font-weight: 600; color: var(--text-bright); }
+    .deck-table .bar-inline {
+      display: inline-block;
+      height: 4px;
+      border-radius: 2px;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+    .deck-table .bar-inline.green { background: #4cd964; }
+    .deck-table .bar-inline.red { background: #ff3b30; }
+
+    /* 空状态 */
+    .empty-state {
+      text-align: center;
+      padding: 30px;
+      color: var(--text-dim);
+    }
+    .empty-state .emoji { font-size: 40px; display: block; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+  <div class="page-header">
+    <div>
+      <h1>📊 MD Stats · 详细统计</h1>
+      <div class="subtitle">数据实时更新 · 记录全部对局详情</div>
+    </div>
+    <div id="last-update" style="font-size:11px;color:var(--text-dim)">—</div>
+  </div>
+
+  <!-- ═══ 概览大数字 ═══ -->
+  <div class="hero-row" id="hero-row"></div>
+
+  <!-- ═══ 双列网格 ═══ -->
+  <div class="grid-2col">
+
+    <!-- 硬币统计 -->
+    <div class="stat-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(255,215,0,0.12)">🪙</div>
+        <div>
+          <div class="card-title-text">硬币统计</div>
+          <div class="card-subtitle">猜硬币正反胜负</div>
+        </div>
+      </div>
+      <div id="coin-content"></div>
+    </div>
+
+    <!-- 先后手对比 -->
+    <div class="stat-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(100,200,255,0.12)">⚔️</div>
+        <div>
+          <div class="card-title-text">先后手对比</div>
+          <div class="card-subtitle">先手 vs 后手胜率</div>
+        </div>
+      </div>
+      <div id="first-second-content"></div>
+    </div>
+
+    <!-- 手坑统计 -->
+    <div class="stat-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(200,100,255,0.12)">🛡️</div>
+        <div>
+          <div class="card-title-text">吃手坑统计</div>
+          <div class="card-subtitle">增殖的G / 陨石 / 鸟G / 锁鸟 / 大宇宙人 / 其他</div>
+        </div>
+      </div>
+      <div id="handtrap-content"></div>
+    </div>
+
+    <!-- 手牌状态 -->
+    <div class="stat-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(255,100,100,0.12)">🃏</div>
+        <div>
+          <div class="card-title-text">手牌与卡手统计</div>
+          <div class="card-subtitle">手牌事故 / 互卡 / 大牌哥</div>
+        </div>
+      </div>
+      <div id="handstate-content"></div>
+    </div>
+
+    <!-- 打错了统计 -->
+    <div class="stat-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(255,80,80,0.12)">💢</div>
+        <div>
+          <div class="card-title-text">失误统计</div>
+          <div class="card-subtitle">失误频率 · 胜负比 · 各卡组失误分布</div>
+        </div>
+      </div>
+      <div id="mistake-content"></div>
+    </div>
+
+    <!-- 对手T0动统计 -->
+    <div class="stat-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(255,0,100,0.12)">⚡</div>
+        <div>
+          <div class="card-title-text">对手T0动统计</div>
+          <div class="card-subtitle">先手被对手T0干扰 · 按对手卡组分布</div>
+        </div>
+      </div>
+      <div id="t0-content"></div>
+    </div>
+
+    <!-- 先手终场质量 -->
+    <div class="stat-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(255,200,50,0.12)">🏰</div>
+        <div>
+          <div class="card-title-text">先手终场质量</div>
+          <div class="card-subtitle">先手时的终场质量</div>
+        </div>
+      </div>
+      <div id="endboard-content"></div>
+    </div>
+
+    <!-- 后手突破统计 -->
+    <div class="stat-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(255,150,50,0.12)">💥</div>
+        <div>
+          <div class="card-title-text">后手突破统计</div>
+          <div class="card-subtitle">突破成功率 / OTK率</div>
+        </div>
+      </div>
+      <div id="breakboard-content"></div>
+    </div>
+
+    <!-- 连接异常（掉线） -->
+    <div class="stat-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(136,136,160,0.12)">🔌</div>
+        <div>
+          <div class="card-title-text">连接异常</div>
+          <div class="card-subtitle">掉线统计</div>
+        </div>
+      </div>
+      <div id="connectivity-content"></div>
+    </div>
+
+    <!-- 超时统计 -->
+    <div class="stat-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(255,180,0,0.12)">⏰</div>
+        <div>
+          <div class="card-title-text">超时统计</div>
+          <div class="card-subtitle">超时次数 · 按卡组分布</div>
+        </div>
+      </div>
+      <div id="timeout-content"></div>
+    </div>
+
+    <!-- 提丰趣味统计 -->
+    <div class="stat-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(200,50,200,0.12)">🐉</div>
+        <div>
+          <div class="card-title-text">提丰到底被黑了多少次</div>
+          <div class="card-subtitle">提丰出场后出提丰的人是输是赢</div>
+        </div>
+      </div>
+      <div id="typhon-content"></div>
+    </div>
+
+  </div>
+
+  <!-- ═══ 全宽卡片 ═══ -->
+  <div class="stat-card" style="margin-bottom:14px">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(76,217,100,0.12)">🃏</div>
+      <div>
+        <div class="card-title-text">自用卡组统计</div>
+        <div class="card-subtitle">按自己使用的卡组维度统计</div>
+      </div>
+    </div>
+    <div id="mydeck-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
+  </div>
+
+  <div class="stat-card" style="margin-bottom:14px">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(255,59,48,0.12)">🏷️</div>
+      <div>
+        <div class="card-title-text">对战卡组统计</div>
+        <div class="card-subtitle">按对手卡组维度统计胜负</div>
+      </div>
+    </div>
+    <div id="oppdeck-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
+  </div>
+
+  <!-- ═══ 二维交叉统计 ═══ -->
+  <div class="stat-card" style="margin-bottom:14px" id="matchup-card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(200,100,255,0.12)">⚔️</div>
+      <div>
+        <div class="card-title-text">对阵交叉统计</div>
+        <div class="card-subtitle">自己卡组 vs 对手卡组 二维胜率</div>
+      </div>
+    </div>
+    <div id="matchup-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
+  </div>
+
+  <script>
+    (function() {
+      var api = window.mdStats;
+      if (!api) { document.body.innerHTML = '<div class="empty-state"><span class="emoji">❌</span>API 加载失败</div>'; return; }
+
+      function fmt(v) { return v === '0.0' ? '0.0' : v; }
+
+      // ═══ 概览大数字 ═══
+      function renderHero(stats) {
+        document.getElementById('hero-row').innerHTML =
+          '<div class="hero-box total"><div class="val">' + stats.total + '</div><div class="lbl">总对局</div></div>' +
+          '<div class="hero-box wins-box"><div class="val">' + stats.wins + '</div><div class="lbl">胜场</div></div>' +
+          '<div class="hero-box losses-box"><div class="val">' + stats.losses + '</div><div class="lbl">负场</div></div>' +
+          '<div class="hero-box draws-box"><div class="val">' + (stats.draws + stats.abnormals) + '</div><div class="lbl">平局+异常</div></div>' +
+          '<div class="hero-box rate-box"><div class="val">' + fmt(stats.winRate) + '%</div><div class="lbl">胜率</div></div>';
+      }
+
+      // ═══ 先后手 ═══
+      function renderFirstSecond(stats) {
+        var gf = stats.goingFirst, gs = stats.goingSecond;
+        var gfRate = parseFloat(gf.winRate) || 0;
+        var gsRate = parseFloat(gs.winRate) || 0;
+        document.getElementById('first-second-content').innerHTML =
+          '<div class="stat-row"><span class="label">先手</span><span class="value info">' + gf.wins + '胜 ' + gf.losses + '负</span></div>' +
+          '<div class="stat-row"><span class="label"></span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill blue" style="width:' + gfRate + '%"></div></div><span class="value info">' + fmt(gf.winRate) + '%</span></div></div>' +
+          '<div class="stat-row"><span class="label">后手</span><span class="value warn">' + gs.wins + '胜 ' + gs.losses + '负</span></div>' +
+          '<div class="stat-row"><span class="label"></span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + gsRate + '%"></div></div><span class="value warn">' + fmt(gs.winRate) + '%</span></div></div>' +
+          '<div class="stat-row" style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">' +
+            '<span class="label">先手平局</span><span class="value">' + gf.draws + '</span>' +
+            '<span class="label">先手异常</span><span class="value">' + gf.abnormals + '</span></div>' +
+          '<div class="stat-row">' +
+            '<span class="label">后手平局</span><span class="value">' + gs.draws + '</span>' +
+            '<span class="label">后手异常</span><span class="value">' + gs.abnormals + '</span></div>';
+      }
+
+      // ═══ 硬币 ═══
+      function renderCoin(stats) {
+        var c = stats.coin;
+        var cr = parseFloat(c.winRate) || 0;
+        document.getElementById('coin-content').innerHTML =
+          '<div class="stat-row"><span class="label">硬币胜</span><span class="value good">' + c.wins + '</span></div>' +
+          '<div class="stat-row"><span class="label">硬币负</span><span class="value bad">' + c.losses + '</span></div>' +
+          '<div class="stat-row"><span class="label">硬币胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + cr + '%"></div></div><span class="value warn">' + fmt(c.winRate) + '%</span></div></div>' +
+          '<div class="stat-row"><span class="label">记录次数</span><span class="value">' + c.total + '/' + stats.total + '</span></div>';
+      }
+
+      // ═══ 手坑 ═══
+      function renderHandtrap(stats) {
+        var h = stats.handtrap;
+        var t = stats.total;
+        var mxR = t > 0 ? ((h.gotMaxxc / t) * 100).toFixed(1) : '0.0';
+        var drR = t > 0 ? ((h.gotDroll / t) * 100).toFixed(1) : '0.0';
+        var jfR = t > 0 ? ((h.gotJellyfish / t) * 100).toFixed(1) : '0.0';
+        var laR = t > 0 ? ((h.gotLancea / t) * 100).toFixed(1) : '0.0';
+        var niR = t > 0 ? ((h.gotNibiru / t) * 100).toFixed(1) : '0.0';
+        var agR = t > 0 ? ((h.gotAnyG / t) * 100).toFixed(1) : '0.0';
+        var diR = t > 0 ? ((h.gotDimension / t) * 100).toFixed(1) : '0.0';
+        var smR = t > 0 ? ((h.gotSmallHT / t) * 100).toFixed(1) : '0.0';
+        document.getElementById('handtrap-content').innerHTML =
+          '<div class="stat-row"><span class="label">增殖的G</span><span class="value">' + h.gotMaxxc + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + mxR + '%</span></div>' +
+          '<div class="stat-row"><span class="label">鸟G</span><span class="value">' + h.gotDroll + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + drR + '%</span></div>' +
+          '<div class="stat-row"><span class="label">水母G</span><span class="value">' + h.gotJellyfish + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + jfR + '%</span></div>' +
+          '<div class="stat-row"><span class="label">锁鸟</span><span class="value">' + h.gotLancea + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + laR + '%</span></div>' +
+          '<div class="stat-row"><span class="label">陨石</span><span class="value">' + h.gotNibiru + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + niR + '%</span></div>' +
+          '<div class="stat-row"><span class="label">大宇宙人 / 次元系</span><span class="value">' + h.gotDimension + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + diR + '%</span></div>' +
+          '<div class="stat-row"><span class="label">其他手坑</span><span class="value">' + h.gotSmallHT + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + smR + '%</span></div>' +
+          '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label">吃G率（G+鸟G+水母G）</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill purple" style="width:' + parseFloat(agR) + '%"></div></div><span class="value info">' + fmt(agR) + '%</span></div></div>' +
+          '<div class="stat-row"><span class="label">吃陨率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(niR) + '%"></div></div><span class="value info">' + fmt(niR) + '%</span></div></div>';
+      }
+
+      // ═══ 手牌状态 ═══
+      function renderHandState(stats) {
+        var hs = stats.handState;
+        var cr = parseFloat(hs.cantPlayRate) || 0;
+        var br = parseFloat(hs.bothStuckRate) || 0;
+        document.getElementById('handstate-content').innerHTML =
+          '<div class="stat-row"><span class="label">初始手牌较差/事故</span><span class="value bad">' + hs.cantPlay + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + fmt(hs.cantPlayRate) + '%</span></div>' +
+          '<div class="stat-row"><span class="label">　废件复数上手</span><span class="value">' + hs.cantPlayGarnet + '</span></div>' +
+          '<div class="stat-row"><span class="label">　同一张复数上手</span><span class="value">' + hs.cantPlayDuplicate + '</span></div>' +
+          '<div class="stat-row"><span class="label">　后手组件复数上手</span><span class="value">' + hs.cantPlayHT + '</span></div>' +
+          '<div class="stat-row"><span class="label">双方都动不了</span><span class="value warn">' + hs.bothStuck + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + fmt(hs.bothStuckRate) + '%</span></div>' +
+          '<div class="stat-row"><span class="label">对手大牌哥</span><span class="value">' + stats.bigHand + ' 次</span></div>' +
+          '<div class="stat-row"><span class="label">卡手率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + cr + '%"></div></div><span class="value bad">' + fmt(hs.cantPlayRate) + '%</span></div></div>';
+      }
+
+      // ═══ 打错了统计 ═══
+      function renderMistake(stats) {
+        var m = stats.mistake;
+        var el = document.getElementById('mistake-content');
+        if (!m || m.total === 0) {
+          el.innerHTML = '<div style="padding:10px;text-align:center;color:var(--text-dim);font-size:12px">还没有打错记录 ✨</div>'; return;
+        }
+        var html =
+          '<div class="stat-row"><span class="label">打错次数</span><span class="value bad">' + m.total + ' 次</span><span style="font-size:11px;color:var(--text-dim)">占 ' + fmt(m.rate) + '%</span></div>' +
+          '<div class="stat-row"><span class="label">打错时胜场</span><span class="value good">' + m.wins + '</span></div>' +
+          '<div class="stat-row"><span class="label">打错时负场</span><span class="value bad">' + m.losses + '</span></div>' +
+          '<div class="stat-row"><span class="label">打错时胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(m.winRate) + '%"></div></div><span class="value warn">' + fmt(m.winRate) + '%</span></div></div>';
+        if (m.byDeck && m.byDeck.length > 0) {
+          html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span style="font-size:11px;color:var(--accent);font-weight:600">各卡组打错分布</span></div>';
+          m.byDeck.forEach(function(d) {
+            html += '<div class="stat-row"><span class="label">' + d.deck + '</span><span class="value" style="font-size:11px;color:var(--text-dim)">' + d.total + ' 次</span><span style="font-size:12px;font-weight:700;font-family:var(--font-mono)">' + d.winRate + '%</span></div>';
+          });
+        }
+        el.innerHTML = html;
+      }
+
+      // ═══ 对手T0动统计 ═══
+      function renderT0(stats) {
+        var t = stats.opponentT0;
+        var el = document.getElementById('t0-content');
+        if (!t || t.total === 0) {
+          el.innerHTML = '<div style="padding:10px;text-align:center;color:var(--text-dim);font-size:12px">还没有对手T0动记录</div>'; return;
+        }
+        var html =
+          '<div class="stat-row"><span class="label">对手T0动次数</span><span class="value warn">' + t.total + ' 次</span></div>' +
+          '<div class="stat-row"><span class="label">其中赢了</span><span class="value good">' + t.wins + '</span></div>' +
+          '<div class="stat-row"><span class="label">其中输了</span><span class="value bad">' + t.losses + '</span></div>' +
+          '<div class="stat-row"><span class="label">T0时胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + parseFloat(t.winRate) + '%"></div></div><span class="value warn">' + fmt(t.winRate) + '%</span></div></div>';
+        if (t.byDeck && t.byDeck.length > 0) {
+          html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span style="font-size:11px;color:var(--accent);font-weight:600">被T0的对手卡组</span></div>';
+          t.byDeck.forEach(function(d) {
+            html += '<div class="stat-row"><span class="label">' + d.deck + '</span><span class="value" style="font-size:11px;color:var(--text-dim)">' + d.total + ' 次</span><span style="font-size:12px;font-weight:700;font-family:var(--font-mono)">' + d.winRate + '%</span></div>';
+          });
+        }
+        el.innerHTML = html;
+      }
+
+      // ═══ 先手终场 ═══
+      function renderEndboard(stats) {
+        var eb = stats.endboard;
+        var t = eb.total || 1;
+        var nP = (eb.normal / t * 100).toFixed(1);
+        var cP = (eb.compromised / t * 100).toFixed(1);
+        var sP = (eb.stopped / t * 100).toFixed(1);
+        var suP = (eb.surrender / t * 100).toFixed(1);
+        document.getElementById('endboard-content').innerHTML =
+          '<div class="stat-row"><span class="label">正常终场</span><span class="value good">' + eb.normal + ' (' + nP + '%)</span></div>' +
+          '<div class="stat-row"><span class="label">妥协场</span><span class="value warn">' + eb.compromised + ' (' + cP + '%)</span></div>' +
+          '<div class="stat-row"><span class="label">停牌</span><span class="value bad">' + eb.stopped + ' (' + sP + '%)</span></div>' +
+          '<div class="stat-row"><span class="label">投降</span><span class="value bad">' + eb.surrender + ' (' + suP + '%)</span></div>' +
+          '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px">' +
+            '<span class="label">正常终场率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill green" style="width:' + parseFloat(nP) + '%"></div></div><span class="value good">' + fmt(nP) + '%</span></div></div>';
+      }
+
+      // ═══ 后手突破 ═══
+      function renderBreakBoard(stats) {
+        var bb = stats.breakBoard;
+        var sr = parseFloat(bb.successRate) || 0;
+        var or = parseFloat(bb.otkRate) || 0;
+        var totalTries = bb.success + bb.failed;
+        document.getElementById('breakboard-content').innerHTML =
+          '<div class="stat-row"><span class="label">突破成功</span><span class="value good">' + bb.success + '</span></div>' +
+          '<div class="stat-row"><span class="label">突破失败</span><span class="value bad">' + bb.failed + '</span></div>' +
+          '<div class="stat-row"><span class="label">后手投降</span><span class="value bad">' + bb.surrender + '</span></div>' +
+          '<div class="stat-row"><span class="label">其中OTK</span><span class="value info">' + bb.otk + '</span></div>' +
+          (totalTries > 0 ?
+          '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label">突破成功率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + sr + '%"></div></div><span class="value warn">' + fmt(bb.successRate) + '%</span></div></div>' : '') +
+          (bb.success > 0 ?
+          '<div class="stat-row"><span class="label">OTK率(突破中)</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill blue" style="width:' + or + '%"></div></div><span class="value info">' + fmt(bb.otkRate) + '%</span></div></div>' : '');
+      }
+
+      // ═══ 连接异常 ═══
+      function renderConnectivity(stats) {
+        var con = stats.connectivity;
+        document.getElementById('connectivity-content').innerHTML =
+          '<div class="stat-row"><span class="label">掉线次数</span><span class="value bad">' + con.disconnect + '</span><span style="font-size:11px;color:var(--text-dim)">(' + fmt(con.disconnectRate) + '%)</span></div>' +
+          '<div class="stat-row"><span class="label">　自己掉线</span><span class="value">' + con.disconnectSelf + '</span></div>' +
+          '<div class="stat-row"><span class="label">　对手掉线</span><span class="value">' + con.disconnectOpponent + '</span></div>';
+      }
+
+      // ═══ 超时统计 ═══
+      function renderTimeout(stats) {
+        var con = stats.connectivity;
+        var el = document.getElementById('timeout-content');
+        var html =
+          '<div class="stat-row"><span class="label">超时次数</span><span class="value warn">' + con.timeout + '</span><span style="font-size:11px;color:var(--text-dim)">(' + fmt(con.timeoutRate) + '%)</span></div>' +
+          '<div class="stat-row"><span class="label">　自己超时</span><span class="value">' + con.timeoutSelf + '</span></div>' +
+          '<div class="stat-row"><span class="label">　对手超时</span><span class="value">' + con.timeoutOpponent + '</span></div>';
+        if (con.timeoutSelfByDeck && con.timeoutSelfByDeck.length > 0) {
+          html += '<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:5px"><span style="font-size:11px;color:var(--accent);font-weight:600">自己超时用的卡组</span></div>';
+          con.timeoutSelfByDeck.forEach(function(d) {
+            html += '<div class="stat-row"><span class="label">' + d.deck + '</span><span class="value">' + d.count + ' 次</span></div>';
+          });
+        }
+        if (con.timeoutOppByDeck && con.timeoutOppByDeck.length > 0) {
+          html += '<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:5px"><span style="font-size:11px;color:var(--accent);font-weight:600">对手超时用的卡组</span></div>';
+          con.timeoutOppByDeck.forEach(function(d) {
+            html += '<div class="stat-row"><span class="label">' + d.deck + '</span><span class="value">' + d.count + ' 次</span></div>';
+          });
+        }
+        el.innerHTML = html;
+      }
+
+      // ═══ 提丰趣味统计 ═══
+      function renderTyphon(stats) {
+        var t = stats.typhon;
+        var el = document.getElementById('typhon-content');
+        if (!t || t.total === 0) {
+          el.innerHTML = '<div style="padding:10px;text-align:center;color:var(--text-dim);font-size:12px">还没有提丰登场记录</div>'; return;
+        }
+        var blackened = t.enemyBlack + t.selfBlack;
+        var whitened = t.enemyWhite + t.selfWhite;
+        el.innerHTML =
+          '<div class="stat-row"><span class="label">提丰登场次数</span><span class="value info">' + t.total + ' 次</span></div>' +
+          '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label" style="font-size:14px;font-weight:700;color:#ff3b30">🖤 提丰被黑</span><span class="value" style="font-size:18px;font-weight:800;color:#ff3b30">' + blackened + ' 次</span></div>' +
+          '<div class="stat-row"><span class="label">　其中对手出提丰输了</span><span class="value">' + t.enemyBlack + '</span></div>' +
+          '<div class="stat-row"><span class="label">　其中自己出提丰输了</span><span class="value">' + t.selfBlack + '</span></div>' +
+          '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label" style="font-size:14px;font-weight:700;color:#4cd964">🤍 提丰漂白</span><span class="value" style="font-size:18px;font-weight:800;color:#4cd964">' + whitened + ' 次</span></div>' +
+          '<div class="stat-row"><span class="label">　其中对手出提丰赢了</span><span class="value">' + t.enemyWhite + '</span></div>' +
+          '<div class="stat-row"><span class="label">　其中自己出提丰赢了</span><span class="value">' + t.selfWhite + '</span></div>';
+      }
+
+      // ═══ 连胜 + 最近10场 ═══
+      // ═══ 卡组统计 ═══
+      function renderDeckTable(decks, containerId, labelW, labelL) {
+        var el = document.getElementById(containerId);
+        if (!decks || decks.length === 0) {
+          el.innerHTML = '<span style="color:var(--text-dim);font-size:12px">暂无数据</span>'; return;
+        }
+        var maxTotal = decks[0].total;
+        var html = '<table class="deck-table"><thead><tr><th>卡组</th><th style="text-align:center">总</th><th style="text-align:center">' + labelW + '</th><th style="text-align:center">' + labelL + '</th><th style="text-align:left">胜率</th></tr></thead><tbody>';
+        decks.forEach(function(d) {
+          var pct = maxTotal > 0 ? (d.total / maxTotal * 100) : 0;
+          html += '<tr>' +
+            '<td class="deck-name">' + d.deck + '</td>' +
+            '<td style="text-align:center">' + d.total + '</td>' +
+            '<td style="text-align:center;color:#4cd964">' + d.wins + '</td>' +
+            '<td style="text-align:center;color:#ff3b30">' + d.losses + '</td>' +
+            '<td style="text-align:left">' +
+              '<span style="display:inline-flex;align-items:center;gap:4px">' +
+              '<span style="display:inline-block;width:100px;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;vertical-align:middle">' +
+              '<span style="display:block;height:100%;border-radius:3px;background:#4cd964;width:' + (d.wins + d.losses > 0 ? (d.wins / (d.wins + d.losses) * 100) : 0) + '%"></span></span>' +
+              '<span style="font-weight:700;font-family:var(--font-mono);font-size:12px">' + d.winRate + '%</span></span>' +
+            '</td></tr>';
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+      }
+
+      // ═══ 二维交叉统计 ═══
+      function renderMatchups(stats) {
+        var el = document.getElementById('matchup-content');
+        var card = document.getElementById('matchup-card');
+        if (!stats.matchupStats || stats.matchupStats.length === 0) {
+          card.style.display = 'none';
+          el.innerHTML = ''; return;
+        }
+        card.style.display = '';
+        // 按 myDeck 分组
+        var groups = {};
+        stats.matchupStats.forEach(function(m) {
+          if (!groups[m.myDeck]) groups[m.myDeck] = [];
+          groups[m.myDeck].push(m);
+        });
+        var html = '';
+        Object.keys(groups).sort(function(a, b) {
+          var ta = groups[a].reduce(function(s, m) { return s + m.total; }, 0);
+          var tb = groups[b].reduce(function(s, m) { return s + m.total; }, 0);
+          return tb - ta;
+        }).forEach(function(myDeck) {
+          var items = groups[myDeck];
+          var subTotal = items.reduce(function(s, m) { return s + m.total; }, 0);
+          var subWins = items.reduce(function(s, m) { return s + m.wins; }, 0);
+          var subLosses = items.reduce(function(s, m) { return s + m.losses; }, 0);
+          var subRate = (subWins + subLosses) > 0 ? ((subWins / (subWins + subLosses)) * 100).toFixed(1) : '0.0';
+          html += '<div style="margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
+            '<span style="font-weight:700;font-size:13px;color:var(--accent-bright)">🃏 ' + myDeck + '</span>' +
+            '<span style="font-size:11px;color:var(--text-dim)">共 ' + subTotal + ' 场 · 胜率 ' + subRate + '%</span></div>' +
+            '<table class="deck-table"><thead><tr><th>对手卡组</th><th style="text-align:center">总</th><th style="text-align:center;color:#4cd964">W</th><th style="text-align:center;color:#ff3b30">L</th><th style="text-align:left">胜率</th></tr></thead><tbody>';
+          items.forEach(function(m) {
+            var wr = (m.wins + m.losses) > 0 ? ((m.wins / (m.wins + m.losses)) * 100).toFixed(1) : '0.0';
+            var barW = (m.wins + m.losses) > 0 ? (m.wins / (m.wins + m.losses) * 100) : 0;
+            html += '<tr>' +
+              '<td style="color:var(--text-dim)">' + m.opponentDeck + '</td>' +
+              '<td style="text-align:center">' + m.total + '</td>' +
+              '<td style="text-align:center;color:#4cd964">' + m.wins + '</td>' +
+              '<td style="text-align:center;color:#ff3b30">' + m.losses + '</td>' +
+              '<td style="text-align:left">' +
+                '<span style="display:inline-flex;align-items:center;gap:4px">' +
+                '<span style="display:inline-block;width:100px;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;vertical-align:middle">' +
+                '<span style="display:block;height:100%;border-radius:3px;background:#4cd964;width:' + barW + '%"></span></span>' +
+                '<span style="font-weight:700;font-family:var(--font-mono);font-size:12px">' + wr + '%</span></span>' +
+              '</td></tr>';
+          });
+          html += '</tbody></table></div>';
+        });
+        el.innerHTML = html;
+      }
+
+      // ═══ 主渲染 ═══
+      function renderAll(stats) {
+        if (!stats) return;
+        renderHero(stats);
+        renderFirstSecond(stats);
+        renderCoin(stats);
+        renderHandtrap(stats);
+        renderHandState(stats);
+        renderMistake(stats);
+        renderT0(stats);
+        renderEndboard(stats);
+        renderBreakBoard(stats);
+        renderConnectivity(stats);
+        renderTyphon(stats);
+        renderTimeout(stats);
+        renderDeckTable(stats.myDeckStats, 'mydeck-content', 'W', 'L');
+        renderDeckTable(stats.deckStats, 'oppdeck-content', 'W', 'L');
+        renderMatchups(stats);
+
+        document.getElementById('last-update').textContent = '更新于 ' + new Date().toLocaleTimeString();
+      }
+
+      // ═══ 启动 ═══
+      api.getStats().then(renderAll);
+      api.onStatsUpdate(function() { api.getStats().then(renderAll); });
+    })();
+  </script>
+</body>
+</html>
