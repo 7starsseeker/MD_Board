@@ -50,5 +50,8 @@ contextBridge.exposeInMainWorld('mdStats', {
     add: (name) => ipcRenderer.invoke('mydeck:add', name),
     delete: (name) => ipcRenderer.invoke('mydeck:delete', name),
     rename: (oldName, newName) => ipcRenderer.invoke('mydeck:rename', { oldName, newName })
-  }
+  },
+
+  // ── 关于对话框 ──
+  openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
 });

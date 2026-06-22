@@ -56,6 +56,13 @@
     .modal-box h2 { font-size:15px; margin-bottom:10px; color:var(--text-bright); }
     .modal-box .modal-actions { display:flex; gap:8px; margin-top:10px; }
     .modal-box .modal-actions .btn { flex:1; }
+    .about-content { text-align:center; padding:8px 0; }
+    .about-content .version { font-size:24px; font-weight:800; color:var(--accent); font-family:var(--font-mono); }
+    .about-content .author { font-size:13px; color:var(--text); margin-top:8px; }
+    .about-content .author a { color:#64c8ff; text-decoration:none; cursor:pointer; }
+    .about-content .author a:hover { text-decoration:underline; }
+    .about-content .repo { font-size:12px; color:var(--text-dim); margin-top:4px; }
+    .about-content .repo a { color:#64c8ff; text-decoration:none; cursor:pointer; word-break:break-all; }
     .preset-list { flex:1; overflow-y:auto; max-height:300px; }
     .preset-item { display:flex; align-items:center; gap:6px; padding:5px 4px; border-radius:4px; }
     .preset-item:hover { background:rgba(255,255,255,0.04); }
@@ -470,6 +477,24 @@
       <div class="modal-actions">
         <button class="btn btn-primary" id="import-confirm">✓ 导入</button>
         <button class="btn" id="import-close">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 关于 ═══ -->
+  <div class="modal-overlay" id="about-overlay">
+    <div class="modal-box" style="max-width:320px">
+      <div class="about-content">
+        <div class="version">v1.0.0</div>
+        <div class="author">
+          作者: <a id="about-author-link" href="https://github.com/7starsseeker">7starsseeker</a>
+        </div>
+        <div class="repo">
+          <a id="about-link" href="https://github.com/7starsseeker/MD_Board">github.com/7starsseeker/MD_Board</a>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="about-close">关闭</button>
       </div>
     </div>
   </div>
@@ -1294,11 +1319,18 @@
     api.onStatsUpdate(function() { api.getAll().then(renderAll); });
 
     document.getElementById('btn-about').addEventListener('click', function() {
-      alert(
-        'MD_Board v1.0.0\n' +
-        '作者: 7starsseeker\n' +
-        '仓库: https://github.com/7starsseeker/MD_Board'
-      );
+      document.getElementById('about-overlay').classList.add('show');
+    });
+    document.getElementById('about-close').addEventListener('click', function() {
+      document.getElementById('about-overlay').classList.remove('show');
+    });
+    document.getElementById('about-link').addEventListener('click', function(e) {
+      e.preventDefault();
+      api.openExternal('https://github.com/7starsseeker/MD_Board');
+    });
+    document.getElementById('about-author-link').addEventListener('click', function(e) {
+      e.preventDefault();
+      api.openExternal('https://github.com/7starsseeker');
     });
     document.getElementById('btn-close-control').addEventListener('click', function() { window.close(); });
   </script>

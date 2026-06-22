@@ -714,6 +714,11 @@ ipcMain.handle('stats:is-portable', () => {
   return !!process.env.PORTABLE_EXECUTABLE_DIR;
 });
 
+ipcMain.handle('shell:open-external', (event, url) => {
+  const { shell } = require('electron');
+  shell.openExternal(url);
+});
+
 // ── 预设卡组管理 ─────────────────────────────────────────────────────────
 ipcMain.handle('presets:get-all', () => {
   return (data.deckPresets || []);
