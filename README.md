@@ -33,13 +33,6 @@ MD_Board 是一个 Electron 桌面应用，包含两个窗口：
 - [Node.js](https://nodejs.org/) v18 或更高版本（仅开发/重新打包时需要）
 - Windows / macOS / Linux
 
-### 快速启动（推荐）
-
-下载 [MD_Board_1.0.0_portable.exe](https://github.com/7starsseeker/MD_Board/releases/download/v1.0.0/MD_Board_1.0.0_portable.exe)（74MB）
-双击运行即可，无需安装任何环境。
-
-或双击项目目录下的 `start.bat`。
-
 ### 从源码运行
 
 ```bash
@@ -49,13 +42,15 @@ npm install
 npm start
 ```
 
-### 重新打包成 exe
+> 如需便携版 exe，请从 [Releases](https://github.com/7starsseeker/MD_Board/releases) 页面下载。
 
-```bash
-npm run pack
-```
+---
 
-打包后的 exe 位于 `release/MD_Board-win32-x64/MD_Board.exe`。
+## 数据存储
+
+便携版 exe 运行时的数据自动保存在系统临时目录，**关闭程序时会弹出对话框**询问是否将数据保存到 exe 同级目录下的 `data/` 文件夹。保存后下次启动自动加载。
+
+从源码运行时，数据保存在项目目录下的 `data/` 文件夹。
 
 ### 直播设置（B站直播姬 / OBS）
 
@@ -64,6 +59,16 @@ npm run pack
 3. 选择 `MD Stats - 显示窗口` 进程
 4. 裁剪窗口区域，只保留统计面板部分
 5. （可选）调整窗口大小和位置
+
+---
+
+## 数据存储
+
+便携版 exe：数据在运行时保存在系统临时目录，**关闭程序时会弹出对话框**询问是否保存到 exe 同级目录下的 `data/` 文件夹。保存后下次启动自动加载。
+
+从源码运行：数据保存在项目目录下的 `data/` 文件夹。
+
+所有数据仅存储在本地计算机，不上传任何服务器。
 
 ---
 
@@ -87,11 +92,6 @@ npm run pack
 - **重置** — 清空对局记录，预设卡组保留
 
 ---
-
-## 数据隐私
-
-所有数据仅存储在本地计算机上，不上传任何服务器。  
-数据文件位于 exe 同目录下的 `data/stats.json`，可随程序文件夹一起移动，实现绿色便携。
 
 ---
 
