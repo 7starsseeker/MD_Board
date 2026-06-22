@@ -32,7 +32,6 @@
       flex: 1;
       position: relative;
       overflow: hidden;
-      -webkit-app-region: no-drag;
     }
     .cycle-slide {
       position: absolute;
@@ -83,7 +82,7 @@
     }
     .cycle-slide .sub-line {
       font-size: 11px;
-      color: #666680;
+      color: #a0a0b8;
       margin-top: 2px;
       text-align: center;
     }
@@ -124,8 +123,8 @@
       font-family: var(--font-mono);
     }
     .cycle-slide .triple-row .col .dl {
-      font-size: 10px;
-      color: var(--text-dim);
+      font-size: 11px;
+      color: #a0a0b8;
     }
 
     .cycle-slide .dots-line {
@@ -265,17 +264,21 @@
 
       RENDERERS.firstSecond = function(s) {
         var gf = s.goingFirst, gs = s.goingSecond;
+        var gfLossRate = gf.total > 0 ? (gf.losses / gf.total * 100).toFixed(1) : '0.0';
+        var gsLossRate = gs.total > 0 ? (gs.losses / gs.total * 100).toFixed(1) : '0.0';
         return {
           label: '先手 ' + gf.winRate + '% / 后手 ' + gs.winRate + '%',
           subLabel: '先后手胜率对比',
           html: '<div class="double-row">' +
                   '<div class="col"><div class="dv" style="color:#4cd964">' + gf.wins + '</div><div class="dl">先手胜</div>' +
                   '<div style="font-size:11px;color:#64c8ff;font-weight:700">' + gf.winRate + '%</div></div>' +
-                  '<div class="col"><div class="dv" style="color:#ff3b30">' + gf.losses + '</div><div class="dl">先手负</div></div>' +
-                  '<div style="width:1px;height:40px;background:rgba(255,255,255,0.08)"></div>' +
+                  '<div class="col"><div class="dv" style="color:#ff3b30">' + gf.losses + '</div><div class="dl">先手负</div>' +
+                  '<div style="font-size:11px;color:#ff6b62;font-weight:700">' + gfLossRate + '%</div></div>' +
+                  '<div style="width:1px;height:50px;background:rgba(255,255,255,0.08)"></div>' +
                   '<div class="col"><div class="dv" style="color:#4cd964">' + gs.wins + '</div><div class="dl">后手胜</div>' +
                   '<div style="font-size:11px;color:#ff9632;font-weight:700">' + gs.winRate + '%</div></div>' +
-                  '<div class="col"><div class="dv" style="color:#ff3b30">' + gs.losses + '</div><div class="dl">后手负</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#ff3b30">' + gs.losses + '</div><div class="dl">后手负</div>' +
+                  '<div style="font-size:11px;color:#ff6b62;font-weight:700">' + gsLossRate + '%</div></div>' +
                 '</div>' +
                 '<div class="big-label">先手 vs 后手</div>'
         };
@@ -303,16 +306,18 @@
 
       RENDERERS.handtrapRate = function(s) {
         var ht = s.handtrap;
+        var otherCount = ht.gotNibiru + ht.gotDimension + ht.gotSmallHT;
+        var otherRate = s.total > 0 ? ((otherCount / s.total) * 100).toFixed(1) : '0.0';
         return {
-          label: 'G率 ' + ht.anyGRate + '%',
-          subLabel: '吃G ' + ht.gotAnyG + ' 次 / 陨石 ' + ht.gotNibiru + ' 次',
+          label: '吃G率 ' + ht.anyGRate + '%',
+          subLabel: '吃锁率 ' + fmt(ht.lanceaRate || (s.total > 0 ? (ht.gotLancea / s.total * 100).toFixed(1) : '0.0')) + '%',
           html: '<div class="triple-row">' +
                   '<div class="col"><div class="dv" style="color:#ffd700">' + fmt(ht.anyGRate) + '%</div><div class="dl">吃G率</div></div>' +
-                  '<div class="col"><div class="dv" style="color:#c864ff">' + fmt(ht.maxxcRate) + '%</div><div class="dl">增殖G</div></div>' +
-                  '<div class="col"><div class="dv" style="color:#ff6482">' + fmt(ht.nibiruRate) + '%</div><div class="dl">陨石</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#64c8ff">' + fmt(ht.lanceaRate || (s.total > 0 ? (ht.gotLancea / s.total * 100).toFixed(1) : '0.0')) + '%</div><div class="dl">吃锁率</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#8888a0">' + otherRate + '%</div><div class="dl">其他</div></div>' +
                 '</div>' +
                 '<div class="big-label">手坑统计</div>' +
-                '<div class="sub-line">其他手坑 ' + (ht.gotDroll + ht.gotJellyfish + ht.gotLancea + ht.gotDimension + ht.gotSmallHT) + ' 次</div>'
+                '<div class="sub-line">吃G ' + ht.gotAnyG + '次 · 锁鸟 ' + ht.gotLancea + '次 · 其他 ' + otherCount + '次（含陨石' + ht.gotNibiru + '次、大宇宙人' + ht.gotDimension + '次等）</div>'
         };
       };
 
@@ -320,11 +325,11 @@
         var c = s.coin;
         return {
           label: c.winRate + '%',
-          subLabel: '硬币猜中 ' + c.wins + ' / 总 ' + c.total,
+          subLabel: '硬币胜 ' + c.wins + ' / 总 ' + c.total,
           html: '<div class="double-row">' +
                   '<div class="col"><div class="dv" style="color:#ffd700">' + fmt(c.winRate) + '%</div><div class="dl">硬币胜率</div></div>' +
-                  '<div class="col"><div class="dv" style="color:#4cd964">' + c.wins + '</div><div class="dl">猜中</div></div>' +
-                  '<div class="col"><div class="dv" style="color:#ff3b30">' + c.losses + '</div><div class="dl">猜错</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#4cd964">' + c.wins + '</div><div class="dl">胜</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#ff3b30">' + c.losses + '</div><div class="dl">负</div></div>' +
                 '</div>' +
                 '<div class="big-label">硬币统计</div>'
         };
@@ -399,6 +404,143 @@
           html: '<div class="big-value" style="color:' + (cp > 20 ? '#ff3b30' : '#ffd700') + '">' + fmt(hs.cantPlayRate) + '<span class="pct">%</span></div>' +
                 '<div class="big-label">卡手率</div>' +
                 '<div class="sub-line">卡手 ' + hs.cantPlay + ' 次 · 互卡 ' + hs.bothStuck + ' 次</div>'
+        };
+      };
+
+      RENDERERS.mistake = function(s) {
+        var m = s.mistake;
+        if (!m || m.total === 0) {
+          return { label: '0', subLabel: '暂无严重失误', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无严重失误</div>' };
+        }
+        return {
+          label: m.total + '',
+          subLabel: '严重失误 ' + fmt(m.rate) + '%',
+          html: '<div class="big-value" style="color:#ff6482">' + m.total + ' 💢</div>' +
+                '<div class="big-label">严重失误统计</div>' +
+                '<div class="sub-line">严重失误率 ' + fmt(m.rate) + '% · 严重失误时胜率 ' + fmt(m.winRate) + '%</div>'
+        };
+      };
+
+      RENDERERS.opponentT0 = function(s) {
+        var t0 = s.opponentT0;
+        if (!t0 || t0.total === 0) {
+          return { label: '0', subLabel: '暂无T0记录', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无对手T0</div>' };
+        }
+        return {
+          label: t0.total + '',
+          subLabel: '被T0 ' + t0.total + ' 次',
+          html: '<div class="big-value" style="color:#ff2d55">' + t0.total + ' ⚡</div>' +
+                '<div class="big-label">对手T0动</div>' +
+                '<div class="sub-line">T0时胜率 ' + fmt(t0.winRate) + '% (' + t0.wins + '胜 ' + t0.losses + '负)</div>'
+        };
+      };
+
+      RENDERERS.disconnect = function(s) {
+        var con = s.connectivity;
+        if (!con || con.disconnect === 0) {
+          return { label: '0', subLabel: '暂无掉线', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无掉线</div>' };
+        }
+        return {
+          label: con.disconnect + '',
+          subLabel: '掉线率 ' + fmt(con.disconnectRate) + '%',
+          html: '<div class="big-value" style="color:#8888a0">' + con.disconnect + ' 🔌</div>' +
+                '<div class="big-label">掉线统计</div>' +
+                '<div class="sub-line">自己掉线 ' + con.disconnectSelf + ' · 对手掉线 ' + con.disconnectOpponent + '</div>'
+        };
+      };
+
+      RENDERERS.timeout = function(s) {
+        var con = s.connectivity;
+        if (!con || con.timeout === 0) {
+          return { label: '0', subLabel: '暂无超时', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无超时</div>' };
+        }
+        return {
+          label: con.timeout + '',
+          subLabel: '超时率 ' + fmt(con.timeoutRate) + '%',
+          html: '<div class="big-value" style="color:#ff9f0a">' + con.timeout + ' ⏰</div>' +
+                '<div class="big-label">超时统计</div>' +
+                '<div class="sub-line">自己超时 ' + con.timeoutSelf + ' · 对手超时 ' + con.timeoutOpponent + '</div>'
+        };
+      };
+
+      RENDERERS.typhon = function(s) {
+        var t = s.typhon;
+        if (!t || t.total === 0) {
+          return { label: '0', subLabel: '暂无提丰', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无提丰登场</div>' };
+        }
+        var blackened = t.enemyBlack + t.selfBlack;
+        var whitened = t.enemyWhite + t.selfWhite;
+        return {
+          label: t.total + '',
+          subLabel: '提丰登场 ' + t.total + ' 次',
+          html: '<div class="big-value" style="color:#af52de">' + t.total + ' 🐉</div>' +
+                '<div class="big-label">提丰统计</div>' +
+                '<div class="sub-line">🖤被黑 ' + blackened + ' · 🤍漂白 ' + whitened + '</div>'
+        };
+      };
+
+      RENDERERS.myDeckStats = function(s) {
+        var decks = s.myDeckStats;
+        if (!decks || decks.length === 0) {
+          return { label: '—', subLabel: '暂无卡组数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无卡组数据</div>' };
+        }
+        var top = decks.slice(0, 3);
+        var list = top.map(function(d) {
+          return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:280px;padding:2px 0;font-size:12px">' +
+            '<span style="color:var(--text-bright)">' + d.deck + '</span>' +
+            '<span><span style="color:#4cd964;font-weight:700;font-family:var(--font-mono)">' + d.wins + '</span>' +
+            '<span style="color:var(--text-dim)">/</span>' +
+            '<span style="color:#ff3b30;font-weight:700;font-family:var(--font-mono)">' + d.losses + '</span>' +
+            ' <span style="font-weight:700;font-family:var(--font-mono);color:#64c8ff">' + d.winRate + '%</span></span></div>';
+        }).join('');
+        return {
+          label: decks.length + ' 套卡组',
+          subLabel: '自用卡组胜率',
+          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%">' + list + '</div>' +
+                '<div class="big-label" style="margin-top:4px">自用卡组胜率</div>'
+        };
+      };
+
+      RENDERERS.oppDeckStats = function(s) {
+        var decks = s.deckStats;
+        if (!decks || decks.length === 0) {
+          return { label: '—', subLabel: '暂无对手卡组数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无对手数据</div>' };
+        }
+        var top = decks.slice(0, 3);
+        var list = top.map(function(d) {
+          return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:280px;padding:2px 0;font-size:12px">' +
+            '<span style="color:var(--text-bright)">' + d.deck + '</span>' +
+            '<span><span style="color:#4cd964;font-weight:700;font-family:var(--font-mono)">' + d.wins + '</span>' +
+            '<span style="color:var(--text-dim)">/</span>' +
+            '<span style="color:#ff3b30;font-weight:700;font-family:var(--font-mono)">' + d.losses + '</span>' +
+            ' <span style="font-weight:700;font-family:var(--font-mono);color:#64c8ff">' + d.winRate + '%</span></span></div>';
+        }).join('');
+        return {
+          label: decks.length + ' 种对手',
+          subLabel: '对战卡组胜率',
+          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%">' + list + '</div>' +
+                '<div class="big-label" style="margin-top:4px">对战卡组胜率</div>'
+        };
+      };
+
+      RENDERERS.matchupStats = function(s) {
+        var matchups = s.matchupStats;
+        if (!matchups || matchups.length === 0) {
+          return { label: '—', subLabel: '暂无交叉数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无交叉数据</div>' };
+        }
+        var top = matchups.slice(0, 3);
+        var list = top.map(function(m) {
+          return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:280px;padding:2px 0;font-size:11px">' +
+            '<span style="color:var(--text-bright)">' + m.myDeck + '</span>' +
+            '<span style="color:var(--text-dim)">vs</span>' +
+            '<span style="color:var(--text)">' + m.opponentDeck + '</span>' +
+            ' <span style="font-weight:700;font-family:var(--font-mono);color:#64c8ff">' + m.winRate + '%</span></span></div>';
+        }).join('');
+        return {
+          label: matchups.length + ' 组对阵',
+          subLabel: '自用 vs 对手交叉胜率',
+          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%">' + list + '</div>' +
+                '<div class="big-label" style="margin-top:4px">对阵交叉统计</div>'
         };
       };
 

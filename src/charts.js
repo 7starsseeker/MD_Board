@@ -376,6 +376,388 @@ function renderStreakGauge(canvas, stats) {
   return canvas._chart;
 }
 
+/**
+ * 9. 硬币统计（饼图）
+ */
+function renderCoinPie(canvas, stats) {
+  destroyChart(canvas._chart);
+  var ctx = canvas.getContext('2d');
+  var c = stats.coin || { total: 0, wins: 0, losses: 0 };
+  if (c.total === 0) { canvas._chart = null; return null; }
+  canvas._chart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['硬币正', '硬币反'],
+      datasets: [{
+        data: [c.wins, c.losses],
+        backgroundColor: ['#ffd700', '#8888a0'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '60%',
+      plugins: {
+        legend: { position: 'right', labels: { color: '#e8e8f0', font: { size: 11 }, padding: 10 } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var total = ctx.dataset.data.reduce(function(a,b){return a+b;}, 0);
+              return ctx.label + ': ' + ctx.parsed + ' (' + (total > 0 ? (ctx.parsed/total*100).toFixed(1) : 0) + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+  return canvas._chart;
+}
+
+/**
+ * 10. 卡手原因分布（饼图）
+ */
+function renderHandStatePie(canvas, stats) {
+  destroyChart(canvas._chart);
+  var ctx = canvas.getContext('2d');
+  var hs = stats.handState || {};
+  var values = [hs.cantPlay||0, hs.cantPlayGarnet||0, hs.cantPlayDuplicate||0, hs.cantPlayHT||0, hs.bothStuck||0];
+  var total = values.reduce(function(a,b){return a+b;}, 0);
+  if (total === 0) { canvas._chart = null; return null; }
+  canvas._chart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['无法动', '卡组件', '卡同名', '卡手坑', '互卡'],
+      datasets: [{
+        data: values,
+        backgroundColor: getColors(5),
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '55%',
+      plugins: {
+        legend: { position: 'right', labels: { color: '#e8e8f0', font: { size: 10 }, padding: 8 } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return ctx.label + ': ' + ctx.parsed + ' 次 (' + fmt(ctx.parsed / (stats.total||1) * 100) + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+  return canvas._chart;
+}
+
+/**
+ * 11. 严重失误统计（饼图 + 附胜率）
+ */
+function renderMistakeDoughnut(canvas, stats) {
+  destroyChart(canvas._chart);
+  var ctx = canvas.getContext('2d');
+  var m = stats.mistake || { total: 0 };
+  var noMistake = Math.max(0, (stats.wins||0) + (stats.losses||0) - m.total);
+  if (m.total === 0 && noMistake === 0) { canvas._chart = null; return null; }
+  canvas._chart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['有失误', '无失误'],
+      datasets: [{
+        data: [m.total, noMistake],
+        backgroundColor: ['#ff3b30', '#4cd964'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '60%',
+      plugins: {
+        legend: { position: 'right', labels: { color: '#e8e8f0', font: { size: 11 }, padding: 10 } },
+        tooltip: {
+          callbacks: {
+            afterBody: function() {
+              return '失误率: ' + fmt(m.rate) + '%\n失误时胜率: ' + fmt(m.winRate) + '%';
+            }
+          }
+        }
+      }
+    }
+  });
+  return canvas._chart;
+}
+
+/**
+ * 12. 对手 T0 动统计（饼图）
+ */
+function renderOpponentT0Doughnut(canvas, stats) {
+  destroyChart(canvas._chart);
+  var ctx = canvas.getContext('2d');
+  var t = stats.opponentT0 || { total: 0, wins: 0, losses: 0 };
+  var noT0 = Math.max(0, (stats.total||0) - t.total);
+  if (t.total === 0 && noT0 === 0) { canvas._chart = null; return null; }
+  canvas._chart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['被T0动', '未被T0'],
+      datasets: [{
+        data: [t.total, noT0],
+        backgroundColor: ['#ff9632', '#4cd964'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '60%',
+      plugins: {
+        legend: { position: 'right', labels: { color: '#e8e8f0', font: { size: 11 }, padding: 10 } },
+        tooltip: {
+          callbacks: {
+            afterBody: function() {
+              var wr = (t.wins + t.losses) > 0 ? ((t.wins / (t.wins + t.losses)) * 100).toFixed(1) : '0.0';
+              return '被T0时胜率: ' + wr + '%';
+            }
+          }
+        }
+      }
+    }
+  });
+  return canvas._chart;
+}
+
+/**
+ * 13. 吓跑对手（仪表盘风格）
+ */
+function renderOpponentRanGauge(canvas, stats) {
+  destroyChart(canvas._chart);
+  var ctx = canvas.getContext('2d');
+  var or = stats.opponentRan || { total: 0 };
+  if (or.total === 0) { canvas._chart = null; return null; }
+  canvas._chart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['吓跑对手', ''],
+      datasets: [{
+        data: [or.total, Math.max(or.total, 5)],
+        backgroundColor: ['#ff9632', 'rgba(255,255,255,0.06)'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '75%',
+      rotation: -90, circumference: 180,
+      plugins: { legend: { display: false } }
+    },
+    plugins: [{
+      id: 'centerText',
+      afterDraw: function(chart) {
+        var w = chart.width, h = chart.height;
+        var ctx2 = chart.ctx;
+        ctx2.save();
+        ctx2.textAlign = 'center';
+        ctx2.textBaseline = 'middle';
+        ctx2.font = 'bold 32px monospace';
+        ctx2.fillStyle = '#ff9632';
+        ctx2.fillText(or.total + '🏃', w / 2, h / 2 - 6);
+        ctx2.font = '13px sans-serif';
+        ctx2.fillStyle = '#8888a0';
+        ctx2.fillText('吓跑对手', w / 2, h / 2 + 20);
+        ctx2.restore();
+      }
+    }]
+  });
+  return canvas._chart;
+}
+
+/**
+ * 14. 提丰趣味统计（饼图）
+ */
+function renderTyphonPie(canvas, stats) {
+  destroyChart(canvas._chart);
+  var ctx = canvas.getContext('2d');
+  var t = stats.typhon || { total: 0, enemyBlack: 0, enemyWhite: 0, selfBlack: 0, selfWhite: 0 };
+  if (t.total === 0) { canvas._chart = null; return null; }
+  canvas._chart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['对手出🖤输', '对手出🤍赢', '自己出🖤输', '自己出🤍赢'],
+      datasets: [{
+        data: [t.enemyBlack, t.enemyWhite, t.selfBlack, t.selfWhite],
+        backgroundColor: ['#ff3b30', '#4cd964', '#8888a0', '#64c8ff'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '55%',
+      plugins: {
+        legend: { position: 'right', labels: { color: '#e8e8f0', font: { size: 10 }, padding: 6 } }
+      }
+    }
+  });
+  return canvas._chart;
+}
+
+/**
+ * 15. 对战卡组胜率排行（横向柱状图）
+ */
+function renderOppDeckBar(canvas, stats) {
+  destroyChart(canvas._chart);
+  var ctx = canvas.getContext('2d');
+  var decks = stats.deckStats || [];
+  if (decks.length === 0) { canvas._chart = null; return null; }
+  var top = decks.slice(0, 10);
+  var labels = top.map(function(d){return d.deck;});
+  var winRates = top.map(function(d){return parseFloat(d.winRate);});
+  var counts = top.map(function(d){return d.total;});
+  canvas._chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '胜率',
+        data: winRates,
+        backgroundColor: winRates.map(function(v){return v >= 50 ? '#4cd964' : '#ff3b30';}),
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: function(v){return v+'%';} } },
+        y: { grid: { display: false } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            afterLabel: function(ctx) { return '场次: ' + counts[ctx.dataIndex]; }
+          }
+        }
+      }
+    }
+  });
+  return canvas._chart;
+}
+
+/**
+ * 16. 连接异常统计（饼图）
+ */
+function renderDisconnectPie(canvas, stats) {
+  destroyChart(canvas._chart);
+  var ctx = canvas.getContext('2d');
+  var con = stats.connectivity || {};
+  var dSelf = con.disconnectSelf || 0;
+  var dOpp = con.disconnectOpponent || 0;
+  var totalDC = dSelf + dOpp;
+  if (totalDC === 0) { canvas._chart = null; return null; }
+  canvas._chart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['自己掉线', '对手掉线'],
+      datasets: [{
+        data: [dSelf, dOpp],
+        backgroundColor: ['#ff3b30', '#ffd700'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '60%',
+      plugins: {
+        legend: { position: 'right', labels: { color: '#e8e8f0', font: { size: 11 }, padding: 10 } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var total = ctx.dataset.data.reduce(function(a,b){return a+b;}, 0);
+              return ctx.label + ': ' + ctx.parsed + ' (' + (total > 0 ? (ctx.parsed/total*100).toFixed(1) : 0) + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+  return canvas._chart;
+}
+
+/**
+ * 17. 超时统计（饼图：自己超时 vs 对手超时）
+ */
+function renderTimeoutPie(canvas, stats) {
+  destroyChart(canvas._chart);
+  var ctx = canvas.getContext('2d');
+  var con = stats.connectivity || {};
+  var tSelf = con.timeoutSelf || 0;
+  var tOpp = con.timeoutOpponent || 0;
+  var totalTO = tSelf + tOpp;
+  if (totalTO === 0) { canvas._chart = null; return null; }
+  canvas._chart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['自己超时', '对手超时'],
+      datasets: [{
+        data: [tSelf, tOpp],
+        backgroundColor: ['#c864ff', '#64c8ff'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '60%',
+      plugins: {
+        legend: { position: 'right', labels: { color: '#e8e8f0', font: { size: 11 }, padding: 10 } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var total = ctx.dataset.data.reduce(function(a,b){return a+b;}, 0);
+              return ctx.label + ': ' + ctx.parsed + ' (' + (total > 0 ? (ctx.parsed/total*100).toFixed(1) : 0) + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+  return canvas._chart;
+}
+
+/**
+ * 18. 对手大牌统计（仪表盘风格）
+ */
+function renderBigHandGauge(canvas, stats) {
+  destroyChart(canvas._chart);
+  var ctx = canvas.getContext('2d');
+  var bh = stats.bigHand || 0;
+  if (bh === 0) { canvas._chart = null; return null; }
+  canvas._chart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['对手大牌', ''],
+      datasets: [{
+        data: [bh, Math.max(bh, 5)],
+        backgroundColor: ['#ff2d55', 'rgba(255,255,255,0.06)'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '75%',
+      rotation: -90, circumference: 180,
+      plugins: { legend: { display: false } }
+    },
+    plugins: [{
+      id: 'centerText',
+      afterDraw: function(chart) {
+        var w = chart.width, h = chart.height;
+        var ctx2 = chart.ctx;
+        ctx2.save();
+        ctx2.textAlign = 'center';
+        ctx2.textBaseline = 'middle';
+        ctx2.font = 'bold 32px monospace';
+        ctx2.fillStyle = '#ff2d55';
+        ctx2.fillText(bh + '🃏', w / 2, h / 2 - 6);
+        ctx2.font = '13px sans-serif';
+        ctx2.fillStyle = '#8888a0';
+        ctx2.fillText('对手大牌', w / 2, h / 2 + 20);
+        ctx2.restore();
+      }
+    }]
+  });
+  return canvas._chart;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  全局图表管理器（用于批量渲染/更新）
 // ═══════════════════════════════════════════════════════════════════════════

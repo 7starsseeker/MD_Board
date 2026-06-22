@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MD Stats - 图表窗口</title>
   <link rel="stylesheet" href="style.css">
-  <script src="../lib/chart.min.js"></script>
+  <script src="lib/chart.min.js"></script>
   <script src="charts.js"></script>
   <style>
     body {
@@ -207,8 +207,18 @@
         { id: 'endboard', label: '先手终场', sub: '终场质量分布', render: renderEndboardPie },
         { id: 'breakboard', label: '后手突破', sub: '突破成功/失败/投降', render: renderBreakBoardPie },
         { id: 'trend', label: '胜率趋势', sub: '累计胜率变化', render: renderWinTrendLine },
-        { id: 'deck-bar', label: '卡组胜率', sub: '各卡组胜率排行', render: renderDeckBar },
-        { id: 'streak', label: '连胜状态', sub: '当前连胜/连败', render: renderStreakGauge }
+        { id: 'deck-bar', label: '自用卡组胜率', sub: '各卡组胜率排行', render: renderDeckBar },
+        { id: 'streak', label: '连胜状态', sub: '当前连胜/连败', render: renderStreakGauge },
+        { id: 'coin', label: '硬币统计', sub: '硬币正反胜负分布', render: renderCoinPie },
+        { id: 'handstate', label: '卡手原因', sub: '各类无法动原因分布', render: renderHandStatePie },
+        { id: 'mistake', label: '严重失误', sub: '失误频率与胜率', render: renderMistakeDoughnut },
+        { id: 'opponent-t0', label: '对手T0动', sub: '被对手T0干扰统计', render: renderOpponentT0Doughnut },
+        { id: 'opponent-ran', label: '吓跑对手', sub: '对手逃跑次数', render: renderOpponentRanGauge },
+        { id: 'typhon', label: '提丰统计', sub: '提丰出场各方结果', render: renderTyphonPie },
+        { id: 'opp-deck-bar', label: '对战卡组胜率', sub: '对手卡组胜率排行', render: renderOppDeckBar },
+        { id: 'disconnect', label: '掉线统计', sub: '掉线次数分布', render: renderDisconnectPie },
+        { id: 'timeout', label: '超时统计', sub: '超时次数分布', render: renderTimeoutPie },
+        { id: 'big-hand', label: '对手大牌', sub: '对手大牌哥次数', render: renderBigHandGauge }
       ];
 
       var currentIndex = 0;
@@ -306,11 +316,8 @@
 
       function renderAllCharts() {
         if (!stats) return;
-        CHART_DEFS.forEach(function(def) {
-          var canvas = document.getElementById('chart-w-' + def.id);
-          if (!canvas) return;
-          ChartManager.render('standalone-' + def.id, canvas, def.render, stats);
-        });
+        // 只渲染当前活动图表，其余导航时按需渲染
+        renderCurrentChart();
       }
 
       // ═══ 数据更新 ═══
@@ -333,7 +340,7 @@
         updateNav();
       }
 
-      // ═══ 关闭 / 键盘 ═══
+      // ═══ 关闭 / 键盘 / 窗口调整 ═══
       document.getElementById('btn-close').addEventListener('click', function() { window.close(); });
       document.getElementById('btn-prev').addEventListener('click', prev);
       document.getElementById('btn-next').addEventListener('click', next);
@@ -342,6 +349,10 @@
         if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') prev();
         else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next();
         else if (e.key === 'Escape') window.close();
+      });
+
+      window.addEventListener('resize', function() {
+        if (stats && stats.total > 0) renderCurrentChart();
       });
 
       // ═══ 启动 ═══

@@ -6,7 +6,24 @@
   <title>MD Stats - 控制面板</title>
   <link rel="stylesheet" href="style.css">
   <style>
-    body { background: #11111b; padding: 12px; overflow-y: auto; user-select: text; height: 100vh; }
+    body { background: #11111b; padding: 0; overflow: hidden; user-select: text; height: 100vh; }
+    /* 固定标题栏 */
+    .title-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 10px; -webkit-app-region: drag; flex-shrink: 0;
+      background: #11111b; border-bottom: 1px solid var(--border);
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: 36px;
+    }
+    .title-bar .title { font-size: 14px; font-weight: 700; color: var(--accent); letter-spacing: 1px; }
+    .title-bar .title-actions { display: flex; gap: 4px; -webkit-app-region: no-drag; }
+    .title-bar .title-actions button {
+      background: none; border: none; color: #aaa; cursor: pointer;
+      font-size: 12px; padding: 2px 8px; border-radius: 4px; transition: all 0.15s;
+    }
+    .title-bar .title-actions button:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .title-bar .title-actions .close-btn:hover { color: #ff4444; }
+    /* 可滚动内容区域 */
+    .content-wrap { padding: 52px 12px 12px; height: 100vh; overflow-y: auto; }
     .app-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
     .app-header h1 { font-size:16px; font-weight:700; color:var(--accent); letter-spacing:1px; }
     .app-header .header-actions { display:flex; gap:6px; }
@@ -60,7 +77,7 @@
     .stat-box .stat-value.neutral { color:var(--accent); }
     .stats-extended { margin-top:10px; display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text-dim); }
     .stats-extended span { white-space:nowrap; }
-    .stats-extended .val { color:var(--text); font-weight:600; }
+    .stats-extended .val { color:var(--text); font-weight:600; font-family:var(--font-mono); }
 
     /* 对局列表 */
     .match-list { max-height:360px; overflow-y:auto; }
@@ -97,17 +114,20 @@
 </head>
 <body>
 
-  <!-- ═══ 标题 ═══ -->
-  <div class="app-header">
-    <h1>🎴 MD Stats</h1>
-    <div class="header-actions">
-      <button class="btn btn-sm" id="btn-open-stats">📊 详细统计</button>
-      <button class="btn btn-sm" id="btn-open-chart">📈 图表</button>
-      <button class="btn btn-sm" id="btn-export">📤 导出</button>
-      <button class="btn btn-sm" id="btn-import">📥 导入</button>
-      <button class="btn btn-sm" id="btn-reset">🗑 重置</button>
+  <!-- ═══ 固定标题栏 ═══ -->
+  <div class="title-bar">
+    <span class="title">🎴 MD Stats</span>
+    <div class="title-actions">
+      <button class="btn btn-sm" id="btn-open-stats" title="详细统计" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📊</button>
+      <button class="btn btn-sm" id="btn-open-chart" title="图表" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📈</button>
+      <button class="btn btn-sm" id="btn-export" title="导出数据" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📤</button>
+      <button class="btn btn-sm" id="btn-import" title="导入数据" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📥</button>
+      <button class="btn btn-sm" id="btn-reset" title="重置所有数据" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">🗑</button>
+      <button class="close-btn" id="btn-close-control" title="关闭" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:14px;padding:2px 8px;border-radius:4px">✕</button>
     </div>
   </div>
+
+  <div class="content-wrap">
 
   <!-- ═══════════════════ 录入新对局 ═══════════════════ -->
   <div class="card">
@@ -249,10 +269,10 @@
           <label for="chk-both-stuck">双方都动不了</label>
         </div>
 
-        <!-- 出牌失误 -->
+        <!-- 出现严重失误 -->
         <div class="checkbox-row">
           <input type="checkbox" id="chk-mistake">
-          <label for="chk-mistake">出牌失误</label>
+          <label for="chk-mistake">出现严重失误</label>
         </div>
 
         <!-- 提丰趣味统计 -->
@@ -464,6 +484,8 @@
     </div>
   </div>
 
+  </div> <!-- /content-wrap -->
+
   <script>
     var api = window.mdStats;
     if (!api) { document.body.innerHTML = '<div style="padding:40px;text-align:center;color:#ff3b30">API 加载失败</div>'; throw new Error('API not available'); }
@@ -503,6 +525,7 @@
       endboardInteraction: null,
       myDeck: '',
       opponentRan: false,
+      typhonWho: 'opponent',
       notes: ''
     };
 
@@ -581,8 +604,10 @@
         return;
       }
       document.getElementById('section-firstmover').classList.remove('visible');
-      document.getElementById('section-first').classList.toggle('visible', state.goingFirst === true);
-      document.getElementById('section-t0').classList.toggle('visible', state.goingFirst === true);
+      // 如果对手直接跑了，隐藏终场情况
+      var showEndboard = state.goingFirst === true && !state.opponentRan;
+      document.getElementById('section-first').classList.toggle('visible', showEndboard);
+      document.getElementById('section-t0').classList.toggle('visible', showEndboard);
       document.getElementById('section-opponent-ran').classList.toggle('visible', state.goingFirst === true && state.result === 'win');
       document.getElementById('section-second').classList.toggle('visible', state.goingFirst === false);
       // 切换先后手时重置条件区域的选中状态
@@ -662,6 +687,13 @@
     bindCheckbox('chk-small-ht', 'gotSmallHT');
     bindCheckbox('chk-mistake', 'mistake');
     bindCheckbox('chk-opponent-ran', 'opponentRan');
+    document.getElementById('chk-opponent-ran').addEventListener('change', function() {
+      if (this.checked) {
+        state.endboardState = null;
+        document.querySelectorAll('#section-first .btn').forEach(function(b) { b.classList.remove('active'); });
+      }
+      updateConditionalSections();
+    });
     bindCheckbox('chk-t0', 'opponentT0');
     bindCheckbox('chk-disconnect', 'disconnect');
     // 一方掉线 - 自定义级联
@@ -749,7 +781,7 @@
         if (state.bothStuck) {
           if (state.firstMover === null) missing.push('最终谁先能动');
         } else {
-          if (state.goingFirst === true && state.endboardState === null) missing.push('终场情况');
+          if (state.goingFirst === true && !state.opponentRan && state.endboardState === null) missing.push('终场情况');
           if (state.goingFirst === false && state.brokeBoard === null) missing.push('是否成功突破');
           if (state.goingFirst === false && state.brokeBoard === true && state.otk === null) missing.push('是否一回合斩杀');
           if (state.goingFirst === false && state.brokeBoard === true && state.otk === false && state.endboardInteraction === null) missing.push('残局阻抗情况');
@@ -845,6 +877,7 @@
       document.getElementById('sub-cant-play').style.display = 'none';
       document.getElementById('sub-disconnect').style.display = 'none';
       document.getElementById('sub-timeout').style.display = 'none';
+      document.getElementById('sub-typhon').style.display = 'none';
       document.getElementById('section-firstmover').classList.remove('visible');
       document.getElementById('section-otk').classList.remove('visible');
       document.getElementById('section-endboard').classList.remove('visible');
@@ -1044,7 +1077,7 @@
         if (m.gotNibiru) extras.push('陨石');
         if (m.gotDimension) extras.push('大宇宙');
         if (m.gotSmallHT) extras.push('其他坑');
-        if (m.mistake) extras.push('打错');
+        if (m.mistake) extras.push('严重失误');
         if (m.opponentT0) extras.push('T0');
         if (m.disconnect) extras.push('掉线' + (m.disconnectWho === 'self' ? '(我)' : m.disconnectWho === 'opponent' ? '(对)' : ''));
         if (m.timeout) extras.push('超时' + (m.timeoutWho === 'self' ? '(我)' : m.timeoutWho === 'opponent' ? '(对)' : ''));
@@ -1103,12 +1136,20 @@
       { type: 'firstSecond', label: '先后手对比', desc: '先手 vs 后手胜率' },
       { type: 'streak', label: '连胜/连败', desc: '当前连胜或连败次数' },
       { type: 'handtrapRate', label: '手坑统计', desc: '吃G率 / 陨石率' },
-      { type: 'coinRate', label: '硬币统计', desc: '猜硬币胜率' },
+      { type: 'coinRate', label: '硬币统计', desc: '硬币胜负概率' },
       { type: 'totalMatches', label: '总场次', desc: '对局总场数量' },
       { type: 'opponentRan', label: '吓跑对手', desc: '先手胜利时对手逃跑次数' },
       { type: 'endboard', label: '先手终场', desc: '正常终场率' },
       { type: 'breakBoard', label: '后手突破', desc: '突破成功率' },
-      { type: 'handState', label: '卡手率', desc: '卡手/互卡次数' }
+      { type: 'handState', label: '卡手率', desc: '卡手/互卡次数' },
+      { type: 'mistake', label: '严重失误', desc: '严重失误次数/率' },
+      { type: 'opponentT0', label: '对手T0动', desc: '被对手T0干扰次数' },
+      { type: 'disconnect', label: '掉线统计', desc: '掉线次数/率' },
+      { type: 'timeout', label: '超时统计', desc: '超时次数/率' },
+      { type: 'typhon', label: '提丰统计', desc: '提丰登场/被黑/漂白' },
+      { type: 'myDeckStats', label: '自用卡组', desc: '自用卡组胜率排行 Top3' },
+      { type: 'oppDeckStats', label: '对战卡组', desc: '对战卡组胜率排行 Top3' },
+      { type: 'matchupStats', label: '交叉统计', desc: '自用vs对手交叉胜率 Top3' }
     ];
 
     function renderCycleSettings(config) {
@@ -1250,6 +1291,8 @@
 
     api.getAll().then(renderAll);
     api.onStatsUpdate(function() { api.getAll().then(renderAll); });
+
+    document.getElementById('btn-close-control').addEventListener('click', function() { window.close(); });
   </script>
 </body>
 </html>

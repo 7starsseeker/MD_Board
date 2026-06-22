@@ -228,12 +228,12 @@ function computeStats() {
   const typhonSelfBlack = typhonMatches.filter(m => m.typhonWho === 'self' && m.result === 'loss').length;
   const typhonSelfWhite = typhonMatches.filter(m => m.typhonWho === 'self' && m.result === 'win').length;
 
-  // ── 打错了统计 ──
+  // ── 严重失误统计 ──
   const mistakeMatches = matches.filter(m => m.mistake);
   const mistakeCount = mistakeMatches.length;
   const mistakeWins = mistakeMatches.filter(m => m.result === 'win').length;
   const mistakeLosses = mistakeMatches.filter(m => m.result === 'loss').length;
-  // 打错了 × 自用卡组
+  // 严重失误 × 自用卡组
   const mistakeByDeck = {};
   mistakeMatches.forEach(m => {
     const deck = (m.myDeck || '').trim();
@@ -394,7 +394,7 @@ function computeStats() {
         deck, ...s,
         winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0'
       })),
-    // 打错了统计
+    // 严重失误统计
     mistake: {
       total: mistakeCount,
       rate: total > 0 ? ((mistakeCount / total) * 100).toFixed(1) : '0.0',
@@ -517,7 +517,7 @@ function createControlWindow() {
     height: state.controlHeight || 640,
     x: state.controlX || 100,
     y: state.controlY || 100,
-    frame: true,
+    frame: false,
     resizable: true,
     title: 'MD Stats - 控制面板',
     webPreferences: {
@@ -591,7 +591,7 @@ ipcMain.handle('stats:open-window', () => {
   statsWin = new BrowserWindow({
     width: 800,
     height: 640,
-    frame: true,
+    frame: false,
     resizable: true,
     title: 'MD Stats - 详细统计',
     webPreferences: {
@@ -814,7 +814,15 @@ function getDefaultCycleConfig() {
       { type: 'opponentRan', enabled: true, label: '吓跑对手' },
       { type: 'endboard', enabled: true, label: '先手终场' },
       { type: 'breakBoard', enabled: true, label: '后手突破' },
-      { type: 'handState', enabled: true, label: '卡手率' }
+      { type: 'handState', enabled: true, label: '卡手率' },
+      { type: 'mistake', enabled: true, label: '严重失误' },
+      { type: 'opponentT0', enabled: true, label: '对手T0动' },
+      { type: 'disconnect', enabled: true, label: '掉线统计' },
+      { type: 'timeout', enabled: true, label: '超时统计' },
+      { type: 'typhon', enabled: true, label: '提丰统计' },
+      { type: 'myDeckStats', enabled: true, label: '自用卡组' },
+      { type: 'oppDeckStats', enabled: true, label: '对战卡组' },
+      { type: 'matchupStats', enabled: true, label: '交叉统计' }
     ]
   };
 }

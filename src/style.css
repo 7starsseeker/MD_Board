@@ -25,7 +25,7 @@
 
   --radius: 10px;
   --radius-sm: 6px;
-  --font-mono: 'Consolas', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
+  --font-mono: 'Consolas', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', '思源黑体', 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', monospace;
   --font-sans: '思源黑体', 'Noto Sans CJK SC', 'Source Han Sans SC', 'PingFang SC', 'HarmonyOS Sans', 'WenQuanYi Micro Hei', sans-serif;
 }
 
