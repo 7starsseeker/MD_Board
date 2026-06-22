@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MD Stats - 控制面板</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { background: #11111b; padding: 12px; overflow-y: auto; user-select: text; height: 100vh; }
+    .app-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+    .app-header h1 { font-size:16px; font-weight:700; color:var(--accent); letter-spacing:1px; }
+    .app-header .header-actions { display:flex; gap:6px; }
+    .card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; margin-bottom:12px; }
+    .card-title { font-size:12px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; }
+    .form-row { display:flex; gap:8px; margin-bottom:8px; align-items:flex-end; }
+    .form-row .form-group { flex:1; }
+    .form-row .form-group.shrink { flex:0 0 auto; }
+    .btn-group { display:flex; gap:4px; }
+    .btn-group .btn { flex:1; }
+    .btn-group-3 { display:flex; gap:3px; }
+    .btn-group-3 .btn { flex:1; font-size:12px; padding:5px 4px; }
+    .submit-row { display:flex; gap:8px; margin-top:10px; }
+    .submit-row .btn { flex:1; padding:9px; font-size:14px; }
+    .checkbox-group { display:flex; flex-direction:column; gap:5px; margin-bottom:8px; }
+    .checkbox-row { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; padding:3px 0; }
+    .checkbox-row input[type=checkbox] { width:16px; height:16px; accent-color:var(--accent); cursor:pointer; }
+    .checkbox-row label { font-size:13px; color:var(--text); cursor:pointer; margin:0; }
+    .sub-checkboxes { margin-left:22px; display:flex; flex-direction:column; gap:3px; padding:4px 0 6px; }
+    .sub-checkboxes .checkbox-row { font-size:12px; }
+    .sub-checkboxes .checkbox-row label { font-size:12px; }
+    .radio-group { display:flex; gap:8px; margin-top:3px; margin-left:22px; }
+    .radio-group label { font-size:12px; color:var(--text); display:flex; align-items:center; gap:4px; cursor:pointer; }
+    .radio-group input[type=radio] { accent-color:var(--accent); }
+
+    /* 预设管理弹窗 */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:100; align-items:center; justify-content:center; }
+    .modal-overlay.show { display:flex; }
+    .modal-box { background:#1a1a2e; border:1px solid var(--border); border-radius:var(--radius); padding:16px; width:90%; max-width:360px; max-height:80vh; display:flex; flex-direction:column; }
+    .modal-box h2 { font-size:15px; margin-bottom:10px; color:var(--text-bright); }
+    .modal-box .modal-actions { display:flex; gap:8px; margin-top:10px; }
+    .modal-box .modal-actions .btn { flex:1; }
+    .preset-list { flex:1; overflow-y:auto; max-height:300px; }
+    .preset-item { display:flex; align-items:center; gap:6px; padding:5px 4px; border-radius:4px; }
+    .preset-item:hover { background:rgba(255,255,255,0.04); }
+    .preset-item .name { flex:1; font-size:13px; }
+    .preset-item input { flex:1; font-size:13px; padding:3px 6px; }
+    .preset-item button { background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:14px; padding:2px; }
+    .preset-item .btn-del:hover { color:var(--loss); }
+    .preset-item .btn-save:hover { color:var(--win); }
+    .preset-add-row { display:flex; gap:4px; margin-bottom:8px; }
+    .preset-add-row input { flex:1; }
+
+    /* 统计概览 */
+    .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .stat-box { background:var(--bg-input); border-radius:var(--radius-sm); padding:8px 10px; text-align:center; }
+    .stat-box .stat-value { font-size:20px; font-weight:800; font-family:var(--font-mono); }
+    .stat-box .stat-label { font-size:10px; color:var(--text-dim); margin-top:1px; }
+    .stat-box .stat-value.win { color:var(--win); } .stat-box .stat-value.loss { color:var(--loss); }
+    .stat-box .stat-value.good { color:var(--win); } .stat-box .stat-value.bad { color:var(--loss); }
+    .stat-box .stat-value.neutral { color:var(--accent); }
+    .stats-extended { margin-top:10px; display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text-dim); }
+    .stats-extended span { white-space:nowrap; }
+    .stats-extended .val { color:var(--text); font-weight:600; }
+
+    /* 对局列表 */
+    .match-list { max-height:360px; overflow-y:auto; }
+    .match-item { display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:var(--radius-sm); cursor:default; transition:background 0.1s; font-size:13px; }
+    .match-item:hover { background:rgba(255,255,255,0.04); }
+    .match-item .match-result { font-weight:700; width:32px; text-align:center; font-family:var(--font-mono); }
+    .match-item .match-info { flex:1; min-width:0; }
+    .match-item .match-info .match-deck { font-weight:600; color:var(--text-bright); }
+    .match-item .match-info .match-meta { font-size:11px; color:var(--text-dim); margin-top:1px; }
+    .match-item .match-actions { display:flex; gap:2px; opacity:0; transition:opacity 0.15s; }
+    .match-item:hover .match-actions { opacity:1; }
+    .match-item .match-actions button { background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:14px; padding:2px; }
+    .match-item .match-actions button:hover { color:var(--text); }
+    .match-item .match-actions .btn-del:hover { color:var(--loss); }
+    .match-empty { text-align:center; padding:20px; color:var(--text-dim); font-size:13px; }
+    .match-empty .emoji { font-size:28px; display:block; margin-bottom:6px; }
+
+    /* 卡组标签 */
+    .deck-list { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+    .deck-tag { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:4px; font-size:11px; background:var(--bg-input); }
+    .deck-tag .dw { color:var(--win); } .deck-tag .dl { color:var(--loss); }
+
+    /* 确认弹窗 */
+    .confirm-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; align-items:center; justify-content:center; }
+    .confirm-overlay.show { display:flex; }
+    .confirm-box { background:#1a1a2e; border:1px solid var(--border); border-radius:var(--radius); padding:20px; text-align:center; max-width:300px; }
+    .confirm-box p { margin-bottom:14px; font-size:14px; }
+    .confirm-box .confirm-actions { display:flex; gap:8px; justify-content:center; }
+
+    /* 终场/突破 条件区域 - 隐藏直到显示 */
+    .conditional-section { display:none; }
+    .conditional-section.visible { display:block; }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ 标题 ═══ -->
+  <div class="app-header">
+    <h1>🎴 MD Stats</h1>
+    <div class="header-actions">
+      <button class="btn btn-sm" id="btn-export">📤 导出</button>
+      <button class="btn btn-sm" id="btn-import">📥 导入</button>
+      <button class="btn btn-sm" id="btn-reset">🗑 重置</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ 录入新对局 ═══════════════════ -->
+  <div class="card">
+    <div class="card-title">📝 录入新对局</div>
+
+    <!-- 硬币 + 先后手 + 结果 -->
+    <div class="form-row">
+      <div class="form-group shrink" style="min-width:100px">
+        <label>硬币</label>
+        <div class="btn-group">
+          <button class="btn btn-coin" id="input-coin-win">胜</button>
+          <button class="btn btn-coin" id="input-coin-loss">负</button>
+        </div>
+      </div>
+      <div class="form-group shrink" style="min-width:120px">
+        <label>先后手</label>
+        <div class="btn-group">
+          <button class="btn btn-first" id="input-first" data-val="true">先手</button>
+          <button class="btn btn-second" id="input-second" data-val="false">后手</button>
+        </div>
+      </div>
+      <div class="form-group shrink" style="min-width:180px">
+        <label>结果</label>
+        <div class="btn-group" style="min-width:280px">
+          <button class="btn btn-win" id="input-win" data-val="win">胜</button>
+          <button class="btn btn-loss" id="input-loss" data-val="loss">负</button>
+          <button class="btn" id="input-draw" data-val="draw">平局</button>
+          <button class="btn btn-abnormal" id="input-abnormal" data-val="abnormal">异常</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 对手卡组 -->
+    <div class="form-row">
+      <div class="form-group">
+        <label>对手卡组</label>
+        <div style="display:flex;gap:4px">
+          <input type="text" id="input-deck" placeholder="输入卡组名称..." style="flex:1">
+          <button class="btn btn-sm" id="btn-manage-presets" style="white-space:nowrap">管理预设</button>
+        </div>
+        <div class="deck-quick-btns" id="deck-quick-btns"></div>
+      </div>
+    </div>
+
+    <!-- 对局情况 - 复选框 -->
+    <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:8px">
+      <label style="font-size:12px;color:var(--text-dim);margin-bottom:6px">对局情况</label>
+      <div class="checkbox-group">
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-big-hand">
+          <label for="chk-big-hand">对手是大牌哥</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-maxxc">
+          <label for="chk-maxxc">吃到增殖的G</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-droll">
+          <label for="chk-droll">吃到鸟G / 水母G</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-lancea">
+          <label for="chk-lancea">吃到锁鸟</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-nibiru">
+          <label for="chk-nibiru">吃到陨石</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-disconnect">
+          <label for="chk-disconnect">一方掉线</label>
+        </div>
+        <div class="sub-checkboxes" id="sub-disconnect" style="display:none">
+          <label style="font-size:12px;color:var(--text-dim);margin:2px 0">掉线者：</label>
+          <div class="radio-group">
+            <label><input type="radio" name="disconnect-who" value="self"> 自己</label>
+            <label><input type="radio" name="disconnect-who" value="opponent"> 对手</label>
+          </div>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-timeout">
+          <label for="chk-timeout">一方超时</label>
+        </div>
+        <div class="sub-checkboxes" id="sub-timeout" style="display:none">
+          <label style="font-size:12px;color:var(--text-dim);margin:2px 0">超时者：</label>
+          <div class="radio-group">
+            <label><input type="radio" name="timeout-who" value="self"> 自己</label>
+            <label><input type="radio" name="timeout-who" value="opponent"> 对手</label>
+          </div>
+        </div>
+
+        <!-- 起手动不了 -->
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-cant-play">
+          <label for="chk-cant-play">起手动不了</label>
+        </div>
+        <div class="sub-checkboxes" id="sub-cant-play">
+          <div class="checkbox-row">
+            <input type="checkbox" id="chk-cant-garnet">
+            <label for="chk-cant-garnet">废件复数上手</label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="chk-cant-dup">
+            <label for="chk-cant-dup">同一张牌复数上手</label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="chk-cant-ht">
+            <label for="chk-cant-ht">后手组件/手坑复数上手</label>
+          </div>
+        </div>
+
+        <!-- 双方都动不了 -->
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-both-stuck">
+          <label for="chk-both-stuck">双方都动不了</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- 终场/突破/谁先能动 （条件显示） -->
+    <div style="border-top:1px solid var(--border);padding-top:10px">
+      <!-- 谁先能动（双方都动不了时显示） -->
+      <div class="conditional-section" id="section-firstmover">
+        <label style="font-size:12px;color:var(--text-dim);margin-bottom:6px;display:block">最终谁先能动</label>
+        <div class="btn-group" style="margin-bottom:6px">
+          <button class="btn btn-endboard" id="firstmover-self" data-val="self">自己</button>
+          <button class="btn btn-endboard" id="firstmover-opponent" data-val="opponent">对方</button>
+        </div>
+      </div>
+
+      <!-- 先手 - 终场情况 -->
+      <div class="conditional-section" id="section-first">
+        <label style="font-size:12px;color:var(--text-dim);margin-bottom:6px;display:block">终场情况</label>
+        <div class="btn-group" style="margin-bottom:6px">
+          <button class="btn btn-endboard" id="endboard-surrender" data-val="surrender">投降</button>
+          <button class="btn btn-endboard" id="endboard-stopped" data-val="stopped">停牌</button>
+          <button class="btn btn-endboard" id="endboard-compromise" data-val="compromised">妥协场</button>
+          <button class="btn btn-endboard" id="endboard-normal" data-val="normal">正常终场</button>
+        </div>
+      </div>
+
+      <!-- 后手 - 突破 -->
+      <div class="conditional-section" id="section-second">
+        <label style="font-size:12px;color:var(--text-dim);margin-bottom:6px;display:block">是否成功突破</label>
+        <div class="btn-group" style="margin-bottom:8px">
+          <button class="btn btn-broke" id="broke-yes" data-val="true">是</button>
+          <button class="btn btn-broke" id="broke-no" data-val="false">否</button>
+          <button class="btn btn-broke" id="broke-surrender" data-val="surrender">投降</button>
+        </div>
+
+        <div class="conditional-section" id="section-otk">
+          <label style="font-size:12px;color:var(--text-dim);margin-bottom:6px;display:block">是否一回合斩杀</label>
+          <div class="btn-group" style="margin-bottom:6px">
+            <button class="btn btn-broke" id="otk-yes" data-val="true">是</button>
+            <button class="btn btn-broke" id="otk-no" data-val="false">否</button>
+          </div>
+        </div>
+
+        <!-- 没斩杀时的残局阻抗 -->
+        <div class="conditional-section" id="section-endboard">
+          <label style="font-size:12px;color:var(--text-dim);margin-bottom:6px;display:block">残局阻抗情况</label>
+          <div class="btn-group">
+            <button class="btn btn-interact" id="interact-none" data-val="none">无阻抗</button>
+            <button class="btn btn-interact" id="interact-some" data-val="some">有阻抗</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 提交按钮 -->
+    <div class="submit-row" style="margin-top:12px">
+      <button class="btn btn-primary" id="btn-submit">✓ 提交</button>
+      <button class="btn" id="btn-clear">清空</button>
+    </div>
+  </div>
+
+  <!-- ═══ 统计概览 ═══ -->
+  <div class="card">
+    <div class="card-title">📊 统计概览</div>
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-box"><div class="stat-value neutral">0</div><div class="stat-label">总场</div></div>
+      <div class="stat-box"><div class="stat-value neutral">0.0%</div><div class="stat-label">胜率</div></div>
+      <div class="stat-box"><div class="stat-value win">0</div><div class="stat-label">胜场</div></div>
+      <div class="stat-box"><div class="stat-value loss">0</div><div class="stat-label">负场</div></div>
+    </div>
+    <div class="stats-extended" id="stats-extended"></div>
+  </div>
+
+  <!-- ═══ 卡组统计 ═══ -->
+  <div class="card">
+    <div class="card-title">🏷 对战卡组统计</div>
+    <div id="deck-stats-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
+  </div>
+
+  <!-- ═══ 对局记录 ═══ -->
+  <div class="card">
+    <div class="card-title">📋 对局记录</div>
+    <div class="match-list" id="match-list">
+      <div class="match-empty"><span class="emoji">🎴</span>还没有对局记录</div>
+    </div>
+  </div>
+
+  <!-- ═══ 预设管理弹窗 ═══ -->
+  <div class="modal-overlay" id="modal-presets">
+    <div class="modal-box">
+      <h2>🏷 管理预设卡组</h2>
+      <div class="preset-add-row">
+        <input type="text" id="preset-new-name" placeholder="输入新卡组名称...">
+        <button class="btn btn-sm btn-primary" id="preset-add-btn">添加</button>
+      </div>
+      <div class="preset-list" id="preset-list"></div>
+      <div class="modal-actions">
+        <button class="btn" id="preset-close">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 导入导出弹窗 ═══ -->
+  <div class="modal-overlay" id="modal-export">
+    <div class="modal-box">
+      <h2>📤 导出数据</h2>
+      <textarea id="export-text" readonly style="flex:1;min-height:200px;font-family:var(--font-mono);font-size:12px;margin-bottom:10px"></textarea>
+      <div class="modal-actions">
+        <button class="btn" id="export-copy">📋 复制</button>
+        <button class="btn" id="export-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-import">
+    <div class="modal-box">
+      <h2>📥 导入数据</h2>
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px">粘贴之前导出的 JSON 数据，将覆盖当前所有记录.</p>
+      <textarea id="import-text" placeholder="粘贴 JSON 数据..." style="flex:1;min-height:200px;font-family:var(--font-mono);font-size:12px;margin-bottom:10px"></textarea>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="import-confirm">✓ 导入</button>
+        <button class="btn" id="import-close">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 确认弹窗 ═══ -->
+  <div class="confirm-overlay" id="confirm-overlay">
+    <div class="confirm-box">
+      <p id="confirm-msg"></p>
+      <div class="confirm-actions">
+        <button class="btn btn-primary" id="confirm-yes">确定</button>
+        <button class="btn" id="confirm-no">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var api = window.mdStats;
+    if (!api) { document.body.innerHTML = '<div style="padding:40px;text-align:center;color:#ff3b30">API 加载失败</div>'; throw new Error('API not available'); }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  状态
+    // ═══════════════════════════════════════════════════════════════════════
+
+    var state = {
+      result: null,
+      goingFirst: null,
+      coinToss: null,
+      opponentDeck: '',
+      opponentBigHand: false,
+      gotMaxxC: false,
+      gotDroll: false,
+      gotLancea: false,
+      gotNibiru: false,
+      disconnect: false,
+      disconnectWho: null,
+      timeout: false,
+      timeoutWho: null,
+      cantPlay: false,
+      cantPlayGarnet: false,
+      cantPlayDuplicate: false,
+      cantPlayHT: false,
+      bothStuck: false,
+      firstMover: null,
+      endboardState: null,
+      brokeBoard: null,
+      otk: null,
+      endboardInteraction: null,
+      notes: ''
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  按钮组工具
+    // ═══════════════════════════════════════════════════════════════════════
+
+    function bindGroup(btns, stateKey, valueMap) {
+      btns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          btns.forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          state[stateKey] = valueMap ? valueMap(btn) : (btn.dataset.val === 'true' ? true : btn.dataset.val === 'false' ? false : btn.dataset.val);
+        });
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  表单绑定
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // 结果
+    var resultBtns = [document.getElementById('input-win'), document.getElementById('input-loss'), document.getElementById('input-draw'), document.getElementById('input-abnormal')];
+    bindGroup(resultBtns, 'result', function(b) { return b.dataset.val; });
+    resultBtns.forEach(function(b) {
+      b.addEventListener('click', function() {
+        if (state.result === 'abnormal') {
+          state.opponentDeck = '未知';
+          document.getElementById('input-deck').value = '未知';
+          document.getElementById('input-deck').disabled = true;
+        } else {
+          document.getElementById('input-deck').disabled = false;
+        }
+        document.querySelectorAll('#input-win, #input-loss, #input-draw, #input-abnormal').forEach(function(btn) { btn.classList.remove('active'); });
+        if (state.result === 'abnormal') {
+          state.endboardState = null; state.brokeBoard = null; state.otk = null; state.endboardInteraction = null; state.firstMover = null;
+        }
+        // 重新点亮刚选的结果按钮
+        b.classList.add('active');
+        updateConditionalSections();
+      });
+    });
+
+    // 先后手
+    var firstBtn = document.getElementById('input-first');
+    var secondBtn = document.getElementById('input-second');
+    bindGroup([firstBtn, secondBtn], 'goingFirst');
+
+    // 硬币
+    bindGroup([document.getElementById('input-coin-win'), document.getElementById('input-coin-loss')], 'coinToss', function(b) {
+      return b.id === 'input-coin-win' ? true : false;
+    });
+
+    // 先后手切换时显示/隐藏条件区域
+    function updateConditionalSections() {
+      // 异常时隐藏所有条件区域
+      if (state.result === 'abnormal') {
+        document.getElementById('section-firstmover').classList.remove('visible');
+        document.getElementById('section-first').classList.remove('visible');
+        document.getElementById('section-second').classList.remove('visible');
+        document.getElementById('section-otk').classList.remove('visible');
+        document.getElementById('section-endboard').classList.remove('visible');
+        return;
+      }
+      // 如果双方都动不了已勾选，固定显示谁先能动，隐藏其他
+      if (document.getElementById('chk-both-stuck').checked) {
+        document.getElementById('section-firstmover').classList.add('visible');
+        document.getElementById('section-first').classList.remove('visible');
+        document.getElementById('section-second').classList.remove('visible');
+        document.getElementById('section-otk').classList.remove('visible');
+        document.getElementById('section-endboard').classList.remove('visible');
+        return;
+      }
+      document.getElementById('section-firstmover').classList.remove('visible');
+      document.getElementById('section-first').classList.toggle('visible', state.goingFirst === true);
+      document.getElementById('section-second').classList.toggle('visible', state.goingFirst === false);
+      // 切换先后手时重置条件区域的选中状态
+      if (state.goingFirst === true) {
+        state.brokeBoard = null; state.otk = null; state.endboardInteraction = null;
+        document.querySelectorAll('#section-second .btn').forEach(function(b) { b.classList.remove('active'); });
+        document.getElementById('section-otk').classList.remove('visible');
+        document.getElementById('section-endboard').classList.remove('visible');
+      }
+      if (state.goingFirst === false) {
+        state.endboardState = null;
+        document.querySelectorAll('#section-first .btn').forEach(function(b) { b.classList.remove('active'); });
+      }
+    }
+    firstBtn.addEventListener('click', updateConditionalSections);
+    secondBtn.addEventListener('click', updateConditionalSections);
+    updateConditionalSections();
+
+    // 终场情况 (先手)
+    bindGroup([
+      document.getElementById('endboard-stopped'),
+      document.getElementById('endboard-compromise'),
+      document.getElementById('endboard-normal'),
+      document.getElementById('endboard-surrender')
+    ], 'endboardState');
+
+    // 突破 (后手)
+    var brokeBtns = [
+      document.getElementById('broke-surrender'),
+      document.getElementById('broke-yes'),
+      document.getElementById('broke-no')
+    ];
+    bindGroup(brokeBtns, 'brokeBoard');
+
+    // 突破选择时显示/隐藏一回合斩杀
+    function updateOtkSection() {
+      document.getElementById('section-otk').classList.toggle('visible', state.brokeBoard === true);
+      if (state.brokeBoard !== true) {
+        document.getElementById('section-endboard').classList.remove('visible');
+      }
+    }
+    brokeBtns.forEach(function(b) {
+      b.addEventListener('click', updateOtkSection);
+    });
+
+    // 一回合斩杀 (后手)
+    var otkYes = document.getElementById('otk-yes');
+    var otkNo = document.getElementById('otk-no');
+    bindGroup([otkYes, otkNo], 'otk');
+    otkYes.addEventListener('click', function() { document.getElementById('section-endboard').classList.remove('visible'); });
+    otkNo.addEventListener('click', function() { document.getElementById('section-endboard').classList.add('visible'); });
+    document.getElementById('section-endboard').classList.remove('visible'); // 默认隐藏
+
+    // 终场阻抗 (后手没斩杀时)
+    bindGroup([document.getElementById('interact-none'), document.getElementById('interact-some')], 'endboardInteraction');
+
+    // ── 复选框 ──
+    function bindCheckbox(id, stateKey) {
+      var el = document.getElementById(id);
+      el.addEventListener('change', function() { state[stateKey] = el.checked; });
+      // 级联显示子选项
+      if (id === 'chk-cant-play') {
+        el.addEventListener('change', function() {
+          document.getElementById('sub-cant-play').style.display = el.checked ? 'flex' : 'none';
+        });
+      }
+    }
+    bindCheckbox('chk-big-hand', 'opponentBigHand');
+    bindCheckbox('chk-maxxc', 'gotMaxxC');
+    bindCheckbox('chk-droll', 'gotDroll');
+    bindCheckbox('chk-lancea', 'gotLancea');
+    bindCheckbox('chk-nibiru', 'gotNibiru');
+    bindCheckbox('chk-disconnect', 'disconnect');
+    // 一方掉线 - 自定义级联
+    (function() {
+      var el = document.getElementById('chk-disconnect');
+      el.addEventListener('change', function() {
+        state.disconnect = el.checked;
+        document.getElementById('sub-disconnect').style.display = el.checked ? 'block' : 'none';
+        if (!el.checked) state.disconnectWho = null;
+      });
+    })();
+    document.querySelectorAll('input[name="disconnect-who"]').forEach(function(rb) {
+      rb.addEventListener('change', function() { state.disconnectWho = rb.value; });
+    });
+    // 选手超时 - 自定义级联
+    (function() {
+      var el = document.getElementById('chk-timeout');
+      el.addEventListener('change', function() {
+        state.timeout = el.checked;
+        document.getElementById('sub-timeout').style.display = el.checked ? 'block' : 'none';
+        if (!el.checked) state.timeoutWho = null;
+      });
+    })();
+    document.querySelectorAll('input[name="timeout-who"]').forEach(function(rb) {
+      rb.addEventListener('change', function() { state.timeoutWho = rb.value; });
+    });
+    bindCheckbox('chk-cant-play', 'cantPlay');
+    bindCheckbox('chk-cant-garnet', 'cantPlayGarnet');
+    bindCheckbox('chk-cant-dup', 'cantPlayDuplicate');
+    bindCheckbox('chk-cant-ht', 'cantPlayHT');
+    // 双方都动不了 - 自定义处理
+    (function() {
+      var el = document.getElementById('chk-both-stuck');
+      el.addEventListener('change', function() {
+        state.bothStuck = el.checked;
+        if (state.result === 'abnormal') return;
+        // 显示/隐藏条件区域
+        document.getElementById('section-firstmover').classList.toggle('visible', el.checked);
+        document.getElementById('section-first').classList.toggle('visible', !el.checked && state.goingFirst === true);
+        document.getElementById('section-second').classList.toggle('visible', !el.checked && state.goingFirst === false);
+        // 清除互斥选项
+        if (el.checked) {
+          state.endboardState = null; state.brokeBoard = null; state.otk = null; state.endboardInteraction = null;
+          document.querySelectorAll('#section-first .btn, #section-second .btn').forEach(function(b) { b.classList.remove('active'); });
+          document.getElementById('section-otk').classList.remove('visible');
+          document.getElementById('section-endboard').classList.remove('visible');
+        } else {
+          state.firstMover = null;
+          document.querySelectorAll('#section-firstmover .btn').forEach(function(b) { b.classList.remove('active'); });
+        }
+      });
+    })();
+
+    // 谁先能动
+    bindGroup([
+      document.getElementById('firstmover-self'),
+      document.getElementById('firstmover-opponent')
+    ], 'firstMover');
+    document.getElementById('sub-cant-play').style.display = 'none';
+
+    document.getElementById('input-deck').addEventListener('input', function(e) { state.opponentDeck = e.target.value; });
+
+    // ── 提交 ──
+    document.getElementById('btn-submit').addEventListener('click', async function() {
+      // ── 校验 ──
+      var missing = [];
+      if (state.result === null) missing.push('结果');
+      if (state.goingFirst === null) missing.push('先后手');
+      if (state.coinToss === null) missing.push('硬币');
+      // 异常跳过后面的条件校验
+      if (state.result !== 'abnormal') {
+        if (state.bothStuck) {
+          if (state.firstMover === null) missing.push('最终谁先能动');
+        } else {
+          if (state.goingFirst === true && state.endboardState === null) missing.push('终场情况');
+          if (state.goingFirst === false && state.brokeBoard === null) missing.push('是否成功突破');
+          if (state.goingFirst === false && state.brokeBoard === true && state.otk === null) missing.push('是否一回合斩杀');
+          if (state.goingFirst === false && state.brokeBoard === true && state.otk === false && state.endboardInteraction === null) missing.push('残局阻抗情况');
+        }
+      }
+
+      if (missing.length > 0) {
+        alert('请选择以下项目：\n' + missing.join('\n'));
+        return;
+      }
+
+      var deck = state.result === 'abnormal' ? '未知' : (state.opponentDeck.trim() || '未知');
+      await api.addMatch({
+        result: state.result,
+        goingFirst: state.goingFirst,
+        coinToss: state.coinToss,
+        opponentDeck: deck,
+        opponentBigHand: state.opponentBigHand || null,
+        gotMaxxC: state.gotMaxxC || null,
+        gotDroll: state.gotDroll || null,
+        gotLancea: state.gotLancea || null,
+        gotNibiru: state.gotNibiru || null,
+        disconnect: state.disconnect || null,
+        disconnectWho: state.disconnectWho,
+        timeout: state.timeout || null,
+        timeoutWho: state.timeoutWho,
+        cantPlay: state.cantPlay || null,
+        cantPlayGarnet: state.cantPlayGarnet || null,
+        cantPlayDuplicate: state.cantPlayDuplicate || null,
+        cantPlayHT: state.cantPlayHT || null,
+        bothStuck: state.bothStuck || null,
+        firstMover: state.firstMover,
+        endboardState: state.goingFirst ? state.endboardState : null,
+        brokeBoard: !state.goingFirst ? state.brokeBoard : null,
+        otk: (!state.goingFirst && state.brokeBoard === true) ? state.otk : null,
+        endboardInteraction: (!state.goingFirst && state.brokeBoard === true && !state.otk) ? state.endboardInteraction : null
+      });
+      clearForm();
+    });
+
+    // ── 清空 ──
+    document.getElementById('btn-clear').addEventListener('click', clearForm);
+    function clearForm() {
+      state.result = null;
+      state.goingFirst = null;
+      state.coinToss = null;
+      state.opponentDeck = '';
+      state.opponentBigHand = false;
+      state.gotMaxxC = false;
+      state.gotDroll = false;
+      state.gotLancea = false;
+      state.gotNibiru = false;
+      state.disconnect = false;
+      state.disconnectWho = null;
+      state.timeout = false;
+      state.timeoutWho = null;
+      state.cantPlay = false;
+      state.cantPlayGarnet = false;
+      state.cantPlayDuplicate = false;
+      state.cantPlayHT = false;
+      state.bothStuck = false;
+      state.firstMover = null;
+      state.endboardState = null;
+      state.brokeBoard = null;
+      state.otk = null;
+      state.endboardInteraction = null;
+
+      // 重置所有UI
+      document.querySelectorAll('.btn-group .btn').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('input[type=checkbox]').forEach(function(c) { c.checked = false; });
+      document.querySelectorAll('input[type=radio]').forEach(function(r) { r.checked = false; });
+      document.getElementById('input-deck').value = '';
+      document.getElementById('input-deck').disabled = false;
+      document.getElementById('sub-cant-play').style.display = 'none';
+      document.getElementById('sub-disconnect').style.display = 'none';
+      document.getElementById('sub-timeout').style.display = 'none';
+      document.getElementById('section-firstmover').classList.remove('visible');
+      document.getElementById('section-otk').classList.remove('visible');
+      document.getElementById('section-endboard').classList.remove('visible');
+      updateConditionalSections();
+    }
+
+    // 快捷提交
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey && e.target.tagName !== 'TEXTAREA' && e.target.id !== 'preset-new-name') {
+        document.getElementById('btn-submit').click();
+      }
+    });
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  预设卡组管理
+    // ═══════════════════════════════════════════════════════════════════════
+
+    var presets = [];
+
+    function loadPresets() {
+      api.presets.getAll().then(function(list) {
+        presets = list || [];
+        renderPresetButtons();
+      });
+    }
+
+    function renderPresetButtons() {
+      var el = document.getElementById('deck-quick-btns');
+      el.innerHTML = '';
+      presets.forEach(function(name) {
+        var btn = document.createElement('button');
+        btn.className = 'btn btn-sm';
+        btn.textContent = name;
+        btn.addEventListener('click', function() {
+          if (state.result === 'abnormal') return;
+          state.opponentDeck = name;
+          document.getElementById('input-deck').value = name;
+        });
+        el.appendChild(btn);
+      });
+    }
+
+    function renderPresetList() {
+      var el = document.getElementById('preset-list');
+      el.innerHTML = '';
+      presets.forEach(function(name, i) {
+        var div = document.createElement('div');
+        div.className = 'preset-item';
+        var span = document.createElement('span');
+        span.className = 'name';
+        span.textContent = name;
+        var delBtn = document.createElement('button');
+        delBtn.className = 'btn-del';
+        delBtn.textContent = '✕';
+        delBtn.addEventListener('click', async function() {
+          if (await confirmAsync('删除预设「' + name + '」？')) {
+            var result = await api.presets.delete(name);
+            if (result.success) {
+              presets = result.presets;
+              renderPresetButtons();
+              renderPresetList();
+            }
+          }
+        });
+        div.appendChild(span);
+        div.appendChild(delBtn);
+        el.appendChild(div);
+      });
+    }
+
+    // 预设管理弹窗
+    document.getElementById('btn-manage-presets').addEventListener('click', function() {
+      renderPresetList();
+      document.getElementById('modal-presets').classList.add('show');
+    });
+    document.getElementById('preset-close').addEventListener('click', function() {
+      document.getElementById('modal-presets').classList.remove('show');
+    });
+    document.getElementById('preset-add-btn').addEventListener('click', async function() {
+      var name = document.getElementById('preset-new-name').value.trim();
+      if (!name) return;
+      var result = await api.presets.add(name);
+      if (!result.success) { alert(result.error); return; }
+      document.getElementById('preset-new-name').value = '';
+      presets = result.presets;
+      renderPresetList();
+      renderPresetButtons();
+    });
+    document.getElementById('preset-new-name').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') document.getElementById('preset-add-btn').click();
+    });
+
+    loadPresets();
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  渲染统计 & 对局记录
+    // ═══════════════════════════════════════════════════════════════════════
+
+    function renderStats(stats) {
+      if (!stats) return;
+      document.getElementById('stats-grid').innerHTML =
+        '<div class="stat-box"><div class="stat-value neutral">' + stats.total + '</div><div class="stat-label">总场</div></div>' +
+        '<div class="stat-box"><div class="stat-value neutral">' + stats.winRate + '%</div><div class="stat-label">胜率</div></div>' +
+        '<div class="stat-box"><div class="stat-value win">' + stats.wins + '</div><div class="stat-label">胜场</div></div>' +
+        '<div class="stat-box"><div class="stat-value loss">' + stats.losses + '</div><div class="stat-label">负场</div></div>';
+      var streak = stats.currentStreak.type
+        ? (stats.currentStreak.type === 'win' ? '🔥 ' : '💀 ') + stats.currentStreak.count + (stats.currentStreak.type === 'win' ? '连胜' : '连败')
+        : '—';
+      document.getElementById('stats-extended').innerHTML =
+        '<span>先手 <span class="val">' + stats.goingFirst.wins + '-' + stats.goingFirst.losses + '</span> (' + stats.goingFirst.winRate + '%)</span>' +
+        '<span>后手 <span class="val">' + stats.goingSecond.wins + '-' + stats.goingSecond.losses + '</span> (' + stats.goingSecond.winRate + '%)</span>' +
+        '<span>当前 <span class="val">' + streak + '</span></span>';
+    }
+
+    function renderDeckStats(stats) {
+      var el = document.getElementById('deck-stats-content');
+      if (!stats || !stats.deckStats || stats.deckStats.length === 0) {
+        el.innerHTML = '<span style="color:var(--text-dim);font-size:12px">暂无数据</span>'; return;
+      }
+      el.innerHTML = '<div class="deck-list">' + stats.deckStats.map(function(d) {
+        return '<span class="deck-tag">' + d.deck + ' <span class="dw">' + d.wins + 'W</span> <span class="dl">' + d.losses + 'L</span>' +
+          (d.abnormals ? ' <span style="color:#888;opacity:0.7">' + d.abnormals + 'X</span>' : '') +
+          ' <span style="opacity:0.5">' + d.winRate + '%</span></span>';
+      }).join('') + '</div>';
+    }
+
+    function renderMatches(matches) {
+      var el = document.getElementById('match-list');
+      if (!matches || matches.length === 0) {
+        el.innerHTML = '<div class="match-empty"><span class="emoji">🎴</span>还没有对局记录</div>'; return;
+      }
+      var reversed = matches.slice().reverse();
+      el.innerHTML = reversed.map(function(m, i) {
+        var idx = matches.length - i;
+        var label = m.result === 'win' ? '胜' : m.result === 'draw' ? '平' : m.result === 'abnormal' ? '异' : '负';
+        var going = m.goingFirst ? '先手' : '后手';
+        var deck = m.opponentDeck || '—';
+        var extras = [];
+        if (m.coinToss === true) extras.push('硬币胜');
+        else if (m.coinToss === false) extras.push('硬币负');
+        if (m.gotMaxxc) extras.push('吃G');
+        if (m.gotDroll) extras.push('吃鸟');
+        if (m.gotNibiru) extras.push('陨石');
+        if (m.disconnect) extras.push('掉线' + (m.disconnectWho === 'self' ? '(我)' : m.disconnectWho === 'opponent' ? '(对)' : ''));
+        if (m.timeout) extras.push('超时' + (m.timeoutWho === 'self' ? '(我)' : m.timeoutWho === 'opponent' ? '(对)' : ''));
+        if (m.cantPlay) extras.push('卡手');
+        if (m.bothStuck) extras.push('互卡');
+        if (m.endboardState) extras.push(m.endboardState === 'normal' ? '正常终场' : m.endboardState === 'compromised' ? '妥协' : '停牌');
+        if (m.brokeBoard === true) extras.push('突破');
+        else if (m.brokeBoard === false) extras.push('未突破');
+        if (m.otk === true) extras.push('斩杀');
+        var notes = m.notes ? ' · ' + m.notes.slice(0, 20) + (m.notes.length > 20 ? '…' : '') : '';
+        var date = new Date(m.timestamp);
+        var timeStr = (date.getMonth()+1) + '/' + date.getDate() + ' ' + String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0');
+        var extraStr = extras.length ? ' · ' + extras.join(' ') : '';
+        var color = m.result === 'win' ? 'var(--win)' : (m.result === 'abnormal' || m.result === 'draw') ? '#8888a0' : 'var(--loss)';
+        return '<div class="match-item"><span class="match-result" style="color:' + color + '">' + label + '</span>' +
+          '<div class="match-info"><div><span class="match-deck">' + deck + '</span><span style="font-size:11px;color:var(--text-dim);margin-left:6px">' + going + '</span></div>' +
+          '<div class="match-meta">#' + idx + ' · ' + timeStr + extraStr + notes + '</div></div>' +
+          '<div class="match-actions"><button class="btn-del" data-id="' + m.id + '" title="删除">✕</button></div></div>';
+      }).join('');
+      el.querySelectorAll('.btn-del').forEach(function(btn) {
+        btn.addEventListener('click', async function(e) {
+          var id = e.target.dataset.id;
+          if (await confirmAsync('删除这条对局记录？')) await api.deleteMatch(id);
+        });
+      });
+    }
+
+    function renderAll(data) {
+      renderStats(data.stats);
+      renderDeckStats(data.stats);
+      renderMatches(data.matches);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  导入/导出/重置
+    // ═══════════════════════════════════════════════════════════════════════
+
+    document.getElementById('btn-export').addEventListener('click', async function() {
+      document.getElementById('export-text').value = await api.exportJSON();
+      document.getElementById('modal-export').classList.add('show');
+    });
+    document.getElementById('export-close').addEventListener('click', function() {
+      document.getElementById('modal-export').classList.remove('show');
+    });
+    document.getElementById('export-copy').addEventListener('click', async function() {
+      await navigator.clipboard.writeText(document.getElementById('export-text').value);
+      document.getElementById('export-copy').textContent = '✓ 已复制';
+      setTimeout(function() { document.getElementById('export-copy').textContent = '📋 复制'; }, 2000);
+    });
+
+    document.getElementById('btn-import').addEventListener('click', function() {
+      document.getElementById('import-text').value = '';
+      document.getElementById('modal-import').classList.add('show');
+    });
+    document.getElementById('import-close').addEventListener('click', function() {
+      document.getElementById('modal-import').classList.remove('show');
+    });
+    document.getElementById('import-confirm').addEventListener('click', async function() {
+      var json = document.getElementById('import-text').value;
+      if (!json.trim()) return;
+      if (await confirmAsync('导入将覆盖所有现有数据，确定？')) {
+        var result = await api.importJSON(json);
+        if (result.success) document.getElementById('modal-import').classList.remove('show');
+        else alert('导入失败：' + result.error);
+      }
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', async function() {
+      if (await confirmAsync('确定清空所有对局数据？预设卡组不会被删除。')) {
+        await api.resetMatches();
+      }
+    });
+
+    // 点击遮罩关闭弹窗
+    document.querySelectorAll('.modal-overlay').forEach(function(el) {
+      el.addEventListener('click', function(e) { if (e.target === el) el.classList.remove('show'); });
+    });
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  确认弹窗
+    // ═══════════════════════════════════════════════════════════════════════
+
+    function confirmAsync(msg) {
+      return new Promise(function(resolve) {
+        document.getElementById('confirm-msg').textContent = msg;
+        document.getElementById('confirm-overlay').classList.add('show');
+        document.getElementById('confirm-yes').onclick = function() {
+          document.getElementById('confirm-overlay').classList.remove('show'); resolve(true);
+        };
+        document.getElementById('confirm-no').onclick = function() {
+          document.getElementById('confirm-overlay').classList.remove('show'); resolve(false);
+        };
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  启动
+    // ═══════════════════════════════════════════════════════════════════════
+
+    api.getAll().then(renderAll);
+    api.onStatsUpdate(function() { api.getAll().then(renderAll); });
+  </script>
+</body>
+</html>

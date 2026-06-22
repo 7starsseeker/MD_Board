@@ -1,0 +1,132 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   游戏王MD 统计板 - 共用样式
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --bg-dark: rgba(15, 15, 25, 0.88);
+  --bg-card: rgba(25, 25, 40, 0.75);
+  --bg-input: rgba(35, 35, 55, 0.7);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-active: rgba(255, 200, 50, 0.4);
+
+  --text: #e8e8f0;
+  --text-dim: #8888a0;
+  --text-bright: #ffffff;
+
+  --win: #4cd964;
+  --win-bg: rgba(76, 217, 100, 0.15);
+  --loss: #ff3b30;
+  --loss-bg: rgba(255, 59, 48, 0.15);
+  --draw: #8888a0;
+
+  --accent: #ffc832;
+  --accent-dim: rgba(255, 200, 50, 0.2);
+  --accent-bright: #ffd866;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font-mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+  --font-sans: 'SimHei', '黑体', -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* ── 滚动条 ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+/* ── 全局 ── */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  font-family: var(--font-sans);
+  color: var(--text);
+  overflow: hidden;
+  user-select: none;
+  -webkit-app-region: no-drag;
+}
+
+/* ── 拖拽区域 ── */
+.drag-region {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* ── 按钮共用 ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+}
+.btn:hover { border-color: var(--text-dim); background: rgba(255,255,255,0.08); }
+.btn:active { transform: scale(0.96); }
+
+.btn-primary {
+  background: var(--accent);
+  color: #1a1a2e;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.btn-primary:hover { background: var(--accent-bright); border-color: var(--accent-bright); }
+
+/* 所有按钮默认统一风格，选中后才变色 */
+.btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-bright); font-weight:600; }
+.btn-win.active { background: var(--win); color: #1a1a2e; border-color: var(--win); }
+.btn-loss.active { background: var(--loss); color: #fff; border-color: var(--loss); }
+.btn-first.active { background: var(--accent); color: #1a1a2e; border-color: var(--accent); }
+.btn-second.active { background: var(--text-dim); color: #111; border-color: var(--text-dim); }
+.btn-coin.active { background: rgba(255, 215, 0, 0.2); border-color: rgba(255, 215, 0, 0.4); color: #ffd700; }
+.btn-endboard.active { background: rgba(100, 200, 255, 0.2); border-color: rgba(100, 200, 255, 0.4); color: #64c8ff; }
+.btn-broke.active { background: rgba(255, 150, 50, 0.2); border-color: rgba(255, 150, 50, 0.4); color: #ff9632; }
+.btn-interact.active { background: rgba(200, 100, 255, 0.2); border-color: rgba(200, 100, 255, 0.4); color: #c864ff; }
+.btn-abnormal.active { background: rgba(200, 200, 200, 0.2); border-color: rgba(200, 200, 200, 0.4); color: #cccccc; }
+
+.btn-sm { padding: 3px 10px; font-size: 12px; }
+.btn-icon {
+  width: 28px; height: 28px; padding: 0;
+  font-size: 16px; line-height: 1;
+}
+
+/* ── 标签 ── */
+.badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge-win { background: var(--win-bg); color: var(--win); }
+.badge-loss { background: var(--loss-bg); color: var(--loss); }
+.badge-first { background: rgba(255, 200, 50, 0.15); color: var(--accent); }
+.badge-second { background: rgba(136, 136, 160, 0.2); color: var(--text-dim); }
+
+/* ── 表单 ── */
+input, textarea, select {
+  font-family: var(--font-sans);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 7px 10px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent);
+}
+textarea { resize: vertical; min-height: 50px; }
+label { font-size: 12px; color: var(--text-dim); display: block; margin-bottom: 4px; }

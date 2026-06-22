@@ -1,0 +1,15 @@
+{
+  "name": "md-stats",
+  "version": "1.0.0",
+  "description": "游戏王Master Duel 对局统计板 - 直播用无边框叠加窗口",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

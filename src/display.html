@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MD Stats - 显示窗口</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      background: transparent;
+      display: flex;
+      align-items: flex-start;
+      height: 100vh;
+      padding: 4px;
+    }
+    .overlay {
+      background: rgba(8, 8, 16, 0.97);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: var(--radius);
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+      position: relative;
+      -webkit-app-region: drag;
+      display: flex;
+      flex-direction: column;
+    }
+    .close-btn {
+      position: absolute;
+      top: 0; right: 4px;
+      background: none;
+      border: none;
+      color: #aaa;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 2px 5px;
+      line-height: 1;
+      -webkit-app-region: no-drag;
+      opacity: 0.4;
+      z-index: 10;
+    }
+    .close-btn:hover { opacity: 1; color: #ff4444; }
+
+    .stats-wrap {
+      padding: 12px 14px;
+      -webkit-app-region: drag;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 100%;
+    }
+
+    .coin-row {
+      font-size: 14px;
+      color: #d0d0e0;
+      margin-bottom: 4px;
+    }
+    .coin-row .coin-label { opacity: 0.8; }
+    .coin-row .coin-val { color: #ffd866; font-weight: 700; }
+
+    .wl-row {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 3px;
+    }
+    .wl-record {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      white-space: nowrap;
+    }
+    .wl-record .wins { color: #4cd964; }
+    .wl-record .losses { color: #ff3b30; }
+    .wl-record .sep { color: #666680; margin: 0 3px; }
+    .wl-record .abnormals { color: #8888a0; }
+    .wl-record .draws { color: #ffd700; }
+    .wl-rate {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    .wl-rate .pct { color: #8888a0; font-size: 14px; }
+
+    .detail-row {
+      display: flex;
+      gap: 14px;
+      font-size: 13px;
+      color: #c8c8dc;
+      margin-bottom: 4px;
+      flex-wrap: wrap;
+    }
+    .detail-row .item { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+    .detail-row .item .lbl { opacity: 0.75; }
+    .detail-row .item .v { color: #f0f0ff; font-weight: 700; }
+
+    .dots-row {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .dots-row .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+    .dots-row .dot.win { background: #4cd964; }
+    .dots-row .dot.loss { background: #ff3b30; }
+    .dots-row .dot.draw {
+      background: #ffd700;
+    }
+    .dots-row .dot.abnormal {
+      background: transparent;
+      border: 2px solid #8888a0;
+      position: relative;
+      overflow: hidden;
+    }
+    .dots-row .dot.abnormal::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: linear-gradient(45deg, transparent 40%, #8888a0 40%, #8888a0 60%, transparent 60%);
+    }
+    .dots-row .dot.empty { background: rgba(255,255,255,0.1); }
+    .dots-row .dot-label {
+      font-size: 11px;
+      color: #a0a0b8;
+      margin-left: 4px;
+    }
+
+    .empty-state {
+      padding: 16px 12px;
+      text-align: center;
+      color: #a0a0b8;
+      font-size: 13px;
+    }
+    .empty-state .emoji { font-size: 22px; display: block; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <div class="overlay" id="app">
+    <button class="close-btn" id="btn-close" title="关闭">✕</button>
+    <div id="content" class="stats-wrap">
+      <div class="empty-state"><span class="emoji">⏳</span>加载中...</div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      var api = window.mdStats;
+      if (!api) { document.getElementById('content').innerHTML = '<div class="empty-state">API 加载失败</div>'; return; }
+
+      function render(stats) {
+        var el = document.getElementById('content');
+        if (!stats || stats.total === 0) {
+          el.innerHTML = '<div class="empty-state"><span class="emoji">🎴</span>暂无对局数据<br><span style="font-size:10px;opacity:0.6">打开控制面板录入</span></div>';
+          return;
+        }
+
+        var c = stats.coin;
+        var coinRow = stats.total > 0
+          ? '<div class="coin-row"><span class="coin-label">硬币 </span><span class="coin-val">' + c.wins + '-' + c.losses + '</span> <span class="coin-label">(' + c.winRate + '%)</span></div>'
+          : '';
+
+        var gf = stats.goingFirst, gs = stats.goingSecond;
+        var w = stats.wins, l = stats.losses, d = stats.draws, a = stats.abnormals;
+        var wlDisplay = '<span class="wl-record"><span class="wins">' + w + '胜</span><span class="sep">-</span><span class="losses">' + l + '负</span>' +
+          '<span class="sep">-</span><span class="draws">' + d + '平</span>' +
+          '<span class="sep">-</span><span class="abnormals">' + a + '异常</span></span>';
+
+        var dots = '';
+        for (var i = 0; i < 10; i++) {
+          var m = stats.last10[i];
+          if (m && m.result === 'win') dots += '<span class="dot win"></span>';
+          else if (m && m.result === 'loss') dots += '<span class="dot loss"></span>';
+          else if (m && m.result === 'draw') dots += '<span class="dot draw"></span>';
+          else if (m && m.result === 'abnormal') dots += '<span class="dot abnormal"></span>';
+          else dots += '<span class="dot empty"></span>';
+        }
+
+        el.innerHTML =
+          coinRow +
+          '<div class="wl-row">' +
+            wlDisplay +
+            '<span class="wl-rate">' + stats.winRate + '<span class="pct">%</span></span>' +
+          '</div>' +
+          '<div class="detail-row">' +
+            '<span class="item"><span class="lbl">先手</span><span class="v"><span style="color:#4cd964">' + gf.wins + '</span>-<span style="color:#ff3b30">' + gf.losses + '</span>-<span style="color:#ffd700">' + gf.draws + '</span>-<span style="color:#8888a0">' + gf.abnormals + '</span></span><span class="lbl">(' + gf.winRate + '%)</span></span>' +
+            '<span class="item"><span class="lbl">后手</span><span class="v"><span style="color:#4cd964">' + gs.wins + '</span>-<span style="color:#ff3b30">' + gs.losses + '</span>-<span style="color:#ffd700">' + gs.draws + '</span>-<span style="color:#8888a0">' + gs.abnormals + '</span></span><span class="lbl">(' + gs.winRate + '%)</span></span>' +
+            '<span class="item"><span class="lbl">总场数</span><span class="v">' + stats.total + '</span></span>' +
+          '</div>' +
+          '<div class="dots-row">' + dots + '<span class="dot-label">最近10场胜负情况</span></div>';
+      }
+
+      api.getStats().then(render);
+      api.onStatsUpdate(render);
+
+      document.getElementById('btn-close').addEventListener('click', function() { window.close(); });
+    })();
+  </script>
+</body>
+</html>
