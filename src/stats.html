@@ -315,6 +315,7 @@
   <div class="title-bar">
     <span class="title">📊 MD Stats · 详细统计</span>
     <div class="title-actions">
+      <span style="font-size:11px;color:var(--text-dim);margin-right:6px" id="stats-tr-label"></span>
       <span class="last-update" id="last-update">—</span>
       <button class="close-btn" id="btn-close" title="关闭">✕</button>
     </div>
@@ -406,7 +407,7 @@
         <div class="card-icon" style="background:rgba(255,45,85,0.12)">⚡</div>
         <div>
           <div class="card-title-text">对手T0动统计</div>
-          <div class="card-subtitle">先手被对手T0干扰 · 按对手卡组分布</div>
+          <div class="card-subtitle">先手被对手T0动干扰 · 按对手卡组分布</div>
         </div>
       </div>
       <div id="t0-content"></div>
@@ -470,6 +471,18 @@
         </div>
       </div>
       <div id="typhon-content"></div>
+    </div>
+
+    <!-- 抽干牌组统计 -->
+    <div class="stat-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(100,200,255,0.12)">📦</div>
+        <div>
+          <div class="card-title-text">抽干牌组统计</div>
+          <div class="card-subtitle">抽干牌组次数及胜负</div>
+        </div>
+      </div>
+      <div id="deckout-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
     </div>
 
   </div>
@@ -648,9 +661,9 @@
           '<div class="stat-row"><span class="label">对手T0动次数</span><span class="value warn">' + t.total + ' 次</span></div>' +
           '<div class="stat-row"><span class="label">其中赢了</span><span class="value good">' + t.wins + '</span></div>' +
           '<div class="stat-row"><span class="label">其中输了</span><span class="value bad">' + t.losses + '</span></div>' +
-          '<div class="stat-row"><span class="label">T0时胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + parseFloat(t.winRate) + '%"></div></div><span class="value warn">' + fmt(t.winRate) + '%</span></div></div>';
+          '<div class="stat-row"><span class="label">被T0动时胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + parseFloat(t.winRate) + '%"></div></div><span class="value warn">' + fmt(t.winRate) + '%</span></div></div>';
         if (t.byDeck && t.byDeck.length > 0) {
-          html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span style="font-size:11px;color:var(--accent);font-weight:600">被T0的对手卡组</span></div>';
+          html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span style="font-size:11px;color:var(--accent);font-weight:600">被T0动的对手卡组</span></div>';
           t.byDeck.forEach(function(d) {
             html += '<div class="stat-row"><span class="label">' + d.deck + '</span><span class="value" style="font-size:11px;color:var(--text-dim)">' + d.total + ' 次</span><span style="font-size:12px;font-weight:700;font-family:var(--font-mono)">' + d.winRate + '%</span></div>';
           });
@@ -743,6 +756,21 @@
           '<div class="stat-row"><span class="label">　其中自己出提丰赢了</span><span class="value">' + t.selfWhite + '</span></div>';
       }
 
+      // ═══ 抽干牌组统计 ═══
+      function renderDeckOut(stats) {
+        var d = stats.deckOut;
+        var el = document.getElementById('deckout-content');
+        if (!d || d.total === 0) {
+          el.innerHTML = '<div style="padding:10px;text-align:center;color:var(--text-dim);font-size:12px">还没有抽干牌组记录</div>'; return;
+        }
+        var html =
+          '<div class="stat-row"><span class="label">抽干牌组次数</span><span class="value info">' + d.total + ' 次</span></div>' +
+          '<div class="stat-row"><span class="label">抽干对手</span><span class="value good">' + d.opponent + '</span></div>' +
+          '<div class="stat-row"><span class="label">自己抽干</span><span class="value bad">' + d.self + '</span></div>' +
+          '<div class="stat-row"><span class="label">自己抽干时胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill blue" style="width:' + parseFloat(d.selfWinRate) + '%"></div></div><span class="value warn">' + fmt(d.selfWinRate) + '%</span></div></div>';
+        el.innerHTML = html;
+      }
+
       // ═══ 连胜 + 最近10场 ═══
       // ═══ 卡组统计 ═══
       function renderDeckTable(decks, containerId, labelW, labelL) {
@@ -823,6 +851,11 @@
       // ═══ 主渲染 ═══
       function renderAll(stats) {
         if (!stats) return;
+        // 更新时间范围标签
+        api.getTimeRange().then(function(range) {
+          var labels = { all: '', today: '📅 今天', week: '📅 本周', month: '📅 本月' };
+          document.getElementById('stats-tr-label').textContent = labels[range] || '';
+        });
         renderHero(stats);
         renderFirstSecond(stats);
         renderCoin(stats);
@@ -835,6 +868,7 @@
         renderBreakBoard(stats);
         renderConnectivity(stats);
         renderTyphon(stats);
+        renderDeckOut(stats);
         renderTimeout(stats);
         renderDeckTable(stats.myDeckStats, 'mydeck-content', 'W', 'L');
         renderDeckTable(stats.deckStats, 'oppdeck-content', 'W', 'L');

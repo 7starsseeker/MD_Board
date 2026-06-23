@@ -143,11 +143,13 @@
       font-size: 13px;
     }
     .empty-state .emoji { font-size: 22px; display: block; margin-bottom: 4px; }
+    .tr-label { position: absolute; top: 4px; left: 8px; font-size: 10px; color: #8888a0; -webkit-app-region: no-drag; z-index: 5; }
   </style>
 </head>
 <body>
   <div class="overlay" id="app">
     <button class="close-btn" id="btn-close" title="关闭">✕</button>
+    <span class="tr-label" id="tr-label"></span>
     <div id="content" class="stats-wrap">
       <div class="empty-state"><span class="emoji">⏳</span>加载中...</div>
     </div>
@@ -160,6 +162,11 @@
 
       function render(stats) {
         var el = document.getElementById('content');
+        // 更新时间范围标签
+        api.getTimeRange().then(function(range) {
+          var labels = { all: '', today: '[今天]', week: '[本周]', month: '[本月]' };
+          document.getElementById('tr-label').textContent = labels[range] || '';
+        });
         if (!stats || stats.total === 0) {
           el.innerHTML = '<div class="empty-state"><span class="emoji">🎴</span>暂无对局数据<br><span style="font-size:10px;opacity:0.6">打开控制面板录入</span></div>';
           return;

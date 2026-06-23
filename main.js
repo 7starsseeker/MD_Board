@@ -12,7 +12,7 @@ function getRuntimeDir() {
 const RUNTIME_DATA = () => path.join(getRuntimeDir(), 'stats.json');
 const RUNTIME_WSTATE = () => path.join(getRuntimeDir(), 'window-state.json');
 
-let data = { matches: [], version: 4, deckPresets: [], myDeckPresets: [], cycleConfig: null };
+let data = { matches: [], version: 4, deckPresets: [], myDeckPresets: [], cycleConfig: null, timeRange: 'all' };
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -56,9 +56,35 @@ function saveData() {
   }
 }
 
+// ── 时间范围过滤 ──────────────────────────────────────────────────
+function filterMatchesByTimeRange(matches, range) {
+  if (range === 'all' || !range) return matches;
+  const now = new Date();
+  let start;
+  if (range === 'today') {
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  } else if (range === 'week') {
+    // 周一起算
+    const day = now.getDay();
+    const diff = (day === 0 ? 6 : day - 1);
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
+  } else if (range === 'month') {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else {
+    return matches;
+  }
+  const startTs = start.getTime();
+  return matches.filter(m => {
+    const t = new Date(m.timestamp).getTime();
+    return t >= startTs;
+  });
+}
+
 // ── 统计计算（v2.0 增强版）─────────────────────────────────────────
 function computeStats() {
-  const matches = data.matches || [];
+  const allMatches = data.matches || [];
+  const timeRange = data.timeRange || 'all';
+  const matches = filterMatchesByTimeRange(allMatches, timeRange);
   const wins = matches.filter(m => m.result === 'win').length;
   const losses = matches.filter(m => m.result === 'loss').length;
   const draws = matches.filter(m => m.result === 'draw').length;
@@ -184,6 +210,12 @@ function computeStats() {
   const typhonEnemyWhite = typhonMatches.filter(m => m.typhonWho === 'opponent' && m.result === 'loss').length;
   const typhonSelfBlack = typhonMatches.filter(m => m.typhonWho === 'self' && m.result === 'loss').length;
   const typhonSelfWhite = typhonMatches.filter(m => m.typhonWho === 'self' && m.result === 'win').length;
+
+  // ── 抽干牌组统计 ──
+  const deckOutMatches = matches.filter(m => m.deckOut);
+  const deckOutSelf = deckOutMatches.filter(m => m.deckOutWho === 'self').length;
+  const deckOutOpponent = deckOutMatches.filter(m => m.deckOutWho === 'opponent').length;
+  const deckOutSelfWins = deckOutMatches.filter(m => m.deckOutWho === 'self' && m.result === 'win').length;
 
   // ── 严重失误统计 ──
   const mistakeMatches = matches.filter(m => m.mistake);
@@ -381,6 +413,12 @@ function computeStats() {
       enemyWhite: typhonEnemyWhite,
       selfBlack: typhonSelfBlack,
       selfWhite: typhonSelfWhite
+    },
+    deckOut: {
+      total: deckOutMatches.length,
+      self: deckOutSelf,
+      opponent: deckOutOpponent,
+      selfWinRate: deckOutSelf > 0 ? ((deckOutSelfWins / deckOutSelf) * 100).toFixed(1) : '0.0'
     },
     matchupStats: Object.entries(matchupStats)
       .sort((a, b) => b[1].total - a[1].total)
@@ -596,7 +634,7 @@ function notifyWindows() {
 }
 
 ipcMain.handle('stats:get-all', () => {
-  return { matches: data.matches, stats: computeStats() };
+  return { matches: data.matches, stats: computeStats(), timeRange: data.timeRange || 'all' };
 });
 
 ipcMain.handle('stats:get-stats', () => {
@@ -662,6 +700,21 @@ ipcMain.handle('stats:reset-matches', () => {
 ipcMain.handle('shell:open-external', (event, url) => {
   const { shell } = require('electron');
   shell.openExternal(url);
+});
+
+// ── 时间范围过滤 ─────────────────────────────────────────────────────────
+ipcMain.handle('stats:get-time-range', () => {
+  return data.timeRange || 'all';
+});
+
+ipcMain.handle('stats:set-time-range', (event, range) => {
+  if (['all', 'today', 'week', 'month'].includes(range)) {
+    data.timeRange = range;
+    saveData();
+    notifyWindows();
+    return { success: true };
+  }
+  return { success: false, error: '无效的时间范围' };
 });
 
 // ── 预设卡组管理 ─────────────────────────────────────────────────────────
@@ -755,6 +808,7 @@ function getDefaultCycleConfig() {
       { type: 'disconnect', enabled: true, label: '掉线统计' },
       { type: 'timeout', enabled: true, label: '超时统计' },
       { type: 'typhon', enabled: true, label: '提丰统计' },
+      { type: 'deckOut', enabled: true, label: '抽干牌组' },
       { type: 'myDeckStats', enabled: true, label: '自用卡组' },
       { type: 'oppDeckStats', enabled: true, label: '对战卡组' },
       { type: 'matchupStats', enabled: true, label: '交叉统计' }
@@ -833,12 +887,13 @@ function showStartupTip() {
 
   const choice = dialog.showMessageBoxSync({
     type: 'info',
-    buttons: ['知道了，不再提示', '知道了'],
+    buttons: ['下次不显示', '确定'],
     defaultId: 1,
     title: 'MD_Board',
     message: '数据存储说明',
-    detail: '所有对局数据保存在系统临时目录中。\n\n' +
-      '如需备份数据，请使用控制面板的「导出」功能。'
+    detail: '所有对局数据默认保存在系统临时目录中。\n\n' +
+      '如需备份，请使用控制面板的「导出」功能；\n' +
+      '恢复数据时使用「导入」功能。'
   });
   if (choice === 0) {
     // 不再提示

@@ -89,6 +89,8 @@ html, body {
 .btn-second.active { background: var(--text-dim); color: #111; border-color: var(--text-dim); }
 .btn-coin.active { background: rgba(255, 215, 0, 0.2); border-color: rgba(255, 215, 0, 0.4); color: #ffd700; }
 .btn-endboard.active { background: rgba(100, 200, 255, 0.2); border-color: rgba(100, 200, 255, 0.4); color: #64c8ff; }
+.btn-time-range { font-size:12px; padding:5px 8px; }
+.btn-time-range.active { background: rgba(100, 200, 255, 0.2); border-color: rgba(100, 200, 255, 0.4); color: #64c8ff; }
 .btn-broke.active { background: rgba(255, 150, 50, 0.2); border-color: rgba(255, 150, 50, 0.4); color: #ff9632; }
 .btn-interact.active { background: rgba(200, 100, 255, 0.2); border-color: rgba(200, 100, 255, 0.4); color: #c864ff; }
 .btn-abnormal.active { background: rgba(200, 200, 200, 0.2); border-color: rgba(200, 200, 200, 0.4); color: #cccccc; }

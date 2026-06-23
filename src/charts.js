@@ -512,7 +512,7 @@ function renderOpponentT0Doughnut(canvas, stats) {
           callbacks: {
             afterBody: function() {
               var wr = (t.wins + t.losses) > 0 ? ((t.wins / (t.wins + t.losses)) * 100).toFixed(1) : '0.0';
-              return '被T0时胜率: ' + wr + '%';
+              return '被T0动时胜率: ' + wr + '%';
             }
           }
         }

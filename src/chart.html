@@ -171,6 +171,7 @@
     <!-- 标题栏 -->
     <div class="title-bar">
       <span class="title">📈 图表</span>
+      <span style="font-size:11px;color:#8888a0;flex:1;text-align:center" id="chart-tr-label"></span>
       <div class="title-actions">
         <button id="btn-prev" title="上一个">◀</button>
         <button id="btn-next" title="下一个">▶</button>
@@ -323,6 +324,11 @@
       // ═══ 数据更新 ═══
       function updateDisplay(newStats) {
         stats = newStats;
+        // 更新时间范围标签
+        api.getTimeRange().then(function(range) {
+          var labels = { all: '', today: '[今天]', week: '[本周]', month: '[本月]' };
+          document.getElementById('chart-tr-label').textContent = labels[range] || '';
+        });
         if (!stats || stats.total === 0) {
           document.getElementById('empty-state').style.display = '';
           document.querySelectorAll('.chart-slide').forEach(function(s) { s.style.display = 'none'; });

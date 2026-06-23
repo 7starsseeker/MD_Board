@@ -208,6 +208,7 @@
   <div class="overlay">
     <div class="title-bar">
       <span class="title">🔄 循环显示</span>
+      <span style="font-size:11px;color:#8888a0;flex:1;text-align:center" id="cycle-time-range-label"></span>
       <div class="title-actions">
         <button id="btn-pause" title="暂停/继续">⏸</button>
         <button class="close-btn" id="btn-close" title="关闭">✕</button>
@@ -231,6 +232,8 @@
       var currentIndex = 0;
       var timer = null;
       var paused = false;
+      var currentTimeRange = 'all';
+      var TIME_RANGE_LABELS = { all: '全部', today: '今天', week: '本周', month: '本月' };
 
       // ═══ 渲染函数 ▸ 返回 { label, subLabel, html } ═══
 
@@ -313,16 +316,15 @@
         return {
           label: '吃G率 ' + agR + '%',
           subLabel: '吃锁率 ' + laR + '%',
-          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:3px">' +
-                  '<div class="sub-line" style="font-size:15px;margin-bottom:4px">各手坑种类频率</div>' +
-                  '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px 12px;width:100%;max-width:320px">' +
-                    '<div style="text-align:center"><div style="font-size:24px;font-weight:800;color:#ffd700">' + fmt(agR) + '%</div><div style="font-size:13px;color:#a0a0b8">吃G率</div></div>' +
-                    '<div style="text-align:center"><div style="font-size:24px;font-weight:800;color:#64c8ff">' + fmt(laR) + '%</div><div style="font-size:13px;color:#a0a0b8">锁鸟</div></div>' +
-                    '<div style="text-align:center"><div style="font-size:24px;font-weight:800;color:#ff3b30">' + fmt(niR) + '%</div><div style="font-size:13px;color:#a0a0b8">陨石</div></div>' +
+          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:2px">' +
+                  '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 10px;width:100%;max-width:300px">' +
+                    '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#ffd700">' + fmt(agR) + '%</div><div style="font-size:12px;color:#a0a0b8">吃G率</div></div>' +
+                    '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#64c8ff">' + fmt(laR) + '%</div><div style="font-size:12px;color:#a0a0b8">锁鸟</div></div>' +
+                    '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#ff3b30">' + fmt(niR) + '%</div><div style="font-size:12px;color:#a0a0b8">陨石</div></div>' +
                   '</div>' +
-                  '<div class="sub-line" style="margin-top:4px">增殖G ' + ht.gotMaxxc + ' · 鸟G ' + ht.gotDroll + ' · 水母G ' + ht.gotJellyfish + ' · 锁鸟 ' + ht.gotLancea + ' · 陨石 ' + ht.gotNibiru + ' · 大宇宙 ' + ht.gotDimension + ' · 其他 ' + ht.gotSmallHT + '</div>' +
+                  '<div style="font-size:12px;color:#a0a0b8;text-align:center;margin-top:2px">增殖G ' + ht.gotMaxxc + ' · 鸟G ' + ht.gotDroll + ' · 水母G ' + ht.gotJellyfish + ' · 锁鸟 ' + ht.gotLancea + ' · 陨石 ' + ht.gotNibiru + ' · 大宇宙人 ' + ht.gotDimension + ' · 其他 ' + ht.gotSmallHT + '</div>' +
                 '</div>' +
-                '<div class="big-label">手坑统计</div>'
+                '<div style="font-size:16px;color:var(--text-dim);margin-top:4px;text-align:center">手坑统计</div>'
         };
       };
 
@@ -382,16 +384,16 @@
         return {
           label: nP + '%',
           subLabel: '正常终场率',
-          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:4px">' +
-                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;width:100%;max-width:300px">' +
-                  '<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#4cd964">' + nP + '%</div><div style="font-size:13px;color:#a0a0b8">正常终场</div></div>' +
-                  '<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#ffd700">' + cP + '%</div><div style="font-size:13px;color:#a0a0b8">妥协场</div></div>' +
-                  '<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#ff3b30">' + sP + '%</div><div style="font-size:13px;color:#a0a0b8">没做出来</div></div>' +
-                  '<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#8888a0">' + suP + '%</div><div style="font-size:13px;color:#a0a0b8">投降</div></div>' +
+          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:3px">' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;width:100%;max-width:280px">' +
+                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#4cd964">' + nP + '%</div><div style="font-size:12px;color:#a0a0b8">正常终场</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#ffd700">' + cP + '%</div><div style="font-size:12px;color:#a0a0b8">妥协场</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#ff3b30">' + sP + '%</div><div style="font-size:12px;color:#a0a0b8">没做出来</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#8888a0">' + suP + '%</div><div style="font-size:12px;color:#a0a0b8">投降</div></div>' +
                 '</div>' +
-                '<div class="sub-line">共 ' + eb.total + ' 场先手 · 正常 ' + eb.normal + ' · 妥协 ' + eb.compromised + ' · 没做出来 ' + eb.stopped + ' · 投降 ' + eb.surrender + '</div>' +
+                '<div style="font-size:12px;color:#a0a0b8;text-align:center">共 ' + eb.total + ' 场先手 · 正常 ' + eb.normal + ' · 妥协 ' + eb.compromised + ' · 没做出来 ' + eb.stopped + ' · 投降 ' + eb.surrender + '</div>' +
                 '</div>' +
-                '<div class="big-label">先手终场质量</div>'
+                '<div style="font-size:16px;color:var(--text-dim);margin-top:4px;text-align:center">先手终场质量</div>'
         };
       };
 
@@ -410,7 +412,7 @@
                   '<div style="text-align:center"><div style="font-size:32px;font-weight:800;color:#ff9632">' + fmt(bb.successRate) + '%</div><div style="font-size:13px;color:#a0a0b8">突破成功率</div></div>' +
                   '<div style="text-align:center"><div style="font-size:32px;font-weight:800;color:#64c8ff">' + fmt(bb.successWinRate) + '%</div><div style="font-size:13px;color:#a0a0b8">突破后胜率</div></div>' +
                 '</div>' +
-                '<div class="sub-line">成功 ' + bb.success + ' · 失败 ' + bb.failed + ' · 投降 ' + bb.surrender + ' · 不需要 ' + bb.notNeeded + ' · 突破后胜 ' + bb.successWins + '</div>' +
+                '<div style="font-size:12px;color:#a0a0b8;text-align:center">共 ' + bb.total + ' 场后手 · 成功 ' + bb.success + ' · 失败 ' + bb.failed + ' · 投降 ' + bb.surrender + ' · 不需要 ' + bb.notNeeded + ' · 突破后胜 ' + bb.successWins + '</div>' +
                 '</div>' +
                 '<div class="big-label">后手突破统计</div>'
         };
@@ -445,14 +447,14 @@
       RENDERERS.opponentT0 = function(s) {
         var t0 = s.opponentT0;
         if (!t0 || t0.total === 0) {
-          return { label: '0', subLabel: '暂无T0记录', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无对手T0</div>' };
+          return { label: '0', subLabel: '暂无对手T0动记录', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无对手T0动</div>' };
         }
         return {
           label: t0.total + '',
-          subLabel: '被T0 ' + t0.total + ' 次',
+          subLabel: '被对手T0动 ' + t0.total + ' 次',
           html: '<div class="big-value" style="color:#ff2d55">' + t0.total + ' ⚡</div>' +
                 '<div class="big-label">对手T0动</div>' +
-                '<div class="sub-line">T0时胜率 ' + fmt(t0.winRate) + '% (' + t0.wins + '胜 ' + t0.losses + '负)</div>'
+                '<div class="sub-line">被T0动时胜率 ' + fmt(t0.winRate) + '% (' + t0.wins + '胜 ' + t0.losses + '负)</div>'
         };
       };
 
@@ -500,12 +502,26 @@
         };
       };
 
+      RENDERERS.deckOut = function(s) {
+        var d = s.deckOut;
+        if (!d || d.total === 0) {
+          return { label: '0', subLabel: '暂无抽干牌组', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无抽干牌组</div>' };
+        }
+        return {
+          label: d.total + '',
+          subLabel: '抽干牌组 ' + d.total + ' 次',
+          html: '<div class="big-value" style="color:#64c8ff">' + d.total + ' 📦</div>' +
+                '<div class="big-label">抽干牌组统计</div>' +
+                '<div class="sub-line">抽干对手 ' + d.opponent + ' · 自己抽干 ' + d.self + ' · 自己抽干时胜率 ' + fmt(d.selfWinRate) + '%</div>'
+        };
+      };
+
       RENDERERS.myDeckStats = function(s) {
         var decks = s.myDeckStats;
         if (!decks || decks.length === 0) {
           return { label: '—', subLabel: '暂无卡组数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label" style="font-size:16px">暂无卡组数据</div>' };
         }
-        var top = decks.slice(0, 3);
+        var top = decks.filter(function(d) { return d.deck !== '未知'; }).slice(0, 3);
         var list = top.map(function(d) {
           return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:290px;padding:4px 0;font-size:20px">' +
             '<span style="color:var(--text-bright)">' + d.deck + '</span>' +
@@ -527,7 +543,7 @@
         if (!decks || decks.length === 0) {
           return { label: '—', subLabel: '暂无对手卡组数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label" style="font-size:16px">暂无对手数据</div>' };
         }
-        var top = decks.slice(0, 3);
+        var top = decks.filter(function(d) { return d.deck !== '未知'; }).slice(0, 3);
         var list = top.map(function(d) {
           return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:290px;padding:4px 0;font-size:20px">' +
             '<span style="color:var(--text-bright)">' + d.deck + '</span>' +
@@ -549,7 +565,7 @@
         if (!matchups || matchups.length === 0) {
           return { label: '—', subLabel: '暂无交叉数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label" style="font-size:16px">暂无交叉数据</div>' };
         }
-        var top = matchups.slice(0, 3);
+        var top = matchups.filter(function(m) { return m.myDeck !== '未知' && m.opponentDeck !== '未知'; }).slice(0, 3);
         var list = top.map(function(m) {
           return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:290px;padding:4px 0;font-size:20px">' +
             '<span style="color:var(--text-bright)">' + m.myDeck + '</span>' +
@@ -666,6 +682,11 @@
       // ═══ 更新全部 ═══
       function updateDisplay(newStats) {
         stats = newStats;
+        // 更新时间范围标签
+        api.getTimeRange().then(function(range) {
+          currentTimeRange = range;
+          document.getElementById('cycle-time-range-label').textContent = '[' + (TIME_RANGE_LABELS[range] || '全部') + ']';
+        });
         var items = getEnabledItems();
         buildSlides(items);
 

@@ -24,6 +24,10 @@ contextBridge.exposeInMainWorld('mdStats', {
     return () => ipcRenderer.removeListener('stats-updated', handler);
   },
 
+  // ── 时间范围过滤 ──
+  getTimeRange: () => ipcRenderer.invoke('stats:get-time-range'),
+  setTimeRange: (range) => ipcRenderer.invoke('stats:set-time-range', range),
+
   // ── 循环显示面板 ──
   openCycleWindow: () => ipcRenderer.invoke('cycle:open-window'),
   getCycleConfig: () => ipcRenderer.invoke('cycle:get-config'),

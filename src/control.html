@@ -295,6 +295,19 @@
             <label><input type="radio" name="typhon-who" value="self"> 自己</label>
           </div>
         </div>
+
+        <!-- 抽干牌组 -->
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-deck-out">
+          <label for="chk-deck-out">抽干牌组</label>
+        </div>
+        <div class="sub-checkboxes" id="sub-deck-out" style="display:none">
+          <label style="font-size:12px;color:var(--text-dim);margin:2px 0">被抽干者：</label>
+          <div class="radio-group">
+            <label><input type="radio" name="deck-out-who" value="opponent" checked> 对手</label>
+            <label><input type="radio" name="deck-out-who" value="self"> 自己</label>
+          </div>
+        </div>
       </div>
 
       <!-- 对手T0动（仅先手时显示） -->
@@ -376,6 +389,21 @@
   <div class="card" id="mydeck-stats-card" style="display:none">
     <div class="card-title">🃏 自用卡组统计</div>
     <div id="mydeck-stats-content"></div>
+  </div>
+
+  <!-- ═══ 时间范围过滤 ═══ -->
+  <div class="card" id="time-range-card">
+    <div class="card-title">⏱ 统计时间范围</div>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px">
+      选择统计数据的计算范围，所有显示面板和轮播面板同步生效。
+    </p>
+    <div class="btn-group" id="time-range-btns">
+      <button class="btn btn-time-range active" data-val="all">全部</button>
+      <button class="btn btn-time-range" data-val="today">今天</button>
+      <button class="btn btn-time-range" data-val="week">本周</button>
+      <button class="btn btn-time-range" data-val="month">本月</button>
+    </div>
+    <div style="margin-top:6px;font-size:11px;color:var(--text-dim)" id="time-range-hint">当前：全部历史数据</div>
   </div>
 
   <!-- ═══ 循环显示面板控制 ═══ -->
@@ -486,7 +514,7 @@
   <div class="modal-overlay" id="about-overlay">
     <div class="modal-box" style="max-width:320px">
       <div class="about-content">
-        <div class="version">v1.0.1</div>
+        <div class="version">v1.0.2</div>
         <div class="author">
           作者: <a id="about-author-link" href="https://github.com/7starsseeker">7starsseeker</a>
         </div>
@@ -527,7 +555,7 @@
       coinToss: null,
       opponentDeck: '',
       opponentBigHand: false,
-      gotMaxxC: false,
+      gotMaxxc: false,
       gotDroll: false,
       gotJellyfish: false,
       gotLancea: false,
@@ -553,6 +581,8 @@
       myDeck: '',
       opponentRan: false,
       typhonWho: 'opponent',
+      deckOut: false,
+      deckOutWho: 'opponent',
       notes: ''
     };
 
@@ -706,7 +736,7 @@
       }
     }
     bindCheckbox('chk-big-hand', 'opponentBigHand');
-    bindCheckbox('chk-maxxc', 'gotMaxxC');
+    bindCheckbox('chk-maxxc', 'gotMaxxc');
     bindCheckbox('chk-droll', 'gotDroll');
     bindCheckbox('chk-jellyfish', 'gotJellyfish');
     bindCheckbox('chk-lancea', 'gotLancea');
@@ -786,6 +816,17 @@
       rb.addEventListener('change', function() { state.typhonWho = rb.value; });
     });
 
+    // 抽干牌组
+    bindCheckbox('chk-deck-out', 'deckOut');
+    document.getElementById('sub-deck-out').style.display = 'none';
+    document.getElementById('chk-deck-out').addEventListener('change', function() {
+      document.getElementById('sub-deck-out').style.display = this.checked ? 'flex' : 'none';
+      if (!this.checked) state.deckOutWho = 'opponent';
+    });
+    document.querySelectorAll('input[name="deck-out-who"]').forEach(function(rb) {
+      rb.addEventListener('change', function() { state.deckOutWho = rb.value; });
+    });
+
     // 谁先能动
     bindGroup([
       document.getElementById('firstmover-self'),
@@ -831,7 +872,7 @@
         myDeck: state.myDeck.trim() || '',
         opponentDeck: deck,
         opponentBigHand: state.opponentBigHand || null,
-        gotMaxxC: state.gotMaxxC || null,
+        gotMaxxc: state.gotMaxxc || null,
         gotDroll: state.gotDroll || null,
         gotJellyfish: state.gotJellyfish || null,
         gotLancea: state.gotLancea || null,
@@ -852,6 +893,8 @@
         bothStuck: state.bothStuck || null,
         typhonAppeared: state.typhonAppeared || null,
         typhonWho: state.typhonWho,
+        deckOut: state.deckOut || null,
+        deckOutWho: state.deckOut ? state.deckOutWho : null,
         firstMover: state.firstMover,
         endboardState: state.goingFirst ? state.endboardState : null,
         brokeBoard: !state.goingFirst ? state.brokeBoard : null,
@@ -869,7 +912,7 @@
       state.coinToss = null;
       state.opponentDeck = '';
       state.opponentBigHand = false;
-      state.gotMaxxC = false;
+      state.gotMaxxc = false;
       state.gotDroll = false;
       state.gotJellyfish = false;
       state.gotLancea = false;
@@ -890,6 +933,8 @@
       state.opponentT0 = false;
       state.typhonAppeared = false;
       state.typhonWho = 'opponent';
+      state.deckOut = false;
+      state.deckOutWho = 'opponent';
       state.firstMover = null;
       state.endboardState = null;
       state.brokeBoard = null;
@@ -908,6 +953,7 @@
       document.getElementById('sub-disconnect').style.display = 'none';
       document.getElementById('sub-timeout').style.display = 'none';
       document.getElementById('sub-typhon').style.display = 'none';
+      document.getElementById('sub-deck-out').style.display = 'none';
       document.getElementById('section-firstmover').classList.remove('visible');
       document.getElementById('section-otk').classList.remove('visible');
       document.getElementById('section-endboard').classList.remove('visible');
@@ -1114,6 +1160,7 @@
         if (m.cantPlay) extras.push('卡手');
         if (m.bothStuck) extras.push('互卡');
         if (m.typhonAppeared) extras.push('提丰' + (m.typhonWho === 'self' ? '(我)' : '(对)'));
+        if (m.deckOut) extras.push('抽干' + (m.deckOutWho === 'self' ? '(我)' : '(对)'));
         if (m.endboardState) extras.push(m.endboardState === 'normal' ? '正常终场' : m.endboardState === 'compromised' ? '妥协' : '没做出来');
         if (m.brokeBoard === true) extras.push('突破');
         else if (m.brokeBoard === false) extras.push('未突破');
@@ -1174,10 +1221,11 @@
       { type: 'breakBoard', label: '后手突破', desc: '突破成功率 / 突破后胜率' },
       { type: 'handState', label: '卡手率', desc: '卡手/互卡次数' },
       { type: 'mistake', label: '严重失误', desc: '严重失误次数/率' },
-      { type: 'opponentT0', label: '对手T0动', desc: '被对手T0干扰次数' },
+      { type: 'opponentT0', label: '对手T0动', desc: '被对手T0动次数' },
       { type: 'disconnect', label: '掉线统计', desc: '掉线次数/率' },
       { type: 'timeout', label: '超时统计', desc: '超时次数/率' },
       { type: 'typhon', label: '提丰统计', desc: '提丰登场/被黑/漂白' },
+      { type: 'deckOut', label: '抽干牌组', desc: '抽干牌组次数' },
       { type: 'myDeckStats', label: '自用卡组', desc: '自用卡组胜率排行 Top3' },
       { type: 'oppDeckStats', label: '对战卡组', desc: '对战卡组胜率排行 Top3' },
       { type: 'matchupStats', label: '交叉统计', desc: '自用vs对手交叉胜率 Top3' }
@@ -1297,6 +1345,28 @@
     // 点击遮罩关闭弹窗
     document.querySelectorAll('.modal-overlay').forEach(function(el) {
       el.addEventListener('click', function(e) { if (e.target === el) el.classList.remove('show'); });
+    });
+
+    // ═══ 时间范围过滤 ═══
+    var TIME_RANGE_LABELS = { all: '全部历史数据', today: '今天的数据', week: '本周的数据（周一起算）', month: '本月的数据' };
+
+    function applyTimeRange(range) {
+      document.querySelectorAll('#time-range-btns .btn').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.val === range);
+      });
+      document.getElementById('time-range-hint').textContent = '当前：' + (TIME_RANGE_LABELS[range] || '全部历史数据');
+    }
+
+    api.getTimeRange().then(function(range) {
+      applyTimeRange(range);
+    });
+
+    document.querySelectorAll('#time-range-btns .btn').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var range = this.dataset.val;
+        var result = await api.setTimeRange(range);
+        if (result.success) applyTimeRange(range);
+      });
     });
 
     // ═══════════════════════════════════════════════════════════════════════
