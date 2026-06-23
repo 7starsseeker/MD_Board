@@ -4,26 +4,13 @@ const fs = require('fs');
 
 // ── 数据管理 ──────────────────────────────────────────────────────────────
 
-/** 运行时的数据目录（系统临时目录） */
+/** 数据目录（系统临时目录） */
 function getRuntimeDir() {
   return path.join(app.getPath('temp'), 'md-stats-data');
 }
 
-/** 持久化数据目录（exe 同级或项目本地） */
-function getPersistDir() {
-  if (process.env.PORTABLE_EXECUTABLE_DIR) {
-    return path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'data');
-  }
-  return path.join(__dirname, 'data');
-}
-
 const RUNTIME_DATA = () => path.join(getRuntimeDir(), 'stats.json');
 const RUNTIME_WSTATE = () => path.join(getRuntimeDir(), 'window-state.json');
-
-/** 持久化目录是否已存在（有 data/ 目录才启用持久模式） */
-function hasPersistDir() {
-  return fs.existsSync(getPersistDir());
-}
 
 let data = { matches: [], version: 4, deckPresets: [], myDeckPresets: [], cycleConfig: null };
 
@@ -31,26 +18,15 @@ function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
-/** 加载数据：优先从持久化目录复制，再读运行目录 */
+/** 加载数据：从系统临时目录读取 */
 function loadData() {
-  const persistDir = getPersistDir();
   const runtimeDir = getRuntimeDir();
   ensureDir(runtimeDir);
 
-  // 如果有持久化数据，复制到运行目录
-  const persistFile = path.join(persistDir, 'stats.json');
-  const persistWs = path.join(persistDir, 'window-state.json');
-  if (fs.existsSync(persistFile)) {
-    try { fs.copyFileSync(persistFile, RUNTIME_DATA()); } catch(e) {}
-    if (fs.existsSync(persistWs)) {
-      try { fs.copyFileSync(persistWs, RUNTIME_WSTATE()); } catch(e) {}
-    }
-  }
-
-  // 从运行目录读取
+  const runtimeFile = RUNTIME_DATA();
   try {
-    if (fs.existsSync(RUNTIME_DATA())) {
-      data = JSON.parse(fs.readFileSync(RUNTIME_DATA(), 'utf-8'));
+    if (fs.existsSync(runtimeFile)) {
+      data = JSON.parse(fs.readFileSync(runtimeFile, 'utf-8'));
       if (!data.deckPresets) data.deckPresets = [];
       if (!data.myDeckPresets) data.myDeckPresets = [];
       // 从 v2 迁移到 v3
@@ -75,30 +51,8 @@ function saveData() {
   try {
     ensureDir(getRuntimeDir());
     fs.writeFileSync(RUNTIME_DATA(), JSON.stringify(data, null, 2), 'utf-8');
-    // 如果已有持久目录，同步写入（源码模式或已保存过的 exe）
-    if (hasPersistDir()) {
-      fs.writeFileSync(path.join(getPersistDir(), 'stats.json'), JSON.stringify(data, null, 2), 'utf-8');
-    }
   } catch (e) {
     console.error('保存数据文件失败:', e.message);
-  }
-}
-
-/** 将运行时数据持久化到 exe 同级目录 */
-function persistData() {
-  const persistDir = getPersistDir();
-  const runtimeDir = getRuntimeDir();
-  ensureDir(persistDir);
-  try {
-    fs.copyFileSync(RUNTIME_DATA(), path.join(persistDir, 'stats.json'));
-    const wsFile = RUNTIME_WSTATE();
-    if (fs.existsSync(wsFile)) {
-      fs.copyFileSync(wsFile, path.join(persistDir, 'window-state.json'));
-    }
-    return true;
-  } catch (e) {
-    console.error('持久化数据失败:', e.message);
-    return false;
   }
 }
 
@@ -221,7 +175,8 @@ function computeStats() {
   const brokeYes = secondMatches.filter(m => m.brokeBoard === true || m.brokeBoard === 'true').length;
   const brokeNo = secondMatches.filter(m => m.brokeBoard === false || m.brokeBoard === 'false').length;
   const brokeSurrender = secondMatches.filter(m => m.brokeBoard === 'surrender').length;
-  const otkYes = secondMatches.filter(m => m.otk === true || m.otk === 'true').length;
+  const brokeNotNeeded = secondMatches.filter(m => m.brokeBoard === 'not_applicable').length;
+  const brokeSuccessWins = secondMatches.filter(m => (m.brokeBoard === true || m.brokeBoard === 'true') && m.result === 'win').length;
 
   // ── 提丰趣味统计 ──
   const typhonMatches = matches.filter(m => m.typhonAppeared);
@@ -381,9 +336,10 @@ function computeStats() {
       success: brokeYes,
       failed: brokeNo,
       surrender: brokeSurrender,
-      successRate: (brokeYes + brokeNo) > 0 ? ((brokeYes / (brokeYes + brokeNo)) * 100).toFixed(1) : '0.0',
-      otk: otkYes,
-      otkRate: brokeYes > 0 ? ((otkYes / brokeYes) * 100).toFixed(1) : '0.0'
+      notNeeded: brokeNotNeeded,
+      successWins: brokeSuccessWins,
+      successRate: secondMatches.length > 0 ? ((brokeYes / secondMatches.length) * 100).toFixed(1) : '0.0',
+      successWinRate: brokeYes > 0 ? ((brokeSuccessWins / brokeYes) * 100).toFixed(1) : '0.0'
     },
     myDeckStats: Object.entries(myDeckStats)
       .sort((a, b) => b[1].total - a[1].total)
@@ -559,11 +515,6 @@ function createControlWindow() {
     saveWindowState({ controlWidth: w, controlHeight: h, controlX: x, controlY: y });
   });
 
-  controlWin.on('close', (event) => {
-    if (hasPersistDir()) {
-      persistData();
-    }
-  });
   controlWin.on('closed', () => { app.quit(); });
 }
 
@@ -706,15 +657,6 @@ ipcMain.handle('stats:reset-matches', () => {
   saveData();
   notifyWindows();
   return { success: true };
-});
-
-// ── 数据持久化（便携版用） ───────────────────────────────────────────────
-ipcMain.handle('stats:persist-data', () => {
-  return { success: persistData() };
-});
-
-ipcMain.handle('stats:is-portable', () => {
-  return !!process.env.PORTABLE_EXECUTABLE_DIR;
 });
 
 ipcMain.handle('shell:open-external', (event, url) => {
@@ -885,8 +827,6 @@ ipcMain.handle('cycle:open-window', () => {
 const TIP_DISMISSED_FILE = () => path.join(getRuntimeDir(), '.tip-dismissed');
 
 function showStartupTip() {
-  // 尚无持久目录时提示（便携版首次运行）
-  if (hasPersistDir()) return;
   try {
     if (fs.existsSync(TIP_DISMISSED_FILE())) return;
   } catch(e) { return; }
@@ -897,10 +837,8 @@ function showStartupTip() {
     defaultId: 1,
     title: 'MD_Board',
     message: '数据存储说明',
-    detail: '当前为便携版（单文件 exe）运行模式，\n\n' +
-      '所有对局数据默认保存在系统临时目录中。\n' +
-      '如需保存数据到 exe 同级目录以便下次启动自动加载，\n' +
-      '请使用控制面板的「导出」和「导入」功能手动备份。'
+    detail: '所有对局数据保存在系统临时目录中。\n\n' +
+      '如需备份数据，请使用控制面板的「导出」功能。'
   });
   if (choice === 0) {
     // 不再提示

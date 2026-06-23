@@ -168,7 +168,7 @@ function renderEndboardPie(canvas, stats) {
   canvas._chart = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: ['正常终场','妥协场','停牌','投降'],
+      labels: ['正常终场','妥协场','没做出来','投降'],
       datasets: [{
         data: [eb.normal, eb.compromised, eb.stopped, eb.surrender],
         backgroundColor: ['#4cd964','#ffd700','#ff3b30','#8888a0'],
@@ -194,14 +194,14 @@ function renderBreakBoardPie(canvas, stats) {
   destroyChart(canvas._chart);
   var ctx = canvas.getContext('2d');
   var bb = stats.breakBoard;
-  if (!bb || (bb.success + bb.failed + bb.surrender) === 0) { canvas._chart = null; return null; }
+  if (!bb || (bb.success + bb.failed + bb.surrender + bb.notNeeded) === 0) { canvas._chart = null; return null; }
   canvas._chart = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: ['突破成功','突破失败','投降'],
+      labels: ['突破成功','突破失败','投降','不需要'],
       datasets: [{
-        data: [bb.success, bb.failed, bb.surrender],
-        backgroundColor: ['#4cd964','#ff3b30','#8888a0'],
+        data: [bb.success, bb.failed, bb.surrender, bb.notNeeded],
+        backgroundColor: ['#4cd964','#ff3b30','#8888a0','#64c8ff'],
         borderWidth: 0
       }]
     },

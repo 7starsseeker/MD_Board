@@ -330,7 +330,7 @@
         <label style="font-size:12px;color:var(--text-dim);margin-bottom:6px;display:block">终场情况</label>
         <div class="btn-group" style="margin-bottom:6px">
           <button class="btn btn-endboard" id="endboard-surrender" data-val="surrender">投降</button>
-          <button class="btn btn-endboard" id="endboard-stopped" data-val="stopped">停牌</button>
+          <button class="btn btn-endboard" id="endboard-stopped" data-val="stopped">没做出来</button>
           <button class="btn btn-endboard" id="endboard-compromise" data-val="compromised">妥协场</button>
           <button class="btn btn-endboard" id="endboard-normal" data-val="normal">正常终场</button>
         </div>
@@ -343,6 +343,7 @@
           <button class="btn btn-broke" id="broke-yes" data-val="true">是</button>
           <button class="btn btn-broke" id="broke-no" data-val="false">否</button>
           <button class="btn btn-broke" id="broke-surrender" data-val="surrender">投降</button>
+          <button class="btn btn-broke" id="broke-unnecessary" data-val="not_applicable">不需要</button>
         </div>
 
         <div class="conditional-section" id="section-otk">
@@ -666,7 +667,8 @@
     var brokeBtns = [
       document.getElementById('broke-surrender'),
       document.getElementById('broke-yes'),
-      document.getElementById('broke-no')
+      document.getElementById('broke-no'),
+      document.getElementById('broke-unnecessary')
     ];
     bindGroup(brokeBtns, 'brokeBoard');
 
@@ -811,6 +813,8 @@
           if (state.goingFirst === false && state.brokeBoard === null) missing.push('是否成功突破');
           if (state.goingFirst === false && state.brokeBoard === true && state.otk === null) missing.push('是否一回合斩杀');
           if (state.goingFirst === false && state.brokeBoard === true && state.otk === false && state.endboardInteraction === null) missing.push('残局阻抗情况');
+          // 不需要突破时自动跳过OTK和残局阻抗
+          if (state.brokeBoard === 'not_applicable') { state.otk = null; state.endboardInteraction = null; }
         }
       }
 
@@ -1110,9 +1114,10 @@
         if (m.cantPlay) extras.push('卡手');
         if (m.bothStuck) extras.push('互卡');
         if (m.typhonAppeared) extras.push('提丰' + (m.typhonWho === 'self' ? '(我)' : '(对)'));
-        if (m.endboardState) extras.push(m.endboardState === 'normal' ? '正常终场' : m.endboardState === 'compromised' ? '妥协' : '停牌');
+        if (m.endboardState) extras.push(m.endboardState === 'normal' ? '正常终场' : m.endboardState === 'compromised' ? '妥协' : '没做出来');
         if (m.brokeBoard === true) extras.push('突破');
         else if (m.brokeBoard === false) extras.push('未突破');
+        else if (m.brokeBoard === 'not_applicable') extras.push('不需要突破');
         if (m.otk === true) extras.push('斩杀');
         var notes = m.notes ? ' · ' + m.notes.slice(0, 20) + (m.notes.length > 20 ? '…' : '') : '';
         var date = new Date(m.timestamp);
@@ -1161,12 +1166,12 @@
       { type: 'record', label: '胜负记录', desc: '胜负平异常各场数量' },
       { type: 'firstSecond', label: '先后手对比', desc: '先手 vs 后手胜率' },
       { type: 'streak', label: '连胜/连败', desc: '当前连胜或连败次数' },
-      { type: 'handtrapRate', label: '手坑统计', desc: '吃G率 / 陨石率' },
+      { type: 'handtrapRate', label: '手坑统计', desc: '吃G率 / 锁鸟 / 陨石 及各手坑频次' },
       { type: 'coinRate', label: '硬币统计', desc: '硬币胜负概率' },
       { type: 'totalMatches', label: '总场次', desc: '对局总场数量' },
       { type: 'opponentRan', label: '吓跑对手', desc: '先手胜利时对手逃跑次数' },
-      { type: 'endboard', label: '先手终场', desc: '正常终场率' },
-      { type: 'breakBoard', label: '后手突破', desc: '突破成功率' },
+      { type: 'endboard', label: '先手终场', desc: '正常/妥协/没做出来/投降 各终场率' },
+      { type: 'breakBoard', label: '后手突破', desc: '突破成功率 / 突破后胜率' },
       { type: 'handState', label: '卡手率', desc: '卡手/互卡次数' },
       { type: 'mistake', label: '严重失误', desc: '严重失误次数/率' },
       { type: 'opponentT0', label: '对手T0动', desc: '被对手T0干扰次数' },

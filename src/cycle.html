@@ -306,18 +306,23 @@
 
       RENDERERS.handtrapRate = function(s) {
         var ht = s.handtrap;
-        var otherCount = ht.gotNibiru + ht.gotDimension + ht.gotSmallHT;
-        var otherRate = s.total > 0 ? ((otherCount / s.total) * 100).toFixed(1) : '0.0';
+        var t = s.total;
+        var laR = t > 0 ? (ht.gotLancea / t * 100).toFixed(1) : '0.0';
+        var niR = t > 0 ? (ht.gotNibiru / t * 100).toFixed(1) : '0.0';
+        var agR = ht.anyGRate || (t > 0 ? (ht.gotAnyG / t * 100).toFixed(1) : '0.0');
         return {
-          label: '吃G率 ' + ht.anyGRate + '%',
-          subLabel: '吃锁率 ' + fmt(ht.lanceaRate || (s.total > 0 ? (ht.gotLancea / s.total * 100).toFixed(1) : '0.0')) + '%',
-          html: '<div class="triple-row">' +
-                  '<div class="col"><div class="dv" style="color:#ffd700">' + fmt(ht.anyGRate) + '%</div><div class="dl">吃G率</div></div>' +
-                  '<div class="col"><div class="dv" style="color:#64c8ff">' + fmt(ht.lanceaRate || (s.total > 0 ? (ht.gotLancea / s.total * 100).toFixed(1) : '0.0')) + '%</div><div class="dl">吃锁率</div></div>' +
-                  '<div class="col"><div class="dv" style="color:#8888a0">' + otherRate + '%</div><div class="dl">其他</div></div>' +
+          label: '吃G率 ' + agR + '%',
+          subLabel: '吃锁率 ' + laR + '%',
+          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:3px">' +
+                  '<div class="sub-line" style="font-size:15px;margin-bottom:4px">各手坑种类频率</div>' +
+                  '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px 12px;width:100%;max-width:320px">' +
+                    '<div style="text-align:center"><div style="font-size:24px;font-weight:800;color:#ffd700">' + fmt(agR) + '%</div><div style="font-size:13px;color:#a0a0b8">吃G率</div></div>' +
+                    '<div style="text-align:center"><div style="font-size:24px;font-weight:800;color:#64c8ff">' + fmt(laR) + '%</div><div style="font-size:13px;color:#a0a0b8">锁鸟</div></div>' +
+                    '<div style="text-align:center"><div style="font-size:24px;font-weight:800;color:#ff3b30">' + fmt(niR) + '%</div><div style="font-size:13px;color:#a0a0b8">陨石</div></div>' +
+                  '</div>' +
+                  '<div class="sub-line" style="margin-top:4px">增殖G ' + ht.gotMaxxc + ' · 鸟G ' + ht.gotDroll + ' · 水母G ' + ht.gotJellyfish + ' · 锁鸟 ' + ht.gotLancea + ' · 陨石 ' + ht.gotNibiru + ' · 大宇宙 ' + ht.gotDimension + ' · 其他 ' + ht.gotSmallHT + '</div>' +
                 '</div>' +
-                '<div class="big-label">手坑统计</div>' +
-                '<div class="sub-line">吃G ' + ht.gotAnyG + '次 · 锁鸟 ' + ht.gotLancea + '次 · 其他 ' + otherCount + '次（含陨石' + ht.gotNibiru + '次、大宇宙人' + ht.gotDimension + '次等）</div>'
+                '<div class="big-label">手坑统计</div>'
         };
       };
 
@@ -371,27 +376,43 @@
           return { label: '—', subLabel: '暂无先手对局', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无先手数据</div>' };
         }
         var nP = (eb.normal / eb.total * 100).toFixed(1);
+        var cP = (eb.compromised / eb.total * 100).toFixed(1);
+        var sP = (eb.stopped / eb.total * 100).toFixed(1);
+        var suP = (eb.surrender / eb.total * 100).toFixed(1);
         return {
           label: nP + '%',
           subLabel: '正常终场率',
-          html: '<div class="big-value" style="color:#4cd964">' + nP + '<span class="pct">%</span></div>' +
-                '<div class="big-label">正常终场率</div>' +
-                '<div class="sub-line">妥协 ' + eb.compromised + ' · 停牌 ' + eb.stopped + ' · 投降 ' + eb.surrender + '</div>'
+          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:4px">' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;width:100%;max-width:300px">' +
+                  '<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#4cd964">' + nP + '%</div><div style="font-size:13px;color:#a0a0b8">正常终场</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#ffd700">' + cP + '%</div><div style="font-size:13px;color:#a0a0b8">妥协场</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#ff3b30">' + sP + '%</div><div style="font-size:13px;color:#a0a0b8">没做出来</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#8888a0">' + suP + '%</div><div style="font-size:13px;color:#a0a0b8">投降</div></div>' +
+                '</div>' +
+                '<div class="sub-line">共 ' + eb.total + ' 场先手 · 正常 ' + eb.normal + ' · 妥协 ' + eb.compromised + ' · 没做出来 ' + eb.stopped + ' · 投降 ' + eb.surrender + '</div>' +
+                '</div>' +
+                '<div class="big-label">先手终场质量</div>'
         };
       };
 
       RENDERERS.breakBoard = function(s) {
         var bb = s.breakBoard;
-        if (!bb || (bb.success + bb.failed) === 0) {
+        if (!bb || bb.total === 0) {
           return { label: '—', subLabel: '暂无后手对局', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无后手数据</div>' };
         }
-        var sr = (bb.success + bb.failed) > 0 ? (bb.success / (bb.success + bb.failed) * 100).toFixed(1) : '0.0';
+        var sr = parseFloat(bb.successRate) || 0;
+        var swr = parseFloat(bb.successWinRate) || 0;
         return {
           label: sr + '%',
           subLabel: '突破成功率',
-          html: '<div class="big-value" style="color:#ff9632">' + sr + '<span class="pct">%</span></div>' +
-                '<div class="big-label">后手突破成功率</div>' +
-                '<div class="sub-line">成功 ' + bb.success + ' · 失败 ' + bb.failed + (bb.otk > 0 ? ' · OTK ' + bb.otk : '') + '</div>'
+          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%">' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;width:100%;max-width:300px;margin-bottom:4px">' +
+                  '<div style="text-align:center"><div style="font-size:32px;font-weight:800;color:#ff9632">' + fmt(bb.successRate) + '%</div><div style="font-size:13px;color:#a0a0b8">突破成功率</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:32px;font-weight:800;color:#64c8ff">' + fmt(bb.successWinRate) + '%</div><div style="font-size:13px;color:#a0a0b8">突破后胜率</div></div>' +
+                '</div>' +
+                '<div class="sub-line">成功 ' + bb.success + ' · 失败 ' + bb.failed + ' · 投降 ' + bb.surrender + ' · 不需要 ' + bb.notNeeded + ' · 突破后胜 ' + bb.successWins + '</div>' +
+                '</div>' +
+                '<div class="big-label">后手突破统计</div>'
         };
       };
 
