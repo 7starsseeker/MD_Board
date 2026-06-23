@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MD Stats - 详细统计</title>
   <link rel="stylesheet" href="style.css">
+  <script src="lib/chart.min.js"></script>
   <style>
     :root {
       --card-glow: rgba(255, 200, 50, 0.06);
@@ -485,6 +486,36 @@
       <div id="deckout-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
     </div>
 
+    <!-- 对手大牌统计 -->
+    <div class="stat-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(255,45,85,0.12)">🃏</div>
+        <div>
+          <div class="card-title-text">对手大牌统计</div>
+          <div class="card-subtitle">对手大牌哥登场次数</div>
+        </div>
+      </div>
+      <div id="bighand-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
+    </div>
+
+  </div>
+
+  <!-- 胜率趋势（全宽） -->
+  <div class="stat-card" style="margin-bottom:14px">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(255,200,50,0.12)">📈</div>
+      <div>
+        <div class="card-title-text">胜率趋势</div>
+        <div class="card-subtitle">累计胜率变化曲线</div>
+      </div>
+    </div>
+    <div id="trend-content" style="display:flex;flex-direction:column;gap:6px">
+      <div style="height:180px;position:relative">
+        <canvas id="trend-chart"></canvas>
+        <div id="trend-empty" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;align-items:center;justify-content:center;text-align:center;color:var(--text-dim);font-size:12px">对局数不足，无法绘制趋势</div>
+      </div>
+      <div id="trend-info" style="font-size:11px;color:var(--text-dim)"></div>
+    </div>
   </div>
 
   <!-- ═══ 全宽卡片 ═══ -->
@@ -521,7 +552,19 @@
     <div id="matchup-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
   </div>
 
+  <!-- ═══ 晋级赛 / 保级赛统计 ═══ -->
+  <div class="stat-card" id="ranked-card" style="margin-bottom:14px;display:none">
+    <div class="card-header">
+      <div class="card-icon" style="background:linear-gradient(135deg,rgba(255,200,50,0.15),rgba(255,59,48,0.1))">🏆</div>
+      <div>
+        <div class="card-title-text">晋级赛 / 保级赛</div>
+        <div class="card-subtitle">关键时刻对局统计</div>
+      </div>
+    </div>
+    <div id="ranked-content"></div>
   </div>
+
+</div>
 
 <script>
     (function() {
@@ -604,7 +647,6 @@
           '<div class="stat-row"><span class="label">　同一张复数上手</span><span class="value">' + hs.cantPlayDuplicate + '</span></div>' +
           '<div class="stat-row"><span class="label">　后手组件复数上手</span><span class="value">' + hs.cantPlayHT + '</span></div>' +
           '<div class="stat-row"><span class="label">双方都动不了</span><span class="value warn">' + hs.bothStuck + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + fmt(hs.bothStuckRate) + '%</span></div>' +
-          '<div class="stat-row"><span class="label">对手大牌哥</span><span class="value">' + stats.bigHand + ' 次</span></div>' +
           '<div class="stat-row"><span class="label">卡手率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + cr + '%"></div></div><span class="value bad">' + fmt(hs.cantPlayRate) + '%</span></div></div>';
       }
 
@@ -737,6 +779,102 @@
         el.innerHTML = html;
       }
 
+      // ═══ 对手大牌统计 ═══
+      function renderBigHand(stats) {
+        var bh = stats.bigHand || 0;
+        var el = document.getElementById('bighand-content');
+        if (bh === 0) {
+          el.innerHTML = '<div style="padding:10px;text-align:center;color:var(--text-dim);font-size:12px">还没有对手大牌哥记录</div>'; return;
+        }
+        var bhRate = stats.total > 0 ? (bh / stats.total * 100).toFixed(1) : '0.0';
+        var hs = stats.handState || {};
+        var selfStuck = (hs.cantPlay||0) + (hs.cantPlayGarnet||0) + (hs.cantPlayDuplicate||0) + (hs.cantPlayHT||0);
+        el.innerHTML =
+          '<div class="stat-row"><span class="label">对手大牌哥次数</span><span class="value bad" style="font-size:18px">' + bh + ' 次</span></div>' +
+          '<div class="stat-row"><span class="label">占总对局比</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(bhRate) + '%"></div></div><span class="value bad">' + fmt(bhRate) + '%</span></div></div>' +
+          '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label">自己卡手次数</span><span class="value warn">' + selfStuck + ' 次</span><span style="font-size:11px;color:var(--text-dim)">（参考对比）</span></div>';
+      }
+
+      // ═══ 胜率趋势 ═══
+      var trendChart = null;
+      function renderWinTrend(stats) {
+        var el = document.getElementById('trend-content');
+        var infoEl = document.getElementById('trend-info');
+        var canvas = document.getElementById('trend-chart');
+        var emptyEl = document.getElementById('trend-empty');
+        if (!canvas || !emptyEl) return;
+        var last10 = stats.last10 || [];
+        if (last10.length < 2) {
+          // 显示空状态，不破坏 canvas
+          if (trendChart) { try { trendChart.destroy(); } catch(e) {} trendChart = null; }
+          canvas.style.display = 'none';
+          emptyEl.style.display = 'flex';
+          infoEl.innerHTML = '';
+          return;
+        }
+        // 有数据：隐藏空状态，恢复 canvas
+        canvas.style.display = '';
+        emptyEl.style.display = 'none';
+        // 计算累计胜率点
+        var points = [];
+        var tw = 0, tt = 0;
+        for (var i = 0; i < last10.length; i++) {
+          var r = last10[i].result;
+          if (r === 'win' || r === 'loss') {
+            tt++;
+            if (r === 'win') tw++;
+            if (tt >= 2 && tt % 2 === 0) {
+              points.push({ label: '#' + tt, rate: (tw / tt * 100).toFixed(1) });
+            }
+          }
+        }
+        if (points.length < 2 && tt > 0) {
+          points.push({ label: '#' + tt, rate: (tw / tt * 100).toFixed(1) });
+        }
+        if (points.length < 2) {
+          canvas.style.display = 'none';
+          emptyEl.style.display = 'flex';
+          infoEl.innerHTML = '';
+          if (trendChart) { try { trendChart.destroy(); } catch(e) {} trendChart = null; }
+          return;
+        }
+        // 有数据：隐藏空状态
+        el.style.display = 'flex';
+        canvas.style.display = '';
+        emptyEl.style.display = 'none';
+        var ctx = canvas.getContext('2d');
+        if (trendChart) { try { trendChart.destroy(); } catch(e) {} }
+        trendChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: points.map(function(p){return p.label;}),
+            datasets: [{
+              label: '胜率',
+              data: points.map(function(p){return parseFloat(p.rate);}),
+              borderColor: '#ffc832',
+              backgroundColor: 'rgba(255,200,50,0.1)',
+              fill: true,
+              tension: 0.3,
+              pointBackgroundColor: '#ffc832',
+              pointRadius: 3,
+              pointHoverRadius: 5
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: function(v){return v+'%';} } },
+              x: { grid: { display: false } }
+            },
+            plugins: { legend: { display: false } }
+          }
+        });
+        // 显示总体胜率
+        var lastWr = tt > 0 ? (tw / tt * 100).toFixed(1) : '0.0';
+        infoEl.innerHTML = '最近 ' + tt + ' 场胜率：<span style="font-weight:700;color:' + (parseFloat(lastWr) >= 50 ? '#4cd964' : '#ff3b30') + '">' + fmt(lastWr) + '%</span>';
+      }
+
       // ═══ 提丰趣味统计 ═══
       function renderTyphon(stats) {
         var t = stats.typhon;
@@ -848,6 +986,54 @@
         el.innerHTML = html;
       }
 
+      // ═══ 晋级赛 / 保级赛 ═══
+      function renderRanked(stats) {
+        var card = document.getElementById('ranked-card');
+        var el = document.getElementById('ranked-content');
+        var rs = stats.rankedStats;
+        var hasData = (rs.promotion || rs.relegation);
+        if (!hasData) { card.style.display = 'none'; el.innerHTML = ''; return; }
+        card.style.display = '';
+
+        function renderTypeBlock(label, icon, data, color) {
+          if (!data) return '';
+          var h = '<div style="margin-bottom:12px;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px;background:rgba(255,255,255,0.02)">' +
+            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:16px">' + icon + '</span><span style="font-weight:700;font-size:14px;color:' + color + '">' + label + '</span><span style="font-size:11px;color:var(--text-dim)">共 ' + data.total + ' 场 · 胜率 ' + data.winRate + '%</span></div>' +
+            '<div class="stat-row"><span class="label">对局胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill green" style="width:' + parseFloat(data.winRate) + '%"></div></div><span class="value good">' + data.winRate + '%</span></div></div>' +
+            '<div class="stat-row"><span class="label">硬币胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + parseFloat(data.coinWinRate) + '%"></div></div><span class="value warn">' + data.coinWinRate + '%</span></div></div>' +
+            '<div class="stat-row"><span class="label">先手胜率</span><span class="value info">' + data.firstWinRate + '%</span></div>' +
+            '<div class="stat-row"><span class="label">后手胜率</span><span class="value warn">' + data.secondWinRate + '%</span></div>' +
+            '<div class="stat-row"><span class="label">卡手率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(data.cantPlayRate) + '%"></div></div><span class="value bad">' + data.cantPlayRate + '%</span></div></div>' +
+            '<div class="stat-row"><span class="label">对手大牌率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(data.bigHandRate) + '%"></div></div><span class="value bad">' + data.bigHandRate + '%</span></div></div>';
+          // 吃手坑情况
+          var ht = data.handtrap;
+          h += '<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span style="font-size:11px;color:var(--accent);font-weight:600">吃手坑情况</span></div>' +
+            '<div class="stat-row"><span class="label">增殖的G</span><span class="value">' + ht.gotMaxxc + ' 次</span></div>' +
+            '<div class="stat-row"><span class="label">鸟G</span><span class="value">' + ht.gotDroll + ' 次</span></div>' +
+            '<div class="stat-row"><span class="label">水母G</span><span class="value">' + ht.gotJellyfish + ' 次</span></div>' +
+            '<div class="stat-row"><span class="label">锁鸟</span><span class="value">' + ht.gotLancea + ' 次</span></div>' +
+            '<div class="stat-row"><span class="label">陨石</span><span class="value">' + ht.gotNibiru + ' 次</span></div>' +
+            '<div class="stat-row"><span class="label">大宇宙人</span><span class="value">' + ht.gotDimension + ' 次</span></div>' +
+            '<div class="stat-row"><span class="label">其他手坑</span><span class="value">' + ht.gotSmallHT + ' 次</span></div>';
+          // 对手卡组分布
+          if (data.oppDecks && data.oppDecks.length > 0) {
+            h += '<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span style="font-size:11px;color:var(--accent);font-weight:600">对手卡组分布</span></div>';
+            data.oppDecks.slice(0, 5).forEach(function(d) {
+              h += '<div class="stat-row"><span class="label">' + d.deck + '</span><span class="value">' + d.wins + 'W ' + d.losses + 'L</span><span style="font-size:11px;color:var(--text-dim)">' + d.winRate + '%</span></div>';
+            });
+            if (data.oppDecks.length > 5) {
+              h += '<div style="font-size:10px;color:var(--text-dim);margin-top:2px">还有 ' + (data.oppDecks.length - 5) + ' 个卡组未显示</div>';
+            }
+          }
+          h += '</div>';
+          return h;
+        }
+
+        el.innerHTML =
+          renderTypeBlock('晋级赛', '🔥', rs.promotion, '#ffc832') +
+          renderTypeBlock('保级赛', '💧', rs.relegation, '#ff6b62');
+      }
+
       // ═══ 主渲染 ═══
       function renderAll(stats) {
         if (!stats) return;
@@ -870,9 +1056,12 @@
         renderTyphon(stats);
         renderDeckOut(stats);
         renderTimeout(stats);
+        renderBigHand(stats);
+        renderWinTrend(stats);
         renderDeckTable(stats.myDeckStats, 'mydeck-content', 'W', 'L');
         renderDeckTable(stats.deckStats, 'oppdeck-content', 'W', 'L');
         renderMatchups(stats);
+        renderRanked(stats);
         document.getElementById('last-update').textContent = '更新于 ' + new Date().toLocaleTimeString();
       }
 

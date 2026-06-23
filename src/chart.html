@@ -108,15 +108,148 @@
       margin-bottom: 4px;
       flex-shrink: 0;
     }
+    .chart-slide .chart-body {
+      flex: 1;
+      display: flex;
+      gap: 6px;
+      min-height: 0;
+      overflow: hidden;
+    }
     .chart-slide .chart-canvas-wrap {
       flex: 1;
       position: relative;
       min-height: 0;
+      min-width: 0;
     }
     .chart-slide .chart-canvas-wrap canvas {
       width: 100% !important;
       height: 100% !important;
     }
+    .chart-slide .chart-info {
+      width: 130px;
+      flex-shrink: 0;
+      font-size: 10px;
+      color: var(--text-dim);
+      overflow-y: auto;
+      display: none;
+      padding: 2px 0;
+    }
+    .chart-slide .chart-info.active { display: block; }
+    .chart-slide .chart-info .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      line-height: 1.4;
+    }
+    .chart-slide .chart-info .info-val {
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--text-bright);
+    }
+    .chart-slide .chart-info .info-label { color: var(--text-dim); }
+    .chart-slide .chart-info .info-section {
+      font-weight: 700;
+      font-size: 10px;
+      color: var(--accent);
+      margin-top: 5px;
+      padding-top: 3px;
+      border-top: 1px solid var(--border);
+    }
+    .chart-slide .chart-info .info-bar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin: 2px 0;
+    }
+    .chart-slide .chart-info .info-bar-track {
+      width: 60px;
+      height: 5px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 2px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .chart-slide .chart-info .info-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+    }
+    .chart-slide .chart-info .info-bar-fill.green { background: #4cd964; }
+    .chart-slide .chart-info .info-bar-fill.gold { background: #ffd700; }
+    .chart-slide .chart-info .info-bar-fill.red { background: #ff3b30; }
+    .chart-slide .chart-info .info-bar-fill.blue { background: #64c8ff; }
+    .chart-slide .chart-info .info-val.good { color: #4cd964; }
+    .chart-slide .chart-info .info-val.bad { color: #ff3b30; }
+    .chart-slide .chart-info .info-val.warn { color: #ffc832; }
+    .chart-slide .chart-info .info-val.info { color: #64c8ff; }
+    .chart-slide .chart-info .info-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+      margin-top: 3px;
+    }
+    .chart-slide .chart-info .info-table th {
+      text-align: left;
+      padding: 2px 3px;
+      color: var(--text-dim);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+    }
+    .chart-slide .chart-info .info-table td {
+      padding: 2px 3px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      white-space: nowrap;
+    }
+
+    /* 概览大数字 */
+    .hero-grid {
+      flex: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      align-items: center;
+      padding: 6px;
+      align-content: center;
+    }
+    .hero-grid .hero-box {
+      width: calc(33% - 6px);
+      text-align: center;
+      background: rgba(255,255,255,0.03);
+      border-radius: 10px;
+      padding: 10px 4px;
+      border: 1px solid rgba(255,255,255,0.06);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-grid .hero-box::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+    .hero-grid .hero-box.total::before { background: linear-gradient(90deg, #ffc832, #ff8c00); }
+    .hero-grid .hero-box.wins-box::before { background: linear-gradient(90deg, #4cd964, #34c759); }
+    .hero-grid .hero-box.losses-box::before { background: linear-gradient(90deg, #ff3b30, #ff6b62); }
+    .hero-grid .hero-box.draws-box::before { background: linear-gradient(90deg, #ffd700, #ffaa00); }
+    .hero-grid .hero-box.rate-box::before { background: linear-gradient(90deg, #64c8ff, #5e5ce6); }
+    .hero-grid .hero-box .hero-val {
+      font-size: 24px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      line-height: 1.3;
+    }
+    .hero-grid .hero-box .hero-lbl {
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 2px;
+      letter-spacing: 0.3px;
+    }
+    .hero-grid .hero-box.total .hero-val { color: #ffc832; }
+    .hero-grid .hero-box.wins-box .hero-val { color: #4cd964; }
+    .hero-grid .hero-box.losses-box .hero-val { color: #ff3b30; }
+    .hero-grid .hero-box.draws-box .hero-val { color: #ffd700; }
+    .hero-grid .hero-box.rate-box .hero-val { color: #64c8ff; }
 
     .nav-bar {
       display: flex;
@@ -202,16 +335,17 @@
 
       // ═══ 图表配置 ═══
       var CHART_DEFS = [
+        { id: 'hero', label: '概览', sub: '数据总览', render: renderHero },
         { id: 'win-pie', label: '胜负分布', sub: '总对局胜负平异常占比', render: renderWinPie },
         { id: 'first-second', label: '先后手对比', sub: '先手 vs 后手胜负', render: renderFirstSecondBar },
-        { id: 'handtrap', label: '手坑分布', sub: '各类手坑被吃比例', render: renderHandtrapPie },
+        { id: 'handtrap', label: '手坑分布', sub: '各类手坑被吃次数（可同时发生）', render: renderHandtrapPie },
         { id: 'endboard', label: '先手终场', sub: '终场质量分布', render: renderEndboardPie },
         { id: 'breakboard', label: '后手突破', sub: '突破成功/失败/投降', render: renderBreakBoardPie },
         { id: 'trend', label: '胜率趋势', sub: '累计胜率变化', render: renderWinTrendLine },
         { id: 'deck-bar', label: '自用卡组胜率', sub: '各卡组胜率排行', render: renderDeckBar },
         { id: 'streak', label: '连胜状态', sub: '当前连胜/连败', render: renderStreakGauge },
         { id: 'coin', label: '硬币统计', sub: '硬币正反胜负分布', render: renderCoinPie },
-        { id: 'handstate', label: '卡手原因', sub: '各类无法动原因分布', render: renderHandStatePie },
+        { id: 'handstate', label: '卡手原因', sub: '各类卡手原因次数（可同时发生）', render: renderHandStatePie },
         { id: 'mistake', label: '严重失误', sub: '失误频率与胜率', render: renderMistakeDoughnut },
         { id: 'opponent-t0', label: '对手T0动', sub: '被对手T0干扰统计', render: renderOpponentT0Doughnut },
         { id: 'opponent-ran', label: '吓跑对手', sub: '对手逃跑次数', render: renderOpponentRanGauge },
@@ -219,7 +353,10 @@
         { id: 'opp-deck-bar', label: '对战卡组胜率', sub: '对手卡组胜率排行', render: renderOppDeckBar },
         { id: 'disconnect', label: '掉线统计', sub: '掉线次数分布', render: renderDisconnectPie },
         { id: 'timeout', label: '超时统计', sub: '超时次数分布', render: renderTimeoutPie },
-        { id: 'big-hand', label: '对手大牌', sub: '对手大牌哥次数', render: renderBigHandGauge }
+        { id: 'big-hand', label: '对手大牌', sub: '对手大牌哥次数', render: renderBigHandGauge },
+        { id: 'deckout', label: '抽干牌组', sub: '抽干对手/自己统计', render: renderDeckOutChart },
+        { id: 'matchup', label: '对阵交叉统计', sub: '按对手卡组分组显示各卡组胜率', render: renderMatchupChart },
+        { id: 'ranked-stats', label: '晋级/保级赛', sub: '晋级赛与保级赛数据对比', render: renderRankedStats }
       ];
 
       var currentIndex = 0;
@@ -246,14 +383,24 @@
           sub.textContent = def.sub;
           slide.appendChild(sub);
 
+          // 图表主体：canvas + info 面板
+          var body = document.createElement('div');
+          body.className = 'chart-body';
+
           var wrap = document.createElement('div');
           wrap.className = 'chart-canvas-wrap';
 
           var canvas = document.createElement('canvas');
           canvas.id = 'chart-w-' + def.id;
           wrap.appendChild(canvas);
-          slide.appendChild(wrap);
+          body.appendChild(wrap);
 
+          var info = document.createElement('div');
+          info.className = 'chart-info';
+          info.id = 'info-' + def.id;
+          body.appendChild(info);
+
+          slide.appendChild(body);
           vp.appendChild(slide);
         });
 
@@ -312,7 +459,8 @@
         var def = CHART_DEFS[currentIndex];
         var canvas = document.getElementById('chart-w-' + def.id);
         if (!canvas) return;
-        ChartManager.render('standalone-' + def.id, canvas, def.render, stats);
+        var infoEl = document.getElementById('info-' + def.id);
+        ChartManager.render('standalone-' + def.id, canvas, def.render, stats, { infoEl: infoEl });
       }
 
       function renderAllCharts() {

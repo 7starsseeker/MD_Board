@@ -581,6 +581,34 @@
         };
       };
 
+      RENDERERS.rankedStats = function(s) {
+        var rs = s.rankedStats;
+        var hasPromo = rs && rs.promotion;
+        var hasReleg = rs && rs.relegation;
+        if (!hasPromo && !hasReleg) {
+          return { label: '—', subLabel: '暂无晋级/保级赛数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无晋级/保级赛数据</div>' };
+        }
+        function block(data, icon, label, color) {
+          if (!data) return '';
+          return '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">' +
+            '<div style="font-size:28px;font-weight:800;color:' + color + '">' + icon + ' ' + data.winRate + '%</div>' +
+            '<div style="font-size:12px;color:var(--text-dim)">' + label + ' 胜率</div>' +
+            '<div style="font-size:11px;color:var(--text-dim)">' + data.total + '场 · 硬币' + data.coinWinRate + '% · 卡手' + data.cantPlayRate + '%</div>' +
+            '</div>';
+        }
+        var cols = '';
+        if (hasPromo) cols += block(rs.promotion, '🔥', '晋级赛', '#ffc832');
+        if (hasReleg) cols += block(rs.relegation, '💧', '保级赛', '#ff6b62');
+        if (hasPromo && hasReleg) cols = '<div style="width:1px;height:60px;background:rgba(255,255,255,0.08);margin:0 6px"></div>' + cols;
+        if (hasPromo && hasReleg) cols = block(rs.promotion, '🔥', '晋级赛', '#ffc832') + cols;
+        return {
+          label: (hasPromo ? '晋级' + rs.promotion.winRate + '%' : '') + (hasPromo && hasReleg ? ' / ' : '') + (hasReleg ? '保级' + rs.relegation.winRate + '%' : ''),
+          subLabel: '晋级赛 vs 保级赛',
+          html: '<div class="double-row" style="gap:4px">' + cols + '</div>' +
+                '<div class="big-label">晋级赛 / 保级赛</div>'
+        };
+      };
+
       // ═══ 构建幻灯片 ═══
       function getEnabledItems() {
         if (!config || !config.items) return [];

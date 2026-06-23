@@ -289,6 +289,65 @@ function computeStats() {
 
   const playable = wins + losses;
 
+  // ── 晋级赛 / 保级赛统计 ──
+  function computeTypeStats(typeMatches) {
+    const tWins = typeMatches.filter(m => m.result === 'win').length;
+    const tLosses = typeMatches.filter(m => m.result === 'loss').length;
+    const tTotal = tWins + tLosses;
+    if (tTotal === 0) return null;
+    // 硬币
+    const tCoin = typeMatches.filter(m => m.coinToss === true || m.coinToss === false);
+    const tCoinWins = tCoin.filter(m => m.coinToss === true).length;
+    // 先后手
+    const tFirst = typeMatches.filter(m => m.goingFirst);
+    const tFirstWins = tFirst.filter(m => m.result === 'win').length;
+    const tSecond = typeMatches.filter(m => !m.goingFirst);
+    const tSecondWins = tSecond.filter(m => m.result === 'win').length;
+    // 手坑
+    const tMaxxc = typeMatches.filter(m => m.gotMaxxc).length;
+    const tDroll = typeMatches.filter(m => m.gotDroll).length;
+    const tJellyfish = typeMatches.filter(m => m.gotJellyfish).length;
+    const tLancea = typeMatches.filter(m => m.gotLancea).length;
+    const tNibiru = typeMatches.filter(m => m.gotNibiru).length;
+    const tDimension = typeMatches.filter(m => m.gotDimension).length;
+    const tSmallHT = typeMatches.filter(m => m.gotSmallHT).length;
+    const tAnyG = typeMatches.filter(m => m.gotMaxxc || m.gotDroll || m.gotJellyfish).length;
+    // 卡手
+    const tCantPlay = typeMatches.filter(m => m.cantPlay || m.bothStuck).length;
+    // 对手大牌
+    const tBigHand = typeMatches.filter(m => m.opponentBigHand).length;
+    // 对手卡组
+    const tOppDecks = {};
+    typeMatches.forEach(m => {
+      if (!m.opponentDeck) return;
+      const d = m.opponentDeck.trim();
+      if (!d) return;
+      if (!tOppDecks[d]) tOppDecks[d] = { total: 0, wins: 0, losses: 0 };
+      tOppDecks[d].total++;
+      if (m.result === 'win') tOppDecks[d].wins++;
+      else if (m.result === 'loss') tOppDecks[d].losses++;
+    });
+    return {
+      total: tTotal, wins: tWins, losses: tLosses,
+      winRate: tTotal > 0 ? ((tWins / tTotal) * 100).toFixed(1) : '0.0',
+      coinWinRate: tCoin.length > 0 ? ((tCoinWins / tCoin.length) * 100).toFixed(1) : '0.0',
+      firstWinRate: tFirst.length > 0 ? ((tFirstWins / tFirst.length) * 100).toFixed(1) : '0.0',
+      secondWinRate: tSecond.length > 0 ? ((tSecondWins / tSecond.length) * 100).toFixed(1) : '0.0',
+      handtrap: { gotMaxxc: tMaxxc, gotDroll: tDroll, gotJellyfish: tJellyfish, gotLancea: tLancea, gotNibiru: tNibiru, gotDimension: tDimension, gotSmallHT: tSmallHT, gotAnyG: tAnyG },
+      cantPlayRate: tTotal > 0 ? ((tCantPlay / tTotal) * 100).toFixed(1) : '0.0',
+      bigHandRate: tTotal > 0 ? ((tBigHand / tTotal) * 100).toFixed(1) : '0.0',
+      oppDecks: Object.entries(tOppDecks)
+        .sort((a, b) => b[1].total - a[1].total)
+        .map(([d, s]) => ({ deck: d, ...s, winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0' }))
+    };
+  }
+  const promotionMatches = matches.filter(m => m.matchType === 'promotion');
+  const relegationMatches = matches.filter(m => m.matchType === 'relegation');
+  const rankedStats = {
+    promotion: computeTypeStats(promotionMatches),
+    relegation: computeTypeStats(relegationMatches)
+  };
+
   return {
     total, wins, losses, draws, abnormals,
     winRate: playable > 0 ? ((wins / playable) * 100).toFixed(1) : '0.0',
@@ -425,7 +484,8 @@ function computeStats() {
       .map(([key, s]) => ({
         myDeck: s.myDeck, opponentDeck: s.opponentDeck, ...s,
         winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0'
-      }))
+      })),
+    rankedStats
   };
 }
 

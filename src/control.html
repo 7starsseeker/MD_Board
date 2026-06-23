@@ -168,6 +168,18 @@
       </div>
     </div>
 
+    <!-- 对局类型 -->
+    <div class="form-row">
+      <div class="form-group shrink" style="min-width:240px">
+        <label>对局类型</label>
+        <div class="btn-group">
+          <button class="btn btn-match-type active" id="match-normal" data-val="normal">普通</button>
+          <button class="btn btn-match-type" id="match-promotion" data-val="promotion" style="border-color:rgba(255,200,50,0.3);color:#ffc832">🔥 晋级赛</button>
+          <button class="btn btn-match-type" id="match-relegation" data-val="relegation" style="border-color:rgba(255,59,48,0.3);color:#ff6b62">💧 保级赛</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 自己卡组 -->
     <div class="form-row">
       <div class="form-group">
@@ -553,6 +565,7 @@
       result: null,
       goingFirst: null,
       coinToss: null,
+      matchType: 'normal',
       opponentDeck: '',
       opponentBigHand: false,
       gotMaxxc: false,
@@ -634,6 +647,16 @@
     // 硬币
     bindGroup([document.getElementById('input-coin-win'), document.getElementById('input-coin-loss')], 'coinToss', function(b) {
       return b.id === 'input-coin-win' ? true : false;
+    });
+
+    // 对局类型
+    var matchTypeBtns = [document.getElementById('match-normal'), document.getElementById('match-promotion'), document.getElementById('match-relegation')];
+    bindGroup(matchTypeBtns, 'matchType', function(b) { return b.dataset.val; });
+    matchTypeBtns.forEach(function(b) {
+      b.addEventListener('click', function() {
+        matchTypeBtns.forEach(function(btn) { btn.classList.remove('active'); });
+        b.classList.add('active');
+      });
     });
 
     // 先后手切换时显示/隐藏条件区域
@@ -869,6 +892,7 @@
         result: state.result,
         goingFirst: state.goingFirst,
         coinToss: state.coinToss,
+        matchType: state.matchType === 'normal' ? undefined : state.matchType,
         myDeck: state.myDeck.trim() || '',
         opponentDeck: deck,
         opponentBigHand: state.opponentBigHand || null,
@@ -940,6 +964,7 @@
       state.brokeBoard = null;
       state.otk = null;
       state.endboardInteraction = null;
+      state.matchType = 'normal';
       // myDeck 保持上一局的录入内容
 
       // 重置所有UI
@@ -960,6 +985,7 @@
       document.getElementById('section-t0').classList.remove('visible');
       document.getElementById('chk-t0').checked = false;
       updateConditionalSections();
+      document.getElementById('match-normal').classList.add('active');
     }
 
     // 快捷提交
@@ -1228,7 +1254,8 @@
       { type: 'deckOut', label: '抽干牌组', desc: '抽干牌组次数' },
       { type: 'myDeckStats', label: '自用卡组', desc: '自用卡组胜率排行 Top3' },
       { type: 'oppDeckStats', label: '对战卡组', desc: '对战卡组胜率排行 Top3' },
-      { type: 'matchupStats', label: '交叉统计', desc: '自用vs对手交叉胜率 Top3' }
+      { type: 'matchupStats', label: '交叉统计', desc: '自用vs对手交叉胜率 Top3' },
+      { type: 'rankedStats', label: '晋级/保级赛', desc: '晋级赛/保级赛对局胜率' }
     ];
 
     function renderCycleSettings(config) {
