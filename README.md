@@ -63,8 +63,6 @@ npm install
 npm start
 ```
 
-> 首次运行会附带 10 条示例对局数据，方便体验全部功能。
-
 ### 使用便携版 exe
 
 从 [Releases](https://github.com/7starsseeker/MD_Board/releases) 页面下载 `MD_Board_x.x.x_portable.exe`，双击运行即可。
