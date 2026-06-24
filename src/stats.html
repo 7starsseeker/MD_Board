@@ -372,7 +372,7 @@
         <div class="card-icon" style="background:rgba(255,100,130,0.12)">🃏</div>
         <div>
           <div class="card-title-text">手牌与卡手统计</div>
-          <div class="card-subtitle">不能动 / 卡组件 / 同名卡 / 卡手坑 / 互卡</div>
+          <div class="card-subtitle">卡手原因：卡废件/卡同名牌/卡后手牌 · 制裁：完全动不了/互卡</div>
         </div>
       </div>
       <div id="handstate-content"></div>
@@ -491,8 +491,8 @@
       <div class="card-header">
         <div class="card-icon" style="background:rgba(255,45,85,0.12)">🃏</div>
         <div>
-          <div class="card-title-text">对手大牌统计</div>
-          <div class="card-subtitle">对手大牌哥登场次数</div>
+          <div class="card-title-text">遇到大牌哥情况统计</div>
+          <div class="card-subtitle">遇到大牌哥登场次数</div>
         </div>
       </div>
       <div id="bighand-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
@@ -641,13 +641,16 @@
         var hs = stats.handState;
         var cr = parseFloat(hs.cantPlayRate) || 0;
         var br = parseFloat(hs.bothStuckRate) || 0;
+        var cantPlaySelfRate = stats.total > 0 ? ((hs.cantPlay||0) / stats.total * 100).toFixed(1) : '0.0';
         document.getElementById('handstate-content').innerHTML =
-          '<div class="stat-row"><span class="label">初始手牌较差/事故</span><span class="value bad">' + hs.cantPlay + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + fmt(hs.cantPlayRate) + '%</span></div>' +
-          '<div class="stat-row"><span class="label">　废件复数上手</span><span class="value">' + hs.cantPlayGarnet + '</span></div>' +
-          '<div class="stat-row"><span class="label">　同一张复数上手</span><span class="value">' + hs.cantPlayDuplicate + '</span></div>' +
-          '<div class="stat-row"><span class="label">　后手组件复数上手</span><span class="value">' + hs.cantPlayHT + '</span></div>' +
-          '<div class="stat-row"><span class="label">双方都动不了</span><span class="value warn">' + hs.bothStuck + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + fmt(hs.bothStuckRate) + '%</span></div>' +
-          '<div class="stat-row"><span class="label">卡手率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + cr + '%"></div></div><span class="value bad">' + fmt(hs.cantPlayRate) + '%</span></div></div>';
+          '<div style="padding:6px 0 2px 0;font-size:13px;font-weight:700;color:#ffd700">📋 卡手原因</div>' +
+          '<div class="stat-row"><span class="label">　卡废件</span><span class="value">' + hs.cantPlayGarnet + '</span></div>' +
+          '<div class="stat-row"><span class="label">　卡同名牌</span><span class="value">' + hs.cantPlayDuplicate + '</span></div>' +
+          '<div class="stat-row"><span class="label">　卡后手牌</span><span class="value">' + hs.cantPlayHT + '</span></div>' +
+          '<div style="padding:6px 0 2px 0;font-size:13px;font-weight:700;color:#ff6b62">🔨 被发牌员制裁</div>' +
+          '<div class="stat-row"><span class="label">　完全动不了</span><span class="value bad">' + (hs.cantPlay||0) + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + cantPlaySelfRate + '%</span></div>' +
+          '<div class="stat-row"><span class="label">　互卡</span><span class="value warn">' + hs.bothStuck + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + fmt(hs.bothStuckRate) + '%</span></div>' +
+          '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label">合计卡手率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + cr + '%"></div></div><span class="value bad">' + fmt(hs.cantPlayRate) + '%</span></div></div>';
       }
 
       // ═══ 严重失误统计 ═══
@@ -705,7 +708,7 @@
           '<div class="stat-row"><span class="label">其中输了</span><span class="value bad">' + t.losses + '</span></div>' +
           '<div class="stat-row"><span class="label">被T0动时胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + parseFloat(t.winRate) + '%"></div></div><span class="value warn">' + fmt(t.winRate) + '%</span></div></div>';
         if (t.byDeck && t.byDeck.length > 0) {
-          html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span style="font-size:11px;color:var(--accent);font-weight:600">被T0动的对手卡组</span></div>';
+          html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span style="font-size:11px;color:var(--accent);font-weight:600">遇到T0动最多的对手卡组</span></div>';
           t.byDeck.forEach(function(d) {
             html += '<div class="stat-row"><span class="label">' + d.deck + '</span><span class="value" style="font-size:11px;color:var(--text-dim)">' + d.total + ' 次</span><span style="font-size:12px;font-weight:700;font-family:var(--font-mono)">' + d.winRate + '%</span></div>';
           });
@@ -790,7 +793,7 @@
         var hs = stats.handState || {};
         var selfStuck = (hs.cantPlay||0) + (hs.cantPlayGarnet||0) + (hs.cantPlayDuplicate||0) + (hs.cantPlayHT||0);
         el.innerHTML =
-          '<div class="stat-row"><span class="label">对手大牌哥次数</span><span class="value bad" style="font-size:18px">' + bh + ' 次</span></div>' +
+          '<div class="stat-row"><span class="label">遇到大牌哥次数</span><span class="value bad" style="font-size:18px">' + bh + ' 次</span></div>' +
           '<div class="stat-row"><span class="label">占总对局比</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(bhRate) + '%"></div></div><span class="value bad">' + fmt(bhRate) + '%</span></div></div>' +
           '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label">自己卡手次数</span><span class="value warn">' + selfStuck + ' 次</span><span style="font-size:11px;color:var(--text-dim)">（参考对比）</span></div>';
       }
@@ -1038,9 +1041,18 @@
       function renderAll(stats) {
         if (!stats) return;
         // 更新时间范围标签
-        api.getTimeRange().then(function(range) {
-          var labels = { all: '', today: '📅 今天', week: '📅 本周', month: '📅 本月' };
-          document.getElementById('stats-tr-label').textContent = labels[range] || '';
+        api.getTimeRange().then(async function(range) {
+          var labels = { all: '', today: '📅 一天', week: '📅 [本周]', month: '📅 [本月]' };
+          var label = labels[range] || '';
+          if (range === 'today') {
+            var selDate = await api.getSelectedDate();
+            if (selDate) {
+              var today = new Date();
+              var todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+              label = '📅 ' + (selDate === todayStr ? selDate + '「今天」' : selDate);
+            }
+          }
+          document.getElementById('stats-tr-label').textContent = label;
         });
         renderHero(stats);
         renderFirstSecond(stats);

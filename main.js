@@ -12,7 +12,7 @@ function getRuntimeDir() {
 const RUNTIME_DATA = () => path.join(getRuntimeDir(), 'stats.json');
 const RUNTIME_WSTATE = () => path.join(getRuntimeDir(), 'window-state.json');
 
-let data = { matches: [], version: 4, deckPresets: [], myDeckPresets: [], cycleConfig: null, timeRange: 'all' };
+let data = { matches: [], version: 4, deckPresets: [], myDeckPresets: [], cycleConfig: null, timeRange: 'all', selectedDate: null };
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -60,9 +60,20 @@ function saveData() {
 function filterMatchesByTimeRange(matches, range) {
   if (range === 'all' || !range) return matches;
   const now = new Date();
-  let start;
+  let start, end;
   if (range === 'today') {
-    start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (data.selectedDate) {
+      // 使用选中的具体日期
+      start = new Date(data.selectedDate);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(start);
+      end.setDate(end.getDate() + 1);
+    } else {
+      // 回退到当天
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      end = new Date(start);
+      end.setDate(end.getDate() + 1);
+    }
   } else if (range === 'week') {
     // 周一起算
     const day = now.getDay();
@@ -74,9 +85,10 @@ function filterMatchesByTimeRange(matches, range) {
     return matches;
   }
   const startTs = start.getTime();
+  const endTs = end ? end.getTime() : Infinity;
   return matches.filter(m => {
     const t = new Date(m.timestamp).getTime();
-    return t >= startTs;
+    return t >= startTs && t < endTs;
   });
 }
 
@@ -138,15 +150,15 @@ function computeStats() {
   const gotSmallHT = matches.filter(m => m.gotSmallHT).length;
 
   // ── 卡手统计 ──
-  const cantPlay = matches.filter(m => m.cantPlay).length;
+  const cantPlay = matches.filter(m => m.cantPlay || m.bothStuck).length;
   const cantPlayGarnet = matches.filter(m => m.cantPlayGarnet).length;
   const cantPlayDuplicate = matches.filter(m => m.cantPlayDuplicate).length;
   const cantPlayHT = matches.filter(m => m.cantPlayHT).length;
 
   // ── 互卡统计 ──
   const bothStuck = matches.filter(m => m.bothStuck).length;
-  // 有效卡手 = 自己卡手 或 双方都动不了（同一场只计一次）
-  const totalCantPlay = matches.filter(m => m.cantPlay || m.bothStuck).length;
+  // 有效卡手 = 任一卡手情况被选中即计为一场（同一场多项也只计一次）
+  const totalCantPlay = matches.filter(m => m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck).length;
 
   // ── 掉线 / 超时 ──
   const disconnect = matches.filter(m => m.disconnect).length;
@@ -313,7 +325,7 @@ function computeStats() {
     const tSmallHT = typeMatches.filter(m => m.gotSmallHT).length;
     const tAnyG = typeMatches.filter(m => m.gotMaxxc || m.gotDroll || m.gotJellyfish).length;
     // 卡手
-    const tCantPlay = typeMatches.filter(m => m.cantPlay || m.bothStuck).length;
+    const tCantPlay = typeMatches.filter(m => m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck).length;
     // 对手大牌
     const tBigHand = typeMatches.filter(m => m.opponentBigHand).length;
     // 对手卡组
@@ -762,19 +774,44 @@ ipcMain.handle('shell:open-external', (event, url) => {
   shell.openExternal(url);
 });
 
+ipcMain.handle('app:get-version', () => {
+  return require('./package.json').version;
+});
+
 // ── 时间范围过滤 ─────────────────────────────────────────────────────────
 ipcMain.handle('stats:get-time-range', () => {
   return data.timeRange || 'all';
 });
 
-ipcMain.handle('stats:set-time-range', (event, range) => {
+ipcMain.handle('stats:set-time-range', (event, range, selectedDate) => {
   if (['all', 'today', 'week', 'month'].includes(range)) {
     data.timeRange = range;
+    if (range === 'today') {
+      data.selectedDate = selectedDate || null;
+    } else {
+      data.selectedDate = null;
+    }
     saveData();
     notifyWindows();
     return { success: true };
   }
   return { success: false, error: '无效的时间范围' };
+});
+
+ipcMain.handle('stats:get-available-dates', () => {
+  const dates = new Set();
+  (data.matches || []).forEach(m => {
+    if (m.timestamp) {
+      const d = new Date(m.timestamp);
+      const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      dates.add(key);
+    }
+  });
+  return Array.from(dates).sort().reverse();
+});
+
+ipcMain.handle('stats:get-selected-date', () => {
+  return data.selectedDate || null;
 });
 
 // ── 预设卡组管理 ─────────────────────────────────────────────────────────
@@ -860,9 +897,11 @@ function getDefaultCycleConfig() {
       { type: 'coinRate', enabled: true, label: '硬币率' },
       { type: 'totalMatches', enabled: true, label: '总场次' },
       { type: 'opponentRan', enabled: true, label: '吓跑对手' },
+      { type: 'bigHand', enabled: true, label: '遇到大牌哥' },
       { type: 'endboard', enabled: true, label: '先手终场' },
       { type: 'breakBoard', enabled: true, label: '后手突破' },
       { type: 'handState', enabled: true, label: '卡手率' },
+      { type: 'dealerScrewed', enabled: true, label: '被发牌员制裁' },
       { type: 'mistake', enabled: true, label: '严重失误' },
       { type: 'opponentT0', enabled: true, label: '对手T0动' },
       { type: 'disconnect', enabled: true, label: '掉线统计' },

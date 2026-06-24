@@ -233,7 +233,7 @@
       var timer = null;
       var paused = false;
       var currentTimeRange = 'all';
-      var TIME_RANGE_LABELS = { all: '全部', today: '今天', week: '本周', month: '本月' };
+      var TIME_RANGE_LABELS = { all: '全部', today: '一天', week: '本周', month: '本月' };
 
       // ═══ 渲染函数 ▸ 返回 { label, subLabel, html } ═══
 
@@ -273,15 +273,15 @@
           label: '先手 ' + gf.winRate + '% / 后手 ' + gs.winRate + '%',
           subLabel: '先后手胜率对比',
           html: '<div class="double-row">' +
-                  '<div class="col"><div class="dv" style="color:#4cd964">' + gf.wins + '</div><div class="dl">先手胜</div>' +
-                  '<div style="font-size:15px;color:#64c8ff;font-weight:700">' + gf.winRate + '%</div></div>' +
-                  '<div class="col"><div class="dv" style="color:#ff3b30">' + gf.losses + '</div><div class="dl">先手负</div>' +
-                  '<div style="font-size:15px;color:#ff6b62;font-weight:700">' + gfLossRate + '%</div></div>' +
-                  '<div style="width:1px;height:70px;background:rgba(255,255,255,0.08)"></div>' +
-                  '<div class="col"><div class="dv" style="color:#4cd964">' + gs.wins + '</div><div class="dl">后手胜</div>' +
-                  '<div style="font-size:15px;color:#ff9632;font-weight:700">' + gs.winRate + '%</div></div>' +
-                  '<div class="col"><div class="dv" style="color:#ff3b30">' + gs.losses + '</div><div class="dl">后手负</div>' +
-                  '<div style="font-size:15px;color:#ff6b62;font-weight:700">' + gsLossRate + '%</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#4cd964;font-size:40px">' + gf.wins + '</div><div class="dl" style="font-size:13px">先手胜</div>' +
+                  '<div style="font-size:13px;color:#64c8ff;font-weight:700">' + gf.winRate + '%</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#ff3b30;font-size:40px">' + gf.losses + '</div><div class="dl" style="font-size:13px">先手负</div>' +
+                  '<div style="font-size:13px;color:#ff6b62;font-weight:700">' + gfLossRate + '%</div></div>' +
+                  '<div style="width:1px;height:50px;background:rgba(255,255,255,0.08)"></div>' +
+                  '<div class="col"><div class="dv" style="color:#4cd964;font-size:40px">' + gs.wins + '</div><div class="dl" style="font-size:13px">后手胜</div>' +
+                  '<div style="font-size:13px;color:#ff9632;font-weight:700">' + gs.winRate + '%</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#ff3b30;font-size:40px">' + gs.losses + '</div><div class="dl" style="font-size:13px">后手负</div>' +
+                  '<div style="font-size:13px;color:#ff6b62;font-weight:700">' + gsLossRate + '%</div></div>' +
                 '</div>' +
                 '<div class="big-label">先手 vs 后手</div>'
         };
@@ -365,9 +365,9 @@
         return {
           label: or.total + '',
           subLabel: '吓跑对手 ' + or.total + ' 次',
-          html: '<div class="big-value" style="color:#ffd700">' + or.total + ' 🏃</div>' +
+          html: '<div class="big-value" style="color:#ffd700">' + or.total + ' <span style="font-size:36px">🏃</span></div>' +
                 '<div class="big-label">吓跑对手</div>' +
-                '<div class="sub-line">占总对局 ' + fmt(or.rate) + '%' +
+                '<div class="sub-line" style="font-size:14px">占总对局 ' + fmt(or.rate) + '%' +
                 (best ? ' · 最多: ' + best.deck + ' (' + best.count + ')' : '') + '</div>'
         };
       };
@@ -426,7 +426,29 @@
           subLabel: '卡手率',
           html: '<div class="big-value" style="color:' + (cp > 20 ? '#ff3b30' : '#ffd700') + '">' + fmt(hs.cantPlayRate) + '<span class="pct">%</span></div>' +
                 '<div class="big-label">卡手率</div>' +
-                '<div class="sub-line">合计 ' + hs.totalCantPlay + ' 次（自己 ' + hs.cantPlay + ' · 互卡 ' + hs.bothStuck + '）</div>'
+                '<div class="sub-line">卡废件 ' + hs.cantPlayGarnet + ' · 卡同名牌 ' + hs.cantPlayDuplicate + ' · 卡后手牌 ' + hs.cantPlayHT + ' · 合计 ' + hs.totalCantPlay + ' 次</div>'
+        };
+      };
+
+      RENDERERS.dealerScrewed = function(s) {
+        var hs = s.handState;
+        var total = (hs.cantPlay||0) + (hs.bothStuck||0);
+        if (total === 0) {
+          return { label: '0', subLabel: '暂无制裁记录', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无制裁记录</div>' };
+        }
+        var cpRate = s.total > 0 ? ((hs.cantPlay||0) / s.total * 100).toFixed(1) : '0.0';
+        var bsRate = s.total > 0 ? ((hs.bothStuck||0) / s.total * 100).toFixed(1) : '0.0';
+        return {
+          label: total + '',
+          subLabel: '被制裁 ' + total + ' 次',
+          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:2px">' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;width:100%;max-width:300px">' +
+                  '<div style="text-align:center"><div style="font-size:36px;font-weight:800;color:#ff3b30">' + (hs.cantPlay||0) + '</div><div style="font-size:12px;color:#a0a0b8">完全动不了</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:36px;font-weight:800;color:#ff9f0a">' + (hs.bothStuck||0) + '</div><div style="font-size:12px;color:#a0a0b8">互卡</div></div>' +
+                '</div>' +
+                '<div style="font-size:12px;color:#a0a0b8;text-align:center;margin-top:2px">完全动不了率 ' + cpRate + '% · 互卡率 ' + bsRate + '%</div>' +
+                '</div>' +
+                '<div class="big-label">被发牌员制裁</div>'
         };
       };
 
@@ -438,9 +460,24 @@
         return {
           label: m.total + '',
           subLabel: '严重失误 ' + fmt(m.rate) + '%',
-          html: '<div class="big-value" style="color:#ff6482">' + m.total + ' 💢</div>' +
+          html: '<div class="big-value" style="color:#ff6482">' + m.total + ' <span style="font-size:36px">💢</span></div>' +
                 '<div class="big-label">严重失误统计</div>' +
                 '<div class="sub-line">严重失误率 ' + fmt(m.rate) + '% · 严重失误时胜率 ' + fmt(m.winRate) + '%</div>'
+        };
+      };
+
+      RENDERERS.bigHand = function(s) {
+        var bh = s.bigHand;
+        if (!bh || bh === 0) {
+          return { label: '0', subLabel: '暂无遇到大牌哥记录', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无遇到大牌哥记录</div>' };
+        }
+        var rate = s.total > 0 ? (bh / s.total * 100).toFixed(1) : '0.0';
+        return {
+          label: bh + '',
+          subLabel: '遇到大牌哥 ' + bh + ' 次',
+          html: '<div class="big-value" style="color:#bf5af2">' + bh + ' <span style="font-size:36px">🃏</span></div>' +
+                '<div class="big-label">遇到大牌哥</div>' +
+                '<div class="sub-line">遭遇率 ' + fmt(rate) + '% · 总对局 ' + s.total + ' 场</div>'
         };
       };
 
@@ -452,7 +489,7 @@
         return {
           label: t0.total + '',
           subLabel: '被对手T0动 ' + t0.total + ' 次',
-          html: '<div class="big-value" style="color:#ff2d55">' + t0.total + ' ⚡</div>' +
+          html: '<div class="big-value" style="color:#ff2d55">' + t0.total + ' <span style="font-size:36px">⚡</span></div>' +
                 '<div class="big-label">对手T0动</div>' +
                 '<div class="sub-line">被T0动时胜率 ' + fmt(t0.winRate) + '% (' + t0.wins + '胜 ' + t0.losses + '负)</div>'
         };
@@ -523,12 +560,12 @@
         }
         var top = decks.filter(function(d) { return d.deck !== '未知'; }).slice(0, 3);
         var list = top.map(function(d) {
-          return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:290px;padding:4px 0;font-size:20px">' +
-            '<span style="color:var(--text-bright)">' + d.deck + '</span>' +
-            '<span><span style="color:#4cd964;font-weight:700;font-family:var(--font-mono)">' + d.wins + '</span>' +
-            '<span style="color:var(--text-dim)">/</span>' +
-            '<span style="color:#ff3b30;font-weight:700;font-family:var(--font-mono)">' + d.losses + '</span>' +
-            ' <span style="font-weight:700;font-family:var(--font-mono);color:#64c8ff">' + d.winRate + '%</span></span></div>';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:290px;padding:3px 0;font-size:16px">' +
+            '<span style="color:var(--text-bright);font-size:14px">' + d.deck + '</span>' +
+            '<span><span style="color:#4cd964;font-weight:700;font-family:var(--font-mono);font-size:15px">' + d.wins + '</span>' +
+            '<span style="color:var(--text-dim);font-size:13px">/</span>' +
+            '<span style="color:#ff3b30;font-weight:700;font-family:var(--font-mono);font-size:15px">' + d.losses + '</span>' +
+            ' <span style="font-weight:700;font-family:var(--font-mono);color:#64c8ff;font-size:15px">' + d.winRate + '%</span></span></div>';
         }).join('');
         return {
           label: decks.length + ' 套卡组',
@@ -545,12 +582,12 @@
         }
         var top = decks.filter(function(d) { return d.deck !== '未知'; }).slice(0, 3);
         var list = top.map(function(d) {
-          return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:290px;padding:4px 0;font-size:20px">' +
-            '<span style="color:var(--text-bright)">' + d.deck + '</span>' +
-            '<span><span style="color:#4cd964;font-weight:700;font-family:var(--font-mono)">' + d.wins + '</span>' +
-            '<span style="color:var(--text-dim)">/</span>' +
-            '<span style="color:#ff3b30;font-weight:700;font-family:var(--font-mono)">' + d.losses + '</span>' +
-            ' <span style="font-weight:700;font-family:var(--font-mono);color:#64c8ff">' + d.winRate + '%</span></span></div>';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:290px;padding:3px 0;font-size:16px">' +
+            '<span style="color:var(--text-bright);font-size:14px">' + d.deck + '</span>' +
+            '<span><span style="color:#4cd964;font-weight:700;font-family:var(--font-mono);font-size:15px">' + d.wins + '</span>' +
+            '<span style="color:var(--text-dim);font-size:13px">/</span>' +
+            '<span style="color:#ff3b30;font-weight:700;font-family:var(--font-mono);font-size:15px">' + d.losses + '</span>' +
+            ' <span style="font-weight:700;font-family:var(--font-mono);color:#64c8ff;font-size:15px">' + d.winRate + '%</span></span></div>';
         }).join('');
         return {
           label: decks.length + ' 种对手',
@@ -567,11 +604,11 @@
         }
         var top = matchups.filter(function(m) { return m.myDeck !== '未知' && m.opponentDeck !== '未知'; }).slice(0, 3);
         var list = top.map(function(m) {
-          return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:290px;padding:4px 0;font-size:20px">' +
-            '<span style="color:var(--text-bright)">' + m.myDeck + '</span>' +
-            '<span style="color:var(--text-dim)">vs</span>' +
-            '<span style="color:var(--text)">' + m.opponentDeck + '</span>' +
-            ' <span style="font-weight:700;font-family:var(--font-mono);color:#64c8ff">' + m.winRate + '%</span></span></div>';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:290px;padding:2px 0;font-size:13px">' +
+            '<span style="color:var(--text-bright);font-size:12px">' + m.myDeck + '</span>' +
+            '<span style="color:var(--text-dim);font-size:11px">vs</span>' +
+            '<span style="color:var(--text);font-size:12px">' + m.opponentDeck + '</span>' +
+            ' <span style="font-weight:700;font-family:var(--font-mono);color:#64c8ff;font-size:13px">' + m.winRate + '%</span></span></div>';
         }).join('');
         return {
           label: matchups.length + ' 组对阵',
@@ -594,12 +631,13 @@
             '<div style="font-size:28px;font-weight:800;color:' + color + '">' + icon + ' ' + data.winRate + '%</div>' +
             '<div style="font-size:12px;color:var(--text-dim)">' + label + ' 胜率</div>' +
             '<div style="font-size:11px;color:var(--text-dim)">' + data.total + '场 · 硬币' + data.coinWinRate + '% · 卡手' + data.cantPlayRate + '%</div>' +
+            '<div style="font-size:11px;color:var(--text-dim)">遇到大牌哥 ' + data.bigHandRate + '%</div>' +
             '</div>';
         }
         var cols = '';
         if (hasPromo) cols += block(rs.promotion, '🔥', '晋级赛', '#ffc832');
         if (hasReleg) cols += block(rs.relegation, '💧', '保级赛', '#ff6b62');
-        if (hasPromo && hasReleg) cols = '<div style="width:1px;height:60px;background:rgba(255,255,255,0.08);margin:0 6px"></div>' + cols;
+        if (hasPromo && hasReleg) cols = '<div style="width:1px;height:80px;background:rgba(255,255,255,0.08);margin:0 6px"></div>' + cols;
         if (hasPromo && hasReleg) cols = block(rs.promotion, '🔥', '晋级赛', '#ffc832') + cols;
         return {
           label: (hasPromo ? '晋级' + rs.promotion.winRate + '%' : '') + (hasPromo && hasReleg ? ' / ' : '') + (hasReleg ? '保级' + rs.relegation.winRate + '%' : ''),
@@ -711,9 +749,20 @@
       function updateDisplay(newStats) {
         stats = newStats;
         // 更新时间范围标签
-        api.getTimeRange().then(function(range) {
+        api.getTimeRange().then(async function(range) {
           currentTimeRange = range;
-          document.getElementById('cycle-time-range-label').textContent = '[' + (TIME_RANGE_LABELS[range] || '全部') + ']';
+          var label = TIME_RANGE_LABELS[range] || '全部';
+          if (range === 'today') {
+            var selDate = await api.getSelectedDate();
+            if (selDate) {
+              var today = new Date();
+              var todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+              label = selDate === todayStr ? selDate + '「今天」' : selDate;
+            }
+          } else {
+            label = '[' + label + ']';
+          }
+          document.getElementById('cycle-time-range-label').textContent = label;
         });
         var items = getEnabledItems();
         buildSlides(items);

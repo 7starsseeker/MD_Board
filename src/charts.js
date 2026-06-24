@@ -639,15 +639,14 @@ function renderCoinPie(canvas, stats, options) {
 }
 
 /**
- * 10. 卡手原因分布（横向柱状图 — 多项可同时发生，不误导互斥比例）
+ * 10. 卡手原因分布（横向柱状图 — 仅卡手相关，不含完全动不了和互卡）
  */
 function renderHandStatePie(canvas, stats, options) {
   destroyChart(canvas._chart);
   var ctx = canvas.getContext('2d');
   var hs = stats.handState || {};
-  var bigHand = stats.bigHand || 0;
-  var labels = ['无法动','卡组件','卡同名','卡手坑','互卡'];
-  var values = [hs.cantPlay||0, hs.cantPlayGarnet||0, hs.cantPlayDuplicate||0, hs.cantPlayHT||0, hs.bothStuck||0];
+  var labels = ['卡废件','卡同名牌','卡后手牌'];
+  var values = [hs.cantPlayGarnet||0, hs.cantPlayDuplicate||0, hs.cantPlayHT||0];
   var total = values.reduce(function(a,b){return a+b;}, 0);
   if (total === 0) { canvas._chart = null; return null; }
   // 改用柱状图：每种原因独立展示发生次数
@@ -658,7 +657,7 @@ function renderHandStatePie(canvas, stats, options) {
       datasets: [{
         label: '次数',
         data: values,
-        backgroundColor: getColors(5),
+        backgroundColor: getColors(3),
         borderRadius: 3
       }]
     },
@@ -685,22 +684,76 @@ function renderHandStatePie(canvas, stats, options) {
   var info = options && options.infoEl;
   if (info) {
     info.className = 'chart-info active';
-    var cantPlayTotal = hs.cantPlay + hs.cantPlayGarnet + hs.cantPlayDuplicate + hs.cantPlayHT;
+    var cantPlayTotal = (hs.cantPlayGarnet||0) + (hs.cantPlayDuplicate||0) + (hs.cantPlayHT||0);
     var stuckRate = stats.total > 0 ? (cantPlayTotal / stats.total * 100) : 0;
-    var bothStuckRate = stats.total > 0 ? ((hs.bothStuck||0) / stats.total * 100) : 0;
-    var bigHandRate = stats.total > 0 ? (bigHand / stats.total * 100) : 0;
     info.innerHTML =
-      infoRow('无法动', hs.cantPlay || 0) +
-      infoRow('卡组件', hs.cantPlayGarnet || 0) +
-      infoRow('卡同名', hs.cantPlayDuplicate || 0) +
-      infoRow('卡手坑', hs.cantPlayHT || 0) +
-      infoRow('互卡(双方)', hs.bothStuck || 0, 'warn') +
-      infoRow('对手大牌', bigHand, 'bad') +
+      infoRow('卡废件', hs.cantPlayGarnet || 0) +
+      infoRow('卡同名牌', hs.cantPlayDuplicate || 0) +
+      infoRow('卡后手牌', hs.cantPlayHT || 0) +
       infoSection('汇总') +
       infoBar('卡手率', stuckRate, 'red') +
-      (hs.bothStuck ? infoBar('互卡率', bothStuckRate, 'gold') : '') +
-      (bigHand ? infoBar('对手大牌率', bigHandRate, 'red') : '') +
       infoRow('卡手总次数', cantPlayTotal);
+  }
+  return canvas._chart;
+}
+
+/**
+ * 10b. 被发牌员制裁情况（横向柱状图 — 完全动不了 + 互卡）
+ */
+function renderDealerScrewed(canvas, stats, options) {
+  destroyChart(canvas._chart);
+  var ctx = canvas.getContext('2d');
+  var hs = stats.handState || {};
+  var labels = ['完全动不了','互卡'];
+  var values = [hs.cantPlay||0, hs.bothStuck||0];
+  var total = values.reduce(function(a,b){return a+b;}, 0);
+  if (total === 0) { canvas._chart = null; return null; }
+  canvas._chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '次数',
+        data: values,
+        backgroundColor: getColors(2),
+        borderRadius: 3
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { precision: 0 } },
+        y: { grid: { display: false }, ticks: { font: { size: 9 } } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return ctx.parsed.x + ' 次 (' + fmt(ctx.parsed.x / (stats.total||1) * 100) + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+  var info = options && options.infoEl;
+  if (info) {
+    info.className = 'chart-info active';
+    var totalScrewed = (hs.cantPlay||0) + (hs.bothStuck||0);
+    var cantPlayRate = stats.total > 0 ? ((hs.cantPlay||0) / stats.total * 100) : 0;
+    var bothStuckRate = stats.total > 0 ? ((hs.bothStuck||0) / stats.total * 100) : 0;
+    var totalRate = stats.total > 0 ? (totalScrewed / stats.total * 100) : 0;
+    info.innerHTML =
+      infoRow('完全动不了', hs.cantPlay || 0) +
+      infoRow('互卡', hs.bothStuck || 0) +
+      infoSection('汇总') +
+      infoBar('完全动不了率', cantPlayRate, 'red') +
+      infoBar('互卡率', bothStuckRate, 'gold') +
+      infoRow('合计次数', totalScrewed) +
+      infoBar('占总对局', totalRate, 'red');
   }
   return canvas._chart;
 }
@@ -754,7 +807,7 @@ function renderMistakeDoughnut(canvas, stats, options) {
       for (var i = 0; i < topDecks.length; i++) {
         var d = topDecks[i];
         var dwr = (d.wins + d.losses) > 0 ? (d.wins / (d.wins + d.losses) * 100).toFixed(1) : '0.0';
-        ihtml += infoRow(d.deck, d.count + ' 次 (' + dwr + '%)');
+        ihtml += infoRow(d.deck, d.total + ' 次 (' + dwr + '%)');
       }
     }
     info.innerHTML = ihtml;
@@ -808,10 +861,10 @@ function renderOpponentT0Doughnut(canvas, stats, options) {
       infoBar('胜率', t0Wr, 'gold');
     // 按卡组分布
     if (t.byDeck && t.byDeck.length > 0) {
-      ihtml += infoSection('被T0最多的对手卡组');
+      ihtml += infoSection('遇到T0动最多的对手卡组');
       var topD = t.byDeck.slice(0, 5);
       for (var i = 0; i < topD.length; i++) {
-        ihtml += infoRow(topD[i].deck, topD[i].count + ' 次');
+        ihtml += infoRow(topD[i].deck, topD[i].total + ' 次');
       }
     }
     info.innerHTML = ihtml;
@@ -1096,7 +1149,7 @@ function renderBigHandGauge(canvas, stats, options) {
   canvas._chart = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: ['对手大牌', ''],
+      labels: ['遇到大牌哥', ''],
       datasets: [{
         data: [bh, Math.max(bh, 5)],
         backgroundColor: ['#ff2d55', 'rgba(255,255,255,0.06)'],
@@ -1121,7 +1174,7 @@ function renderBigHandGauge(canvas, stats, options) {
         ctx2.fillText(bh + '🃏', w / 2, h / 2 - 6);
         ctx2.font = '13px sans-serif';
         ctx2.fillStyle = '#8888a0';
-        ctx2.fillText('对手大牌', w / 2, h / 2 + 20);
+        ctx2.fillText('遇到大牌哥', w / 2, h / 2 + 20);
         ctx2.restore();
       }
     }]
@@ -1132,10 +1185,10 @@ function renderBigHandGauge(canvas, stats, options) {
     var bhRate = stats.total > 0 ? (bh / stats.total * 100) : 0;
     var hs = stats.handState || {};
     info.innerHTML =
-      infoRow('对手大牌次数', bh + ' 次', 'bad') +
+      infoRow('遇到大牌哥次数', bh + ' 次', 'bad') +
       infoBar('占总对局比', bhRate, 'red') +
       infoSection('关联统计') +
-      infoRow('自己卡手次数', (hs.cantPlay||0) + (hs.cantPlayGarnet||0) + (hs.cantPlayDuplicate||0) + (hs.cantPlayHT||0) + ' 次');
+      infoRow('自己卡手次数', ((hs.cantPlay||0) + (hs.cantPlayGarnet||0) + (hs.cantPlayDuplicate||0) + (hs.cantPlayHT||0)) + ' 次');
   }
   return canvas._chart;
 }
@@ -1358,7 +1411,7 @@ function renderRankedStats(canvas, stats, options) {
         '<span style="color:var(--text-dim)">先手</span><span style="color:var(--text-bright);font-weight:700;font-family:var(--font-mono);text-align:right">' + data.firstWinRate + '%</span>' +
         '<span style="color:var(--text-dim)">后手</span><span style="color:var(--text-bright);font-weight:700;font-family:var(--font-mono);text-align:right">' + data.secondWinRate + '%</span>' +
         '<span style="color:var(--text-dim)">卡手率</span><span style="color:#ff3b30;font-weight:700;font-family:var(--font-mono);text-align:right">' + data.cantPlayRate + '%</span>' +
-        '<span style="color:var(--text-dim)">大牌率</span><span style="color:#ff3b30;font-weight:700;font-family:var(--font-mono);text-align:right">' + data.bigHandRate + '%</span>' +
+        '<span style="color:var(--text-dim)">遇到大牌哥</span><span style="color:#ff3b30;font-weight:700;font-family:var(--font-mono);text-align:right">' + data.bigHandRate + '%</span>' +
         '<span style="color:var(--text-dim)">吃G率</span><span style="color:#ffd700;font-weight:700;font-family:var(--font-mono);text-align:right">' + fmt(ht.gotAnyG / (stats.total||1) * 100) + '%</span>' +
       '</div>' +
       '<div style="font-size:10px;color:var(--text-dim);margin-top:4px;border-top:1px solid rgba(255,255,255,0.05);padding-top:3px">手坑: G' + ht.gotMaxxc + ' 鸟G' + ht.gotDroll + ' 水母G' + ht.gotJellyfish + ' 锁' + ht.gotLancea + ' 陨' + ht.gotNibiru + ' 宇宙人' + ht.gotDimension + '</div>' +

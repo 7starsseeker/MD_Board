@@ -263,24 +263,21 @@
           </div>
         </div>
 
-        <!-- 初始手牌较差/事故 -->
         <div class="checkbox-row">
           <input type="checkbox" id="chk-cant-play">
-          <label for="chk-cant-play">初始手牌较差 / 事故</label>
+          <label for="chk-cant-play">手牌动不了</label>
         </div>
-        <div class="sub-checkboxes" id="sub-cant-play">
-          <div class="checkbox-row">
-            <input type="checkbox" id="chk-cant-garnet">
-            <label for="chk-cant-garnet">废件复数上手</label>
-          </div>
-          <div class="checkbox-row">
-            <input type="checkbox" id="chk-cant-dup">
-            <label for="chk-cant-dup">同一张牌复数上手</label>
-          </div>
-          <div class="checkbox-row">
-            <input type="checkbox" id="chk-cant-ht">
-            <label for="chk-cant-ht">后手组件/手坑复数上手</label>
-          </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-cant-garnet">
+          <label for="chk-cant-garnet">废件复数上手</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-cant-dup">
+          <label for="chk-cant-dup">同一张牌复数上手</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-cant-ht">
+          <label for="chk-cant-ht">后手组件/手坑复数上手</label>
         </div>
 
         <!-- 双方都动不了 -->
@@ -411,9 +408,13 @@
     </p>
     <div class="btn-group" id="time-range-btns">
       <button class="btn btn-time-range active" data-val="all">全部</button>
-      <button class="btn btn-time-range" data-val="today">今天</button>
+      <button class="btn btn-time-range" data-val="today">一天</button>
       <button class="btn btn-time-range" data-val="week">本周</button>
       <button class="btn btn-time-range" data-val="month">本月</button>
+    </div>
+    <div id="date-selector" style="display:none;margin-top:6px;max-height:160px;overflow-y:auto;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px">
+      <div style="font-size:11px;color:var(--text-dim);padding:4px 6px">选择日期：</div>
+      <div id="date-list"></div>
     </div>
     <div style="margin-top:6px;font-size:11px;color:var(--text-dim)" id="time-range-hint">当前：全部历史数据</div>
   </div>
@@ -526,7 +527,7 @@
   <div class="modal-overlay" id="about-overlay">
     <div class="modal-box" style="max-width:320px">
       <div class="about-content">
-        <div class="version">v1.0.2</div>
+        <div class="version" id="about-version">v<span id="about-version-num">1.1.1</span></div>
         <div class="author">
           作者: <a id="about-author-link" href="https://github.com/7starsseeker">7starsseeker</a>
         </div>
@@ -751,12 +752,6 @@
     function bindCheckbox(id, stateKey) {
       var el = document.getElementById(id);
       el.addEventListener('change', function() { state[stateKey] = el.checked; });
-      // 级联显示子选项
-      if (id === 'chk-cant-play') {
-        el.addEventListener('change', function() {
-          document.getElementById('sub-cant-play').style.display = el.checked ? 'flex' : 'none';
-        });
-      }
     }
     bindCheckbox('chk-big-hand', 'opponentBigHand');
     bindCheckbox('chk-maxxc', 'gotMaxxc');
@@ -811,6 +806,12 @@
       el.addEventListener('change', function() {
         state.bothStuck = el.checked;
         if (state.result === 'abnormal') return;
+        // 双方都动不了时自动选中自己动不了
+        var cantPlayEl = document.getElementById('chk-cant-play');
+        if (el.checked) {
+          cantPlayEl.checked = true;
+          state.cantPlay = true;
+        }
         // 显示/隐藏条件区域
         document.getElementById('section-firstmover').classList.toggle('visible', el.checked);
         document.getElementById('section-first').classList.toggle('visible', !el.checked && state.goingFirst === true);
@@ -825,6 +826,19 @@
           state.firstMover = null;
           document.querySelectorAll('#section-firstmover .btn').forEach(function(b) { b.classList.remove('active'); });
         }
+      });
+    })();
+
+    // 手牌动不了：如果双方都动不了已选中，禁止取消
+    (function() {
+      var el = document.getElementById('chk-cant-play');
+      el.addEventListener('change', function() {
+        if (!el.checked && document.getElementById('chk-both-stuck').checked) {
+          el.checked = true;
+          state.cantPlay = true;
+          return;
+        }
+        state.cantPlay = el.checked;
       });
     })();
 
@@ -855,7 +869,6 @@
       document.getElementById('firstmover-self'),
       document.getElementById('firstmover-opponent')
     ], 'firstMover');
-    document.getElementById('sub-cant-play').style.display = 'none';
 
     document.getElementById('input-deck').addEventListener('input', function(e) { state.opponentDeck = e.target.value; });
 
@@ -968,13 +981,12 @@
       // myDeck 保持上一局的录入内容
 
       // 重置所有UI
-      document.querySelectorAll('.btn-group .btn').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.btn-group:not(#time-range-btns) .btn').forEach(function(b) { b.classList.remove('active'); });
       document.querySelectorAll('input[type=checkbox]').forEach(function(c) { c.checked = false; });
       document.querySelectorAll('input[type=radio]').forEach(function(r) { r.checked = false; });
       document.getElementById('input-deck').value = '';
       document.getElementById('input-deck').disabled = false;
       // myDeck 输入框保持上一局的值
-      document.getElementById('sub-cant-play').style.display = 'none';
       document.getElementById('sub-disconnect').style.display = 'none';
       document.getElementById('sub-timeout').style.display = 'none';
       document.getElementById('sub-typhon').style.display = 'none';
@@ -1243,9 +1255,11 @@
       { type: 'coinRate', label: '硬币统计', desc: '硬币胜负概率' },
       { type: 'totalMatches', label: '总场次', desc: '对局总场数量' },
       { type: 'opponentRan', label: '吓跑对手', desc: '先手胜利时对手逃跑次数' },
+      { type: 'bigHand', label: '遇到大牌哥', desc: '遇到大牌哥次数/率' },
       { type: 'endboard', label: '先手终场', desc: '正常/妥协/没做出来/投降 各终场率' },
       { type: 'breakBoard', label: '后手突破', desc: '突破成功率 / 突破后胜率' },
-      { type: 'handState', label: '卡手率', desc: '卡手/互卡次数' },
+      { type: 'handState', label: '卡手率', desc: '卡废件/卡同名牌/卡后手牌次数' },
+      { type: 'dealerScrewed', label: '被发牌员制裁', desc: '完全动不了/互卡次数' },
       { type: 'mistake', label: '严重失误', desc: '严重失误次数/率' },
       { type: 'opponentT0', label: '对手T0动', desc: '被对手T0动次数' },
       { type: 'disconnect', label: '掉线统计', desc: '掉线次数/率' },
@@ -1375,24 +1389,91 @@
     });
 
     // ═══ 时间范围过滤 ═══
-    var TIME_RANGE_LABELS = { all: '全部历史数据', today: '今天的数据', week: '本周的数据（周一起算）', month: '本月的数据' };
+    var TIME_RANGE_LABELS = { all: '全部历史数据', today: '一天的明细', week: '本周的数据（周一起算）', month: '本月的数据' };
+
+    function todayStr() {
+      var d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function formatDateLabel(dateStr) {
+      return dateStr === todayStr() ? dateStr + '「今天」' : dateStr;
+    }
 
     function applyTimeRange(range) {
       document.querySelectorAll('#time-range-btns .btn').forEach(function(b) {
         b.classList.toggle('active', b.dataset.val === range);
       });
-      document.getElementById('time-range-hint').textContent = '当前：' + (TIME_RANGE_LABELS[range] || '全部历史数据');
+      // 显示/隐藏日期选择器
+      var dateSelector = document.getElementById('date-selector');
+      if (range === 'today') {
+        dateSelector.style.display = 'block';
+        document.getElementById('time-range-hint').textContent = '当前：一天 · ' + formatDateLabel(todayStr());
+        loadDateList();
+      } else {
+        dateSelector.style.display = 'none';
+        document.getElementById('time-range-hint').textContent = '当前：' + (TIME_RANGE_LABELS[range] || '全部历史数据');
+      }
     }
 
-    api.getTimeRange().then(function(range) {
+    async function loadDateList() {
+      var dates = await api.getAvailableDates();
+      var selDate = await api.getSelectedDate();
+      // 如果没有选中日期且日期列表不为空，默认高亮今天
+      if (!selDate && dates.length > 0) {
+        var today = todayStr();
+        if (dates.indexOf(today) !== -1) selDate = today;
+      }
+      var list = document.getElementById('date-list');
+      list.innerHTML = '';
+      if (dates.length === 0) {
+        list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);padding:4px 6px">暂无对局记录</div>';
+        return;
+      }
+      dates.forEach(function(d) {
+        var btn = document.createElement('button');
+        btn.className = 'btn btn-sm' + (d === selDate ? ' active' : '');
+        btn.style.display = 'block';
+        btn.style.width = '100%';
+        btn.style.textAlign = 'left';
+        btn.style.margin = '2px 0';
+        btn.style.fontSize = '12px';
+        btn.textContent = formatDateLabel(d);
+        btn.addEventListener('click', async function() {
+          document.querySelectorAll('#date-list .btn').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          await api.setTimeRange('today', d);
+          document.getElementById('time-range-hint').textContent = '当前：一天 · ' + formatDateLabel(d);
+        });
+        list.appendChild(btn);
+      });
+    }
+
+    api.getTimeRange().then(async function(range) {
       applyTimeRange(range);
+      if (range === 'today') {
+        var selDate = await api.getSelectedDate();
+        if (selDate) {
+          document.getElementById('time-range-hint').textContent = '当前：一天 · ' + formatDateLabel(selDate);
+        } else {
+          // 没有选中日期时默认选中今天
+          await api.setTimeRange('today', todayStr());
+          document.getElementById('time-range-hint').textContent = '当前：一天 · ' + formatDateLabel(todayStr());
+        }
+      }
     });
 
     document.querySelectorAll('#time-range-btns .btn').forEach(function(btn) {
       btn.addEventListener('click', async function() {
         var range = this.dataset.val;
-        var result = await api.setTimeRange(range);
-        if (result.success) applyTimeRange(range);
+        if (range === 'today') {
+          // 默认选中今天
+          var result = await api.setTimeRange('today', todayStr());
+          if (result.success) applyTimeRange('today');
+        } else {
+          var result = await api.setTimeRange(range);
+          if (result.success) applyTimeRange(range);
+        }
       });
     });
 
@@ -1420,7 +1501,9 @@
     api.getAll().then(renderAll);
     api.onStatsUpdate(function() { api.getAll().then(renderAll); });
 
-    document.getElementById('btn-about').addEventListener('click', function() {
+    document.getElementById('btn-about').addEventListener('click', async function() {
+      var ver = await api.getVersion();
+      document.getElementById('about-version-num').textContent = ver;
       document.getElementById('about-overlay').classList.add('show');
     });
     document.getElementById('about-close').addEventListener('click', function() {

@@ -345,7 +345,8 @@
         { id: 'deck-bar', label: '自用卡组胜率', sub: '各卡组胜率排行', render: renderDeckBar },
         { id: 'streak', label: '连胜状态', sub: '当前连胜/连败', render: renderStreakGauge },
         { id: 'coin', label: '硬币统计', sub: '硬币正反胜负分布', render: renderCoinPie },
-        { id: 'handstate', label: '卡手原因', sub: '各类卡手原因次数（可同时发生）', render: renderHandStatePie },
+        { id: 'dealer-screwed', label: '被发牌员制裁情况', sub: '完全动不了、互卡次数统计', render: renderDealerScrewed },
+        { id: 'handstate', label: '卡手原因', sub: '卡废件/卡同名牌/卡后手牌次数', render: renderHandStatePie },
         { id: 'mistake', label: '严重失误', sub: '失误频率与胜率', render: renderMistakeDoughnut },
         { id: 'opponent-t0', label: '对手T0动', sub: '被对手T0干扰统计', render: renderOpponentT0Doughnut },
         { id: 'opponent-ran', label: '吓跑对手', sub: '对手逃跑次数', render: renderOpponentRanGauge },
@@ -473,9 +474,20 @@
       function updateDisplay(newStats) {
         stats = newStats;
         // 更新时间范围标签
-        api.getTimeRange().then(function(range) {
-          var labels = { all: '', today: '[今天]', week: '[本周]', month: '[本月]' };
-          document.getElementById('chart-tr-label').textContent = labels[range] || '';
+        api.getTimeRange().then(async function(range) {
+          var labels = { all: '', today: '[一天]', week: '[本周]', month: '[本月]' };
+          var label = labels[range] || '';
+          if (range === 'today') {
+            var selDate = await api.getSelectedDate();
+            if (selDate) {
+              var today = new Date();
+              var todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+              label = selDate === todayStr ? selDate + '「今天」' : selDate;
+            } else {
+              label = '[一天]';
+            }
+          }
+          document.getElementById('chart-tr-label').textContent = label;
         });
         if (!stats || stats.total === 0) {
           document.getElementById('empty-state').style.display = '';

@@ -26,7 +26,9 @@ contextBridge.exposeInMainWorld('mdStats', {
 
   // ── 时间范围过滤 ──
   getTimeRange: () => ipcRenderer.invoke('stats:get-time-range'),
-  setTimeRange: (range) => ipcRenderer.invoke('stats:set-time-range', range),
+  setTimeRange: (range, selectedDate) => ipcRenderer.invoke('stats:set-time-range', range, selectedDate),
+  getAvailableDates: () => ipcRenderer.invoke('stats:get-available-dates'),
+  getSelectedDate: () => ipcRenderer.invoke('stats:get-selected-date'),
 
   // ── 循环显示面板 ──
   openCycleWindow: () => ipcRenderer.invoke('cycle:open-window'),
@@ -56,4 +58,5 @@ contextBridge.exposeInMainWorld('mdStats', {
 
   // ── 关于对话框 ──
   openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
+  getVersion: () => ipcRenderer.invoke('app:get-version'),
 });

@@ -163,9 +163,20 @@
       function render(stats) {
         var el = document.getElementById('content');
         // 更新时间范围标签
-        api.getTimeRange().then(function(range) {
-          var labels = { all: '', today: '[今天]', week: '[本周]', month: '[本月]' };
-          document.getElementById('tr-label').textContent = labels[range] || '';
+        api.getTimeRange().then(async function(range) {
+          var labels = { all: '', today: '[一天]', week: '[本周]', month: '[本月]' };
+          var label = labels[range] || '';
+          if (range === 'today') {
+            var selDate = await api.getSelectedDate();
+            if (selDate) {
+              var today = new Date();
+              var todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+              label = selDate === todayStr ? selDate + '「今天」' : selDate;
+            } else {
+              label = '[一天]';
+            }
+          }
+          document.getElementById('tr-label').textContent = label;
         });
         if (!stats || stats.total === 0) {
           el.innerHTML = '<div class="empty-state"><span class="emoji">🎴</span>暂无对局数据<br><span style="font-size:10px;opacity:0.6">打开控制面板录入</span></div>';
