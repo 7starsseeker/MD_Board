@@ -7,8 +7,8 @@
 
 // ── Chart.js 全局默认值 ──────────────────────────────────────────────
 if (typeof Chart !== 'undefined') {
-  Chart.defaults.color = '#8888a0';
-  Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+  Chart.defaults.color = '#ffffff';
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.12)';
   Chart.defaults.font.family = "'Consolas','Cascadia Code','JetBrains Mono',monospace,'思源黑体','Noto Sans CJK SC','PingFang SC',sans-serif";
 }
 
@@ -94,17 +94,21 @@ function renderWinPie(canvas, stats, options) {
     plugins: [{
       id: 'winCenterText',
       afterDraw: function(chart) {
-        var w = chart.width, h = chart.height;
+        var area = chart.chartArea;
+        var cx = (area.left + area.right) / 2;
+        var cy = (area.top + area.bottom) / 2;
         var c = chart.ctx;
         c.save();
+        c.shadowColor = 'rgba(0,0,0,0.7)';
+        c.shadowBlur = 4;
         c.textAlign = 'center';
         c.textBaseline = 'middle';
         c.font = 'bold 22px monospace';
-        c.fillStyle = parseFloat(wr) >= 50 ? '#4cd964' : '#ff3b30';
-        c.fillText(wr + '%', w / 2, h / 2 - 6);
+        c.fillStyle = '#ffffff';
+        c.fillText(wr + '%', cx, cy - 6);
         c.font = '11px sans-serif';
-        c.fillStyle = '#8888a0';
-        c.fillText('总胜率', w / 2, h / 2 + 16);
+        c.fillStyle = '#cccccc';
+        c.fillText('总胜率', cx, cy + 16);
         c.restore();
       }
     }]
@@ -287,17 +291,22 @@ function renderEndboardPie(canvas, stats, options) {
     plugins: [{
       id: 'endboardCenter',
       afterDraw: function(chart) {
-        var w = chart.width, h = chart.height;
+        var area = chart.chartArea;
+        var cx = (area.left + area.right) / 2;
+        var cy = (area.top + area.bottom) / 2;
         var c = chart.ctx;
         c.save();
+        // 文字阴影保证在任何色块上都清晰
+        c.shadowColor = 'rgba(0,0,0,0.7)';
+        c.shadowBlur = 4;
         c.textAlign = 'center';
         c.textBaseline = 'middle';
         c.font = 'bold 20px monospace';
-        c.fillStyle = '#4cd964';
-        c.fillText(fmt(nPct) + '%', w / 2, h / 2 - 6);
+        c.fillStyle = '#ffffff';
+        c.fillText(fmt(nPct) + '%', cx, cy - 6);
         c.font = '11px sans-serif';
-        c.fillStyle = '#8888a0';
-        c.fillText('正常终场率', w / 2, h / 2 + 16);
+        c.fillStyle = '#cccccc';
+        c.fillText('正常终场率', cx, cy + 16);
         c.restore();
       }
     }]
@@ -347,17 +356,21 @@ function renderBreakBoardPie(canvas, stats, options) {
       id: 'breakCenter',
       afterDraw: function(chart) {
         var sr = parseFloat(bb.successRate) || 0;
-        var w = chart.width, h = chart.height;
+        var area = chart.chartArea;
+        var cx = (area.left + area.right) / 2;
+        var cy = (area.top + area.bottom) / 2;
         var c = chart.ctx;
         c.save();
+        c.shadowColor = 'rgba(0,0,0,0.7)';
+        c.shadowBlur = 4;
         c.textAlign = 'center';
         c.textBaseline = 'middle';
         c.font = 'bold 18px monospace';
-        c.fillStyle = sr >= 50 ? '#4cd964' : '#ffc832';
-        c.fillText(fmt(sr) + '%', w / 2, h / 2 - 6);
+        c.fillStyle = '#ffffff';
+        c.fillText(fmt(sr) + '%', cx, cy - 6);
         c.font = '11px sans-serif';
-        c.fillStyle = '#8888a0';
-        c.fillText('突破成功率', w / 2, h / 2 + 16);
+        c.fillStyle = '#cccccc';
+        c.fillText('突破成功率', cx, cy + 16);
         c.restore();
       }
     }]
@@ -388,42 +401,41 @@ function renderBreakBoardPie(canvas, stats, options) {
 function renderWinTrendLine(canvas, stats, options) {
   destroyChart(canvas._chart);
   var ctx = canvas.getContext('2d');
-  // 使用 last10 场数据生成胜率趋势
-  var last10 = stats.last10 || [];
-  if (last10.length < 2) { canvas._chart = null; return null; }
+  var history = stats.resultHistory || [];
+  // 过滤出有胜负的对局
+  var results = [];
+  for (var i = 0; i < history.length; i++) {
+    var r = history[i];
+    if (r === 'win' || r === 'loss') results.push(r);
+  }
+  if (results.length < 2) { canvas._chart = null; return null; }
 
-  // 按时间顺序累计胜率
+  // 计算每场的累计胜率
   var points = [];
-  var wins = 0, total = 0;
-  for (var i = 0; i < last10.length; i++) {
-    var r = last10[i].result;
-    if (r === 'win' || r === 'loss') {
-      total++;
-      if (r === 'win') wins++;
-      if (total >= 2 && total % 2 === 0) {
-        points.push({ label: '#' + total, rate: (wins / total * 100).toFixed(1) });
-      }
-    }
+  var wins = 0;
+  for (var i = 0; i < results.length; i++) {
+    if (results[i] === 'win') wins++;
+    points.push({ label: '#' + (i + 1), rate: (wins / (i + 1) * 100).toFixed(1) });
   }
-  if (points.length < 2 && total > 0) {
-    points.push({ label: '#' + total, rate: (wins / total * 100).toFixed(1) });
-  }
-  if (points.length < 2) { canvas._chart = null; return null; }
+  // 标签太多时只显示部分
+  var labelStep = points.length > 60 ? Math.ceil(points.length / 30) : 1;
+  var chartLabels = points.map(function(p, idx) { return idx % labelStep === 0 ? p.label : ''; });
+  var chartData = points.map(function(p){return parseFloat(p.rate);});
 
   canvas._chart = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: points.map(function(p){return p.label;}),
+      labels: chartLabels,
       datasets: [{
         label: '胜率',
-        data: points.map(function(p){return parseFloat(p.rate);}),
+        data: chartData,
         borderColor: '#ffc832',
         backgroundColor: 'rgba(255,200,50,0.1)',
         fill: true,
         tension: 0.3,
         pointBackgroundColor: '#ffc832',
-        pointRadius: 3,
-        pointHoverRadius: 5
+        pointRadius: 0,
+        pointHoverRadius: 4
       }]
     },
     options: {
@@ -436,35 +448,147 @@ function renderWinTrendLine(canvas, stats, options) {
       plugins: {
         legend: { display: false }
       }
-    }
+    },
+    plugins: [{
+      id: 'chartBg',
+      beforeDraw: function(chart) {
+        var ctx = chart.ctx;
+        var area = chart.chartArea;
+        ctx.save();
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.fillRect(area.left, area.top, area.width, area.height);
+        ctx.restore();
+      }
+    }]
   });
 
   // info 面板：总体胜率 + 最近场次明细
   var info = options && options.infoEl;
   if (info) {
     info.className = 'chart-info active';
-    var lastWins = 0, lastTotal = 0;
+    var winsTotal = 0;
+    for (var i = 0; i < results.length; i++) { if (results[i] === 'win') winsTotal++; }
     var detailHtml = '';
-    for (var j = last10.length - 1; j >= 0; j--) {
-      var res = last10[j];
-      var cls = '', icon = '';
-      if (res.result === 'win') { cls = 'good'; icon = 'W'; lastWins++; }
-      else if (res.result === 'loss') { cls = 'bad'; icon = 'L'; }
-      else if (res.result === 'draw') { cls = 'warn'; icon = 'D'; }
-      else { cls = ''; icon = 'X'; }
-      if (res.result === 'win' || res.result === 'loss') lastTotal++;
-      // 只显示最近 12 场
-      if (last10.length - j <= 12) {
-        detailHtml += '<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:9px;font-weight:700;margin:1px;' +
-          (res.result === 'win' ? 'background:#4cd964;color:#000' :
-           res.result === 'loss' ? 'background:#ff3b30;color:#fff' :
-           res.result === 'draw' ? 'background:#ffd700;color:#000' : 'background:rgba(255,255,255,0.1);color:#888') + '">' + icon + '</span>';
-      }
+    // 最近 20 场胜负小圆点
+    var lastN = Math.min(20, results.length);
+    for (var j = results.length - 1; j >= results.length - lastN; j--) {
+      var icon = results[j] === 'win' ? 'W' : 'L';
+      var bg = results[j] === 'win' ? '#4cd964' : '#ff3b30';
+      var tc = results[j] === 'win' ? '#000' : '#fff';
+      detailHtml += '<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:8px;font-weight:700;margin:1px;background:' + bg + ';color:' + tc + '">' + icon + '</span>';
     }
-    var lastWr = lastTotal > 0 ? (lastWins / lastTotal * 100).toFixed(1) : '0.0';
+    var wr = (winsTotal / results.length * 100).toFixed(1);
     info.innerHTML =
-      infoRow('最近' + lastTotal + '场胜率', lastWr + '%', parseFloat(lastWr) >= 50 ? 'good' : 'bad') +
-      infoSection('最近对局') +
+      infoRow('总胜率', wr + '%', parseFloat(wr) >= 50 ? 'good' : 'bad') +
+      infoRow('总场次', results.length + ' 场', '') +
+      infoRow('胜/负', winsTotal + ' / ' + (results.length - winsTotal), '') +
+      infoSection('最近 ' + lastN + ' 场') +
+      '<div style="display:flex;flex-wrap:wrap;gap:1px;margin-top:2px">' + detailHtml + '</div>';
+  }
+  return canvas._chart;
+}
+
+/**
+ * 6b. 硬币胜率趋势（折线图：先手 vs 后手累计胜率）
+ */
+function renderCoinTrendLine(canvas, stats, options) {
+  destroyChart(canvas._chart);
+  var ctx = canvas.getContext('2d');
+  var history = stats.coinHistory || [];
+  if (history.length < 2) { canvas._chart = null; return null; }
+
+  // 计算每个点的累计硬币胜率
+  var points = [];
+  var cw = 0;
+  for (var i = 0; i < history.length; i++) {
+    if (history[i].coinToss === true) cw++;
+    points.push({ label: '#' + (i + 1), rate: (cw / (i + 1) * 100).toFixed(1) });
+  }
+  // 标签太多时只显示部分
+  var labelStep = points.length > 60 ? Math.ceil(points.length / 30) : 1;
+  var chartLabels = points.map(function(p, idx) { return idx % labelStep === 0 ? p.label : ''; });
+  var chartData = points.map(function(p){return parseFloat(p.rate);});
+
+  canvas._chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: chartLabels,
+      datasets: [{
+        label: '硬币胜率',
+        data: chartData,
+        borderColor: '#ffd700',
+        backgroundColor: 'rgba(255,215,0,0.1)',
+        fill: true,
+        tension: 0.3,
+        pointBackgroundColor: '#ffd700',
+        pointRadius: 0,
+        pointHoverRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { stepSize: 10, callback: function(v){return v+'%';} } },
+        x: { grid: { display: false }, ticks: { maxRotation: 0, font: { size: 9 } } }
+      },
+      plugins: { legend: { display: false } }
+    },
+    plugins: [{
+      id: 'chartBg',
+      beforeDraw: function(chart) {
+        var ctx = chart.ctx;
+        var area = chart.chartArea;
+        ctx.save();
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.fillRect(area.left, area.top, area.width, area.height);
+        ctx.restore();
+      }
+    }, {
+      id: 'fiftyLine',
+      afterDraw: function(chart) {
+        var yScale = chart.scales.y;
+        var xScale = chart.scales.x;
+        var y = yScale.getPixelForValue(50);
+        var ctx = chart.ctx;
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = 1;
+        ctx.moveTo(xScale.left, y);
+        ctx.lineTo(xScale.right, y);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }]
+  });
+
+  // info 面板
+  var info = options && options.infoEl;
+  if (info) {
+    info.className = 'chart-info active';
+    var cwTotal = 0;
+    var detailHtml = '';
+    // 最近 20 场显示为小圆点
+    var lastN = Math.min(20, history.length);
+    for (var j = history.length - 1; j >= history.length - lastN; j--) {
+      var r = history[j];
+      if (r.coinToss === true) cwTotal++;
+      var bg = r.coinToss === true ? '#ffd700' : 'rgba(255,255,255,0.12)';
+      var tc = r.coinToss === true ? '#000' : '#e8e8f0';
+      detailHtml += '<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:7px;font-weight:700;margin:1px;background:' + bg + ';color:' + tc + '">' + (r.coinToss === true ? '正' : '反') + '</span>';
+    }
+    // 补全剩余场次的正数
+    for (var j = history.length - lastN - 1; j >= 0; j--) {
+      if (history[j].coinToss === true) cwTotal++;
+    }
+    var cwr = (cwTotal / history.length * 100).toFixed(1);
+    info.innerHTML =
+      infoRow('总硬币胜率', cwr + '%', parseFloat(cwr) >= 50 ? 'good' : 'bad') +
+      infoRow('总场次', history.length + ' 场', '') +
+      infoRow('正/反', cwTotal + ' / ' + (history.length - cwTotal), '') +
+      infoSection('最近 ' + lastN + ' 场（金色=正 灰色=反）') +
       '<div style="display:flex;flex-wrap:wrap;gap:1px;margin-top:2px">' + detailHtml + '</div>';
   }
   return canvas._chart;
@@ -502,7 +626,7 @@ function renderDeckBar(canvas, stats, options) {
       maintainAspectRatio: false,
       scales: {
         x: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: function(v){return v+'%';} } },
-        y: { grid: { display: false } }
+        y: { grid: { display: false }, ticks: { font: { size: 10, family: "'PingFang SC','Microsoft YaHei','Noto Sans CJK SC',sans-serif" } } }
       },
       plugins: {
         legend: { display: false },
@@ -537,7 +661,7 @@ function renderStreakGauge(canvas, stats) {
       labels: [isWin ? '连胜' : '连败', ''],
       datasets: [{
         data: [streak.count, Math.max(streak.count, 5)],
-        backgroundColor: [c, 'rgba(255,255,255,0.06)'],
+        backgroundColor: [c, 'rgba(255,255,255,0.12)'],
         borderWidth: 0
       }]
     },
@@ -563,7 +687,7 @@ function renderStreakGauge(canvas, stats) {
         ctx2.fillStyle = c;
         ctx2.fillText(streak.count + (isWin ? '🔥' : '💧'), w / 2, h / 2 - 6);
         ctx2.font = '13px sans-serif';
-        ctx2.fillStyle = '#8888a0';
+        ctx2.fillStyle = '#e8e8f0';
         ctx2.fillText(isWin ? '连胜' : '连败', w / 2, h / 2 + 20);
         ctx2.restore();
       }
@@ -609,17 +733,21 @@ function renderCoinPie(canvas, stats, options) {
     plugins: [{
       id: 'coinCenter',
       afterDraw: function(chart) {
-        var w = chart.width, h = chart.height;
+        var area = chart.chartArea;
+        var cx = (area.left + area.right) / 2;
+        var cy = (area.top + area.bottom) / 2;
         var c2 = chart.ctx;
         c2.save();
+        c2.shadowColor = 'rgba(0,0,0,0.7)';
+        c2.shadowBlur = 4;
         c2.textAlign = 'center';
         c2.textBaseline = 'middle';
         c2.font = 'bold 22px monospace';
-        c2.fillStyle = parseFloat(cWR) >= 50 ? '#ffd700' : '#8888a0';
-        c2.fillText(cWR + '%', w / 2, h / 2 - 6);
+        c2.fillStyle = '#ffffff';
+        c2.fillText(cWR + '%', cx, cy - 6);
         c2.font = '11px sans-serif';
-        c2.fillStyle = '#8888a0';
-        c2.fillText('硬币胜率', w / 2, h / 2 + 16);
+        c2.fillStyle = '#cccccc';
+        c2.fillText('硬币胜率', cx, cy + 16);
         c2.restore();
       }
     }]
@@ -886,7 +1014,7 @@ function renderOpponentRanGauge(canvas, stats, options) {
       labels: ['吓跑对手', ''],
       datasets: [{
         data: [or.total, Math.max(or.total, 5)],
-        backgroundColor: ['#ff9632', 'rgba(255,255,255,0.06)'],
+        backgroundColor: ['#ff9632', 'rgba(255,255,255,0.12)'],
         borderWidth: 0
       }]
     },
@@ -907,7 +1035,7 @@ function renderOpponentRanGauge(canvas, stats, options) {
         ctx2.fillStyle = '#ff9632';
         ctx2.fillText(or.total + '🏃', w / 2, h / 2 - 6);
         ctx2.font = '13px sans-serif';
-        ctx2.fillStyle = '#8888a0';
+        ctx2.fillStyle = '#e8e8f0';
         ctx2.fillText('吓跑对手', w / 2, h / 2 + 20);
         ctx2.restore();
       }
@@ -1006,7 +1134,7 @@ function renderOppDeckBar(canvas, stats, options) {
       indexAxis: 'y', responsive: true, maintainAspectRatio: false,
       scales: {
         x: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: function(v){return v+'%';} } },
-        y: { grid: { display: false } }
+        y: { grid: { display: false }, ticks: { font: { size: 10, family: "'PingFang SC','Microsoft YaHei','Noto Sans CJK SC',sans-serif" } } }
       },
       plugins: {
         legend: { display: false },
@@ -1152,7 +1280,7 @@ function renderBigHandGauge(canvas, stats, options) {
       labels: ['遇到大牌哥', ''],
       datasets: [{
         data: [bh, Math.max(bh, 5)],
-        backgroundColor: ['#ff2d55', 'rgba(255,255,255,0.06)'],
+        backgroundColor: ['#ff2d55', 'rgba(255,255,255,0.12)'],
         borderWidth: 0
       }]
     },
@@ -1173,7 +1301,7 @@ function renderBigHandGauge(canvas, stats, options) {
         ctx2.fillStyle = '#ff2d55';
         ctx2.fillText(bh + '🃏', w / 2, h / 2 - 6);
         ctx2.font = '13px sans-serif';
-        ctx2.fillStyle = '#8888a0';
+        ctx2.fillStyle = '#e8e8f0';
         ctx2.fillText('遇到大牌哥', w / 2, h / 2 + 20);
         ctx2.restore();
       }
@@ -1250,17 +1378,21 @@ function renderDeckOutChart(canvas, stats, options) {
     plugins: [{
       id: 'deckoutCenter',
       afterDraw: function(chart) {
-        var w = chart.width, h = chart.height;
+        var area = chart.chartArea;
+        var cx = (area.left + area.right) / 2;
+        var cy = (area.top + area.bottom) / 2;
         var c = chart.ctx;
         c.save();
+        c.shadowColor = 'rgba(0,0,0,0.7)';
+        c.shadowBlur = 4;
         c.textAlign = 'center';
         c.textBaseline = 'middle';
         c.font = 'bold 24px monospace';
-        c.fillStyle = '#64c8ff';
-        c.fillText(d.total + '', w / 2, h / 2 - 6);
+        c.fillStyle = '#ffffff';
+        c.fillText(d.total + '', cx, cy - 6);
         c.font = '12px sans-serif';
-        c.fillStyle = '#8888a0';
-        c.fillText('抽干总次数', w / 2, h / 2 + 16);
+        c.fillStyle = '#cccccc';
+        c.fillText('抽干总次数', cx, cy + 16);
         c.restore();
       }
     }]
@@ -1305,7 +1437,7 @@ function renderMatchupChart(canvas, stats, options) {
   matchupStats.forEach(function(m) {
     oppDeckSet[m.opponentDeck] = true;
   });
-  var oppDecks = Object.keys(oppDeckSet).slice(0, 8);
+  var oppDecks = Object.keys(oppDeckSet);
 
   if (oppDecks.length === 0 || myDecks.length === 0) { canvas._chart = null; return null; }
 
@@ -1319,7 +1451,7 @@ function renderMatchupChart(canvas, stats, options) {
   // 每个 myDeck 作为一个 dataset
   var colors = ['#4cd964', '#64c8ff', '#ffd700', '#c864ff', '#ff9632'];
   var datasets = [];
-  myDecks.slice(0, 4).forEach(function(myDeck, di) {
+  myDecks.forEach(function(myDeck, di) {
     var data = oppDecks.map(function(opp) {
       var m = lookup[myDeck] && lookup[myDeck][opp];
       if (!m || (m.wins + m.losses) === 0) return null;
@@ -1336,6 +1468,16 @@ function renderMatchupChart(canvas, stats, options) {
   });
 
   var ctx = canvas.getContext('2d');
+
+  // 预先设定 canvas 尺寸（responsive=false 后 Chart.js 不会自动调整）
+  var wrap = canvas.parentElement;
+  var wrapRect = wrap.getBoundingClientRect();
+  var totalH = Math.max(oppDecks.length * 32, 120);
+  canvas.width = Math.max(wrapRect.width, 100);
+  canvas.height = totalH;
+  canvas.style.width = canvas.width + 'px';
+  canvas.style.height = totalH + 'px';
+
   canvas._chart = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -1344,7 +1486,7 @@ function renderMatchupChart(canvas, stats, options) {
     },
     options: {
       indexAxis: 'y',
-      responsive: true,
+      responsive: false,
       maintainAspectRatio: false,
       scales: {
         x: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: function(v) { return v + '%'; } } },
@@ -1367,19 +1509,36 @@ function renderMatchupChart(canvas, stats, options) {
     }
   });
 
+  // 启用滚动：chart-body 默认 overflow:hidden 会裁剪，这里覆盖
+  var chartBody = canvas.closest('.chart-body');
+  if (chartBody) chartBody.style.overflow = 'visible';
+  var slide = canvas.closest('.chart-slide');
+  if (slide) {
+    slide.style.overflowY = 'auto';
+    slide.style.height = '100%';
+  }
+  // canvas 上滚轮时滚动 slide
+  canvas.addEventListener('wheel', function(e) {
+    if (slide) { slide.scrollTop += e.deltaY; }
+    e.preventDefault();
+  }, { passive: false });
+
   // info 面板：W/L 明细
   var info = options && options.infoEl;
   if (info) {
     info.className = 'chart-info active';
+    // 限制高度使滚动生效
+    info.style.maxHeight = '100%';
+    info.style.overflowY = 'auto';
     var ihtml = infoSection('对局明细');
-    myDecks.slice(0, 3).forEach(function(myDeck) {
+    myDecks.forEach(function(myDeck) {
       var items = groups[myDeck];
       var subTotal = items.reduce(function(s, m) { return s + m.total; }, 0);
       var subWins = items.reduce(function(s, m) { return s + m.wins; }, 0);
       var subLosses = items.reduce(function(s, m) { return s + m.losses; }, 0);
       var subRate = (subWins + subLosses) > 0 ? (subWins / (subWins + subLosses) * 100).toFixed(1) : '0.0';
       ihtml += '<div style="margin-top:3px;font-weight:700;font-size:10px;color:var(--accent)">' + myDeck + ' (' + subTotal + '·' + subRate + '%)</div>';
-      items.slice(0, 6).forEach(function(m) {
+      items.forEach(function(m) {
         var wr = (m.wins + m.losses) > 0 ? (m.wins / (m.wins + m.losses) * 100).toFixed(1) : '0.0';
         ihtml += infoRow(m.opponentDeck, m.wins + 'W ' + m.losses + 'L ' + wr + '%');
       });
@@ -1402,7 +1561,7 @@ function renderRankedStats(canvas, stats, options) {
   function buildBlock(data, icon, label, color) {
     if (!data) return '';
     var ht = data.handtrap;
-    return '<div style="flex:1;min-width:0;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px;text-align:center">' +
+    return '<div style="flex:1;min-width:0;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px;text-align:center">' +
       '<div style="font-size:14px;font-weight:700;color:' + color + ';margin-bottom:4px">' + icon + ' ' + label + '</div>' +
       '<div style="font-size:24px;font-weight:800;color:' + color + '">' + data.winRate + '%</div>' +
       '<div style="font-size:10px;color:var(--text-dim);margin-bottom:4px">对局胜率 · ' + data.total + '场</div>' +
@@ -1469,3 +1628,93 @@ var ChartManager = {
     this.instances = {};
   }
 };
+
+/**
+ * 24. 特定卡组胜率趋势（折线图）
+ */
+function renderDeckTrendLine(canvas, stats, options) {
+  destroyChart(canvas._chart);
+  var ctx = canvas.getContext('2d');
+  var sel = document.getElementById('deck-trend-selector');
+  var deckName = sel ? sel.value : '';
+  if (!deckName) { canvas._chart = null; return null; }
+
+  var deckData = stats.deckResults || {};
+  var results = deckData[deckName];
+  if (!results || results.length < 2) { canvas._chart = null; return null; }
+
+  // 更新 subtitle
+  var subEl = canvas.closest('.chart-slide').querySelector('.chart-sub');
+  if (subEl) subEl.textContent = deckName + ' 累计胜率';
+
+  // 计算累计胜率
+  var points = [];
+  var w = 0;
+  for (var i = 0; i < results.length; i++) {
+    if (results[i] === 'win') w++;
+    points.push({ label: '#' + (i + 1), rate: (w / (i + 1) * 100).toFixed(1) });
+  }
+  var labelStep = points.length > 60 ? Math.ceil(points.length / 30) : 1;
+  var chartLabels = points.map(function(p, idx) { return idx % labelStep === 0 ? p.label : ''; });
+  var chartData = points.map(function(p){return parseFloat(p.rate);});
+
+  canvas._chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: chartLabels,
+      datasets: [{
+        label: deckName,
+        data: chartData,
+        borderColor: '#ffc832',
+        backgroundColor: 'rgba(255,200,50,0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+        pointHoverRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: function(v){return v+'%';} } },
+        x: { grid: { display: false }, ticks: { maxRotation: 0, font: { size: 9 } } }
+      },
+      plugins: { legend: { display: false } }
+    },
+    plugins: [{
+      id: 'chartBg',
+      beforeDraw: function(chart) {
+        var ctx = chart.ctx;
+        var area = chart.chartArea;
+        ctx.save();
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.fillRect(area.left, area.top, area.width, area.height);
+        ctx.restore();
+      }
+    }]
+  });
+
+  // info 面板
+  var info = options && options.infoEl;
+  if (info) {
+    info.className = 'chart-info active';
+    var wins = 0, total = results.length;
+    for (var i = 0; i < results.length; i++) { if (results[i] === 'win') wins++; }
+    var wr = (wins / total * 100).toFixed(1);
+    var detailHtml = '';
+    var lastN = Math.min(20, total);
+    for (var j = total - 1; j >= total - lastN; j--) {
+      var bg = results[j] === 'win' ? '#4cd964' : '#ff3b30';
+      var tc = results[j] === 'win' ? '#000' : '#fff';
+      detailHtml += '<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:8px;font-weight:700;margin:1px;background:' + bg + ';color:' + tc + '">' + (results[j] === 'win' ? 'W' : 'L') + '</span>';
+    }
+    info.innerHTML =
+      infoRow('总胜率', wr + '%', parseFloat(wr) >= 50 ? 'good' : 'bad') +
+      infoRow('总场次', total + ' 场', '') +
+      infoRow('胜/负', wins + ' / ' + (total - wins), '') +
+      infoSection('最近 ' + lastN + ' 场') +
+      '<div style="display:flex;flex-wrap:wrap;gap:1px;margin-top:2px">' + detailHtml + '</div>';
+  }
+  return canvas._chart;
+}

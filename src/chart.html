@@ -51,7 +51,7 @@
     .title-bar .title-actions button {
       background: none;
       border: none;
-      color: #aaa;
+      color: #e8e8f0;
       cursor: pointer;
       font-size: 12px;
       padding: 2px 6px;
@@ -131,6 +131,7 @@
       font-size: 10px;
       color: var(--text-dim);
       overflow-y: auto;
+      max-height: 100%;
       display: none;
       padding: 2px 0;
     }
@@ -304,7 +305,7 @@
     <!-- 标题栏 -->
     <div class="title-bar">
       <span class="title">📈 图表</span>
-      <span style="font-size:11px;color:#8888a0;flex:1;text-align:center" id="chart-tr-label"></span>
+      <span style="font-size:11px;color:#e8e8f0;flex:1;text-align:center" id="chart-tr-label"></span>
       <div class="title-actions">
         <button id="btn-prev" title="上一个">◀</button>
         <button id="btn-next" title="下一个">▶</button>
@@ -341,8 +342,11 @@
         { id: 'handtrap', label: '手坑分布', sub: '各类手坑被吃次数（可同时发生）', render: renderHandtrapPie },
         { id: 'endboard', label: '先手终场', sub: '终场质量分布', render: renderEndboardPie },
         { id: 'breakboard', label: '后手突破', sub: '突破成功/失败/投降', render: renderBreakBoardPie },
+        { id: 'coin-trend', label: '硬币胜率趋势', sub: '硬币正反累计胜率变化', render: renderCoinTrendLine },
         { id: 'trend', label: '胜率趋势', sub: '累计胜率变化', render: renderWinTrendLine },
+        { id: 'deck-trend', label: '特定卡组胜率趋势', sub: '', render: renderDeckTrendLine },
         { id: 'deck-bar', label: '自用卡组胜率', sub: '各卡组胜率排行', render: renderDeckBar },
+        { id: 'opp-deck-bar', label: '对战卡组胜率', sub: '对手卡组胜率排行', render: renderOppDeckBar },
         { id: 'streak', label: '连胜状态', sub: '当前连胜/连败', render: renderStreakGauge },
         { id: 'coin', label: '硬币统计', sub: '硬币正反胜负分布', render: renderCoinPie },
         { id: 'dealer-screwed', label: '被发牌员制裁情况', sub: '完全动不了、互卡次数统计', render: renderDealerScrewed },
@@ -351,12 +355,10 @@
         { id: 'opponent-t0', label: '对手T0动', sub: '被对手T0干扰统计', render: renderOpponentT0Doughnut },
         { id: 'opponent-ran', label: '吓跑对手', sub: '对手逃跑次数', render: renderOpponentRanGauge },
         { id: 'typhon', label: '提丰统计', sub: '提丰出场各方结果', render: renderTyphonPie },
-        { id: 'opp-deck-bar', label: '对战卡组胜率', sub: '对手卡组胜率排行', render: renderOppDeckBar },
         { id: 'disconnect', label: '掉线统计', sub: '掉线次数分布', render: renderDisconnectPie },
         { id: 'timeout', label: '超时统计', sub: '超时次数分布', render: renderTimeoutPie },
         { id: 'big-hand', label: '对手大牌', sub: '对手大牌哥次数', render: renderBigHandGauge },
         { id: 'deckout', label: '抽干牌组', sub: '抽干对手/自己统计', render: renderDeckOutChart },
-        { id: 'matchup', label: '对阵交叉统计', sub: '按对手卡组分组显示各卡组胜率', render: renderMatchupChart },
         { id: 'ranked-stats', label: '晋级/保级赛', sub: '晋级赛与保级赛数据对比', render: renderRankedStats }
       ];
 
@@ -383,6 +385,37 @@
           sub.className = 'chart-sub';
           sub.textContent = def.sub;
           slide.appendChild(sub);
+
+          // 特定卡组趋势：添加卡组选择器
+          var deckSel = null;
+          if (def.id === 'deck-trend') {
+            var selRow = document.createElement('div');
+            selRow.style.cssText = 'display:flex;align-items:center;gap:6px;padding:2px 12px 6px';
+            var selLabel = document.createElement('span');
+            selLabel.style.cssText = 'font-size:11px;color:#c0c0d0';
+            selLabel.textContent = '卡组：';
+            selRow.appendChild(selLabel);
+            deckSel = document.createElement('select');
+            deckSel.id = 'deck-trend-selector';
+            deckSel.style.cssText = 'font-size:11px;background:rgba(255,255,255,0.85);color:#1a1a2e;border:1px solid rgba(255,255,255,0.3);border-radius:4px;padding:2px 6px;flex:1;max-width:180px';
+            deckSel.innerHTML = '<option value="">加载中...</option>';
+            // 异步加载卡组列表
+            api.getStats().then(function(st) {
+              var decks = Object.keys(st.deckResults || {}).sort();
+              deckSel.innerHTML = '<option value="">选择卡组</option>';
+              decks.forEach(function(d) {
+                var opt = document.createElement('option');
+                opt.value = d; opt.textContent = d;
+                deckSel.appendChild(opt);
+              });
+              if (decks.length > 0) { deckSel.value = decks[0]; deckSel.dispatchEvent(new Event('change')); }
+            });
+            deckSel.addEventListener('change', function() {
+              updateDisplay(stats);
+            });
+            selRow.appendChild(deckSel);
+            slide.appendChild(selRow);
+          }
 
           // 图表主体：canvas + info 面板
           var body = document.createElement('div');

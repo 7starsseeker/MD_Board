@@ -135,7 +135,8 @@ function computeStats() {
 
   // 最近10场
   const last10 = matches.slice(-10).map(m => ({
-    result: m.result, goingFirst: m.goingFirst, opponentDeck: m.opponentDeck || ''
+    result: m.result, goingFirst: m.goingFirst, opponentDeck: m.opponentDeck || '',
+    coinToss: m.coinToss
   }));
 
   // ── 手坑统计 ──
@@ -369,6 +370,21 @@ function computeStats() {
       losses: coinLosses,
       winRate: coinMatches.length > 0 ? ((coinWins / coinMatches.length) * 100).toFixed(1) : '0.0'
     },
+    coinHistory: matches.filter(function(m) { return m.coinToss === true || m.coinToss === false; }).map(function(m) {
+      return { coinToss: m.coinToss, result: m.result, goingFirst: m.goingFirst };
+    }),
+    resultHistory: matches.map(function(m) { return m.result; }),
+    deckResults: (function() {
+      var dr = {};
+      matches.forEach(function(m) {
+        var deck = m.myDeck;
+        if (deck && (m.result === 'win' || m.result === 'loss')) {
+          if (!dr[deck]) dr[deck] = [];
+          dr[deck].push(m.result);
+        }
+      });
+      return dr;
+    })(),
     goingFirst: {
       total: goingFirst.length,
       wins: gfWins,
@@ -890,11 +906,13 @@ function getDefaultCycleConfig() {
     duration: 5,
     items: [
       { type: 'winRate', enabled: true, label: '总胜率' },
+      { type: 'deckTrend', enabled: false, label: '特定卡组胜率', deck: '' },
       { type: 'record', enabled: true, label: '胜负记录' },
       { type: 'firstSecond', enabled: true, label: '先后手对比' },
       { type: 'streak', enabled: true, label: '连胜/连败' },
       { type: 'handtrapRate', enabled: true, label: '吃G率' },
       { type: 'coinRate', enabled: true, label: '硬币率' },
+      { type: 'coinTrend', enabled: true, label: '硬币胜率趋势' },
       { type: 'totalMatches', enabled: true, label: '总场次' },
       { type: 'opponentRan', enabled: true, label: '吓跑对手' },
       { type: 'bigHand', enabled: true, label: '遇到大牌哥' },
@@ -910,7 +928,9 @@ function getDefaultCycleConfig() {
       { type: 'deckOut', enabled: true, label: '抽干牌组' },
       { type: 'myDeckStats', enabled: true, label: '自用卡组' },
       { type: 'oppDeckStats', enabled: true, label: '对战卡组' },
-      { type: 'matchupStats', enabled: true, label: '交叉统计' }
+      { type: 'matchupStats', enabled: true, label: '交叉统计' },
+      { type: 'promotionStats', enabled: true, label: '晋级赛' },
+      { type: 'relegationStats', enabled: true, label: '保级赛' }
     ]
   };
 }

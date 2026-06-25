@@ -17,7 +17,7 @@
     .title-bar .title { font-size: 14px; font-weight: 700; color: var(--accent); letter-spacing: 1px; }
     .title-bar .title-actions { display: flex; gap: 4px; -webkit-app-region: no-drag; }
     .title-bar .title-actions button {
-      background: none; border: none; color: #aaa; cursor: pointer;
+      background: none; border: none; color: #e8e8f0; cursor: pointer;
       font-size: 12px; padding: 2px 8px; border-radius: 4px; transition: all 0.15s;
     }
     .title-bar .title-actions button:hover { background: rgba(255,255,255,0.1); color: #fff; }
@@ -125,13 +125,13 @@
   <div class="title-bar">
     <span class="title">🎴 MD Stats</span>
     <div class="title-actions">
-      <button class="btn btn-sm" id="btn-open-stats" title="详细统计" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📊</button>
-      <button class="btn btn-sm" id="btn-open-chart" title="图表" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📈</button>
-      <button class="btn btn-sm" id="btn-export" title="导出数据" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📤</button>
-      <button class="btn btn-sm" id="btn-import" title="导入数据" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📥</button>
-      <button class="btn btn-sm" id="btn-reset" title="重置所有数据" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">🗑</button>
-      <button class="btn btn-sm" id="btn-about" title="关于" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">ℹ️</button>
-      <button class="close-btn" id="btn-close-control" title="关闭" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:14px;padding:2px 8px;border-radius:4px">✕</button>
+      <button class="btn btn-sm" id="btn-open-stats" title="详细统计" style="background:none;border:none;color:#e8e8f0;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📊</button>
+      <button class="btn btn-sm" id="btn-open-chart" title="图表" style="background:none;border:none;color:#e8e8f0;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📈</button>
+      <button class="btn btn-sm" id="btn-export" title="导出数据" style="background:none;border:none;color:#e8e8f0;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📤</button>
+      <button class="btn btn-sm" id="btn-import" title="导入数据" style="background:none;border:none;color:#e8e8f0;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📥</button>
+      <button class="btn btn-sm" id="btn-reset" title="重置所有数据" style="background:none;border:none;color:#e8e8f0;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">🗑</button>
+      <button class="btn btn-sm" id="btn-about" title="关于" style="background:none;border:none;color:#e8e8f0;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">ℹ️</button>
+      <button class="close-btn" id="btn-close-control" title="关闭" style="background:none;border:none;color:#e8e8f0;cursor:pointer;font-size:14px;padding:2px 8px;border-radius:4px">✕</button>
     </div>
   </div>
 
@@ -689,7 +689,7 @@
       var showEndboard = state.goingFirst === true && !state.opponentRan;
       document.getElementById('section-first').classList.toggle('visible', showEndboard);
       document.getElementById('section-t0').classList.toggle('visible', showEndboard);
-      document.getElementById('section-opponent-ran').classList.toggle('visible', state.goingFirst === true && state.result === 'win');
+      document.getElementById('section-opponent-ran').classList.toggle('visible', state.result === 'win');
       document.getElementById('section-second').classList.toggle('visible', state.goingFirst === false);
       // 切换先后手时重置条件区域的选中状态
       if (state.goingFirst === true) {
@@ -1208,7 +1208,7 @@
         var date = new Date(m.timestamp);
         var timeStr = (date.getMonth()+1) + '/' + date.getDate() + ' ' + String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0');
         var extraStr = extras.length ? ' · ' + extras.join(' ') : '';
-        var color = m.result === 'win' ? 'var(--win)' : (m.result === 'abnormal' || m.result === 'draw') ? '#8888a0' : 'var(--loss)';
+        var color = m.result === 'win' ? 'var(--win)' : (m.result === 'abnormal' || m.result === 'draw') ? '#e8e8f0' : 'var(--loss)';
         return '<div class="match-item"><span class="match-result" style="color:' + color + '">' + label + '</span>' +
           '<div class="match-info"><div><span class="match-deck">' + deck + '</span><span style="font-size:11px;color:var(--text-dim);margin-left:6px">' + going + '</span></div>' +
           '<div class="match-meta">#' + idx + ' · ' + timeStr + extraStr + notes + '</div></div>' +
@@ -1248,11 +1248,13 @@
 
     var CYCLE_ITEM_DEFS = [
       { type: 'winRate', label: '总胜率', desc: '当前胜率百分比' },
+      { type: 'deckTrend', label: '特定卡组胜率', desc: '选定卡组的累计胜率趋势（需先录入卡组）' },
       { type: 'record', label: '胜负记录', desc: '胜负平异常各场数量' },
       { type: 'firstSecond', label: '先后手对比', desc: '先手 vs 后手胜率' },
       { type: 'streak', label: '连胜/连败', desc: '当前连胜或连败次数' },
       { type: 'handtrapRate', label: '手坑统计', desc: '吃G率 / 锁鸟 / 陨石 及各手坑频次' },
       { type: 'coinRate', label: '硬币统计', desc: '硬币胜负概率' },
+      { type: 'coinTrend', label: '硬币胜率趋势', desc: '硬币正反累计胜率变化曲线' },
       { type: 'totalMatches', label: '总场次', desc: '对局总场数量' },
       { type: 'opponentRan', label: '吓跑对手', desc: '先手胜利时对手逃跑次数' },
       { type: 'bigHand', label: '遇到大牌哥', desc: '遇到大牌哥次数/率' },
@@ -1269,7 +1271,8 @@
       { type: 'myDeckStats', label: '自用卡组', desc: '自用卡组胜率排行 Top3' },
       { type: 'oppDeckStats', label: '对战卡组', desc: '对战卡组胜率排行 Top3' },
       { type: 'matchupStats', label: '交叉统计', desc: '自用vs对手交叉胜率 Top3' },
-      { type: 'rankedStats', label: '晋级/保级赛', desc: '晋级赛/保级赛对局胜率' }
+      { type: 'promotionStats', label: '晋级赛', desc: '晋级赛对局胜率' },
+      { type: 'relegationStats', label: '保级赛', desc: '保级赛对局胜率' }
     ];
 
     function renderCycleSettings(config) {
@@ -1299,6 +1302,25 @@
 
         row.appendChild(cb);
         row.appendChild(lbl);
+
+        // 对特定卡组胜率项添加卡组选择
+        if (def.type === 'deckTrend') {
+          var deckSel = document.createElement('select');
+          deckSel.style.cssText = 'font-size:11px;background:rgba(255,255,255,0.85);color:#1a1a2e;border:1px solid rgba(255,255,255,0.3);border-radius:4px;padding:2px 4px;margin-left:4px;max-width:120px';
+          // 获取预设卡组列表
+          api.myDeckPresets.getAll().then(function(presets) {
+            deckSel.innerHTML = '<option value="">选择卡组</option>';
+            (presets || []).forEach(function(p) {
+              var opt = document.createElement('option');
+              opt.value = p;
+              opt.textContent = p;
+              if ((item && item.deck) === p) opt.selected = true;
+              deckSel.appendChild(opt);
+            });
+          });
+          row.appendChild(deckSel);
+        }
+
         list.appendChild(row);
       });
     }
@@ -1332,11 +1354,17 @@
       document.querySelectorAll('#cycle-items-list input[type=checkbox]').forEach(function(cb) {
         var def = CYCLE_ITEM_DEFS.find(function(d) { return d.type === cb.dataset.type; });
         if (!def) return;
-        items.push({
+        var item = {
           type: def.type,
           enabled: cb.checked,
           label: def.label
-        });
+        };
+        // 对 deckTrend 额外保存选中的卡组
+        if (def.type === 'deckTrend') {
+          var sel = cb.closest('.checkbox-row').querySelector('select');
+          if (sel) item.deck = sel.value;
+        }
+        items.push(item);
       });
       var config = {
         duration: parseInt(document.getElementById('cycle-duration-range').value) || 5,
@@ -1418,12 +1446,14 @@
 
     async function loadDateList() {
       var dates = await api.getAvailableDates();
-      var selDate = await api.getSelectedDate();
-      // 如果没有选中日期且日期列表不为空，默认高亮今天
-      if (!selDate && dates.length > 0) {
-        var today = todayStr();
-        if (dates.indexOf(today) !== -1) selDate = today;
+      // 始终把今天加入列表（即使无数据），保证今天可选
+      var today = todayStr();
+      if (dates.indexOf(today) === -1) {
+        dates.unshift(today);
       }
+      var selDate = await api.getSelectedDate();
+      // 如果没有选中日期，默认高亮今天
+      if (!selDate) selDate = today;
       var list = document.getElementById('date-list');
       list.innerHTML = '';
       if (dates.length === 0) {

@@ -9,8 +9,8 @@
   <style>
     :root {
       --card-glow: rgba(255, 200, 50, 0.06);
-      --bar-bg: rgba(255,255,255,0.06);
-      --text-dim: #a0a0b8;
+      --bar-bg: rgba(255,255,255,0.12);
+      --text-dim: #ffffff;
     }
     body {
       background: #0d0d1a;
@@ -51,7 +51,7 @@
     .title-bar .title-actions button {
       background: none;
       border: none;
-      color: #aaa;
+      color: #e8e8f0;
       cursor: pointer;
       font-size: 12px;
       padding: 2px 8px;
@@ -264,7 +264,7 @@
     .dots-large .dot.draw { background: #ffd700; box-shadow: 0 0 8px rgba(255,215,0,0.3); }
     .dots-large .dot.abnormal {
       background: transparent;
-      border: 2px solid #8888a0;
+      border: 2px solid #e8e8f0;
       position: relative;
       overflow: hidden;
     }
@@ -273,7 +273,7 @@
       position: absolute;
       top: 0; left: 0;
       width: 100%; height: 100%;
-      background: linear-gradient(45deg, transparent 40%, #8888a0 40%, #8888a0 60%, transparent 60%);
+      background: linear-gradient(45deg, transparent 40%, #e8e8f0 40%, #e8e8f0 60%, transparent 60%);
     }
     .dots-large .dot.empty { background: rgba(255,255,255,0.08); }
 
@@ -501,6 +501,25 @@
   </div>
 
   <!-- 胜率趋势（全宽） -->
+  <!-- 硬币胜率趋势（全宽） -->
+  <div class="stat-card" style="margin-bottom:14px">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(100,200,255,0.12)">🪙</div>
+      <div>
+        <div class="card-title-text">硬币胜率趋势</div>
+        <div class="card-subtitle">硬币正反累计胜率变化曲线</div>
+      </div>
+    </div>
+    <div id="coin-trend-content" style="display:flex;flex-direction:column;gap:6px">
+      <div style="height:180px;position:relative">
+        <canvas id="coin-trend-chart"></canvas>
+        <div id="coin-trend-empty" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;align-items:center;justify-content:center;text-align:center;color:var(--text-dim);font-size:12px">对局数不足，无法绘制趋势</div>
+      </div>
+      <div id="coin-trend-info" style="font-size:11px;color:var(--text-dim)"></div>
+    </div>
+  </div>
+
+  <!-- 胜率趋势（全宽） -->
   <div class="stat-card" style="margin-bottom:14px">
     <div class="card-header">
       <div class="card-icon" style="background:rgba(255,200,50,0.12)">📈</div>
@@ -515,6 +534,22 @@
         <div id="trend-empty" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;align-items:center;justify-content:center;text-align:center;color:var(--text-dim);font-size:12px">对局数不足，无法绘制趋势</div>
       </div>
       <div id="trend-info" style="font-size:11px;color:var(--text-dim)"></div>
+    </div>
+  </div>
+
+  <!-- 各卡组胜率趋势 -->
+  <div class="stat-card" style="margin-bottom:14px">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(76,217,100,0.12)">📊</div>
+      <div>
+        <div class="card-title-text">各卡组胜率趋势</div>
+        <div class="card-subtitle">按卡组分组的累计胜率曲线</div>
+      </div>
+    </div>
+    <div id="deck-trend-content">
+      <div id="deck-trend-selector" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px"></div>
+      <div id="deck-trend-charts" style="display:flex;flex-direction:column;gap:12px"></div>
+      <div id="deck-trend-empty" style="display:none;padding:10px;text-align:center;color:var(--text-dim);font-size:12px">暂无卡组数据</div>
     </div>
   </div>
 
@@ -570,6 +605,7 @@
     (function() {
       var api = window.mdStats;
       if (!api) { document.body.innerHTML = '<div class="empty-state"><span class="emoji">❌</span>API 加载失败</div>'; return; }
+      Chart.defaults.color = '#ffffff';
 
       function fmt(v) { return v === '0.0' ? '0.0' : v; }
 
@@ -806,61 +842,49 @@
         var canvas = document.getElementById('trend-chart');
         var emptyEl = document.getElementById('trend-empty');
         if (!canvas || !emptyEl) return;
-        var last10 = stats.last10 || [];
-        if (last10.length < 2) {
-          // 显示空状态，不破坏 canvas
+        var history = stats.resultHistory || [];
+        // 过滤出有胜负的对局
+        var results = [];
+        for (var i = 0; i < history.length; i++) {
+          var r = history[i];
+          if (r === 'win' || r === 'loss') results.push(r);
+        }
+        if (results.length < 2) {
           if (trendChart) { try { trendChart.destroy(); } catch(e) {} trendChart = null; }
           canvas.style.display = 'none';
           emptyEl.style.display = 'flex';
           infoEl.innerHTML = '';
           return;
         }
-        // 有数据：隐藏空状态，恢复 canvas
         canvas.style.display = '';
         emptyEl.style.display = 'none';
-        // 计算累计胜率点
+        // 计算每场的累计胜率
         var points = [];
-        var tw = 0, tt = 0;
-        for (var i = 0; i < last10.length; i++) {
-          var r = last10[i].result;
-          if (r === 'win' || r === 'loss') {
-            tt++;
-            if (r === 'win') tw++;
-            if (tt >= 2 && tt % 2 === 0) {
-              points.push({ label: '#' + tt, rate: (tw / tt * 100).toFixed(1) });
-            }
-          }
+        var tw = 0;
+        for (var i = 0; i < results.length; i++) {
+          if (results[i] === 'win') tw++;
+          points.push({ label: '#' + (i + 1), rate: (tw / (i + 1) * 100).toFixed(1) });
         }
-        if (points.length < 2 && tt > 0) {
-          points.push({ label: '#' + tt, rate: (tw / tt * 100).toFixed(1) });
-        }
-        if (points.length < 2) {
-          canvas.style.display = 'none';
-          emptyEl.style.display = 'flex';
-          infoEl.innerHTML = '';
-          if (trendChart) { try { trendChart.destroy(); } catch(e) {} trendChart = null; }
-          return;
-        }
-        // 有数据：隐藏空状态
-        el.style.display = 'flex';
-        canvas.style.display = '';
-        emptyEl.style.display = 'none';
+        // 标签太多时只显示部分
+        var labelStep = points.length > 60 ? Math.ceil(points.length / 30) : 1;
+        var chartLabels = points.map(function(p, idx) { return idx % labelStep === 0 ? p.label : ''; });
+        var chartData = points.map(function(p){return parseFloat(p.rate);});
         var ctx = canvas.getContext('2d');
         if (trendChart) { try { trendChart.destroy(); } catch(e) {} }
         trendChart = new Chart(ctx, {
           type: 'line',
           data: {
-            labels: points.map(function(p){return p.label;}),
+            labels: chartLabels,
             datasets: [{
               label: '胜率',
-              data: points.map(function(p){return parseFloat(p.rate);}),
+              data: chartData,
               borderColor: '#ffc832',
               backgroundColor: 'rgba(255,200,50,0.1)',
               fill: true,
               tension: 0.3,
               pointBackgroundColor: '#ffc832',
-              pointRadius: 3,
-              pointHoverRadius: 5
+              pointRadius: 0,
+              pointHoverRadius: 4
             }]
           },
           options: {
@@ -871,11 +895,274 @@
               x: { grid: { display: false } }
             },
             plugins: { legend: { display: false } }
-          }
+          },
+          plugins: [{
+            id: 'chartBg',
+            beforeDraw: function(chart) {
+              var ctx = chart.ctx;
+              var area = chart.chartArea;
+              ctx.save();
+              ctx.fillStyle = 'rgba(255,255,255,0.12)';
+              ctx.fillRect(area.left, area.top, area.width, area.height);
+              ctx.restore();
+            }
+          }]
         });
         // 显示总体胜率
-        var lastWr = tt > 0 ? (tw / tt * 100).toFixed(1) : '0.0';
-        infoEl.innerHTML = '最近 ' + tt + ' 场胜率：<span style="font-weight:700;color:' + (parseFloat(lastWr) >= 50 ? '#4cd964' : '#ff3b30') + '">' + fmt(lastWr) + '%</span>';
+        var twTotal = 0;
+        for (var i = 0; i < results.length; i++) { if (results[i] === 'win') twTotal++; }
+        var lastWr = (twTotal / results.length * 100).toFixed(1);
+        infoEl.innerHTML = '共 ' + results.length + ' 场 · 胜 <span style="font-weight:700;color:#4cd964">' + twTotal + '</span> 场 · 负 <span style="font-weight:700;color:#ff3b30">' + (results.length - twTotal) + '</span> 场 · 胜率 <span style="font-weight:700;color:' + (parseFloat(lastWr) >= 50 ? '#4cd964' : '#ff3b30') + '">' + fmt(lastWr) + '%</span>';
+      }
+
+      // ═══ 硬币胜率趋势 ═══
+      var coinTrendChart = null;
+      function renderCoinTrend(stats) {
+        var el = document.getElementById('coin-trend-content');
+        var infoEl = document.getElementById('coin-trend-info');
+        var canvas = document.getElementById('coin-trend-chart');
+        var emptyEl = document.getElementById('coin-trend-empty');
+        if (!canvas || !emptyEl) return;
+        var history = stats.coinHistory || [];
+        if (history.length < 2) {
+          if (coinTrendChart) { try { coinTrendChart.destroy(); } catch(e) {} coinTrendChart = null; }
+          canvas.style.display = 'none';
+          emptyEl.style.display = 'flex';
+          infoEl.innerHTML = '';
+          return;
+        }
+        canvas.style.display = '';
+        emptyEl.style.display = 'none';
+        // 计算每个点的累计硬币胜率
+        var points = [];
+        var cw = 0;
+        for (var i = 0; i < history.length; i++) {
+          if (history[i].coinToss === true) cw++;
+          // 每场都记录一个点
+          var rate = ((cw / (i + 1)) * 100).toFixed(1);
+          var label = '#' + (i + 1);
+          points.push({ label: label, rate: rate });
+        }
+        // 标签太多时只显示部分
+        var labelStep = points.length > 60 ? Math.ceil(points.length / 30) : 1;
+        var chartLabels = points.map(function(p, idx) { return idx % labelStep === 0 ? p.label : ''; });
+        var chartData = points.map(function(p){return parseFloat(p.rate);});
+        var ctx = canvas.getContext('2d');
+        if (coinTrendChart) { try { coinTrendChart.destroy(); } catch(e) {} coinTrendChart = null; }
+        coinTrendChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: chartLabels,
+            datasets: [{
+              label: '硬币胜率',
+              data: chartData,
+              borderColor: '#ffd700',
+              backgroundColor: 'rgba(255,215,0,0.1)',
+              fill: true,
+              tension: 0.3,
+              pointBackgroundColor: '#ffd700',
+              pointRadius: 0,
+              pointHoverRadius: 4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { stepSize: 10, callback: function(v){return v+'%';} } },
+              x: { grid: { display: false }, ticks: { maxRotation: 0, font: { size: 9 } } }
+            },
+            plugins: { legend: { display: false } }
+          },
+          plugins: [{
+            id: 'chartBg',
+            beforeDraw: function(chart) {
+              var ctx = chart.ctx;
+              var area = chart.chartArea;
+              ctx.save();
+              ctx.fillStyle = 'rgba(255,255,255,0.12)';
+              ctx.fillRect(area.left, area.top, area.width, area.height);
+              ctx.restore();
+            }
+          }, {
+            id: 'fiftyLine',
+            afterDraw: function(chart) {
+              var yScale = chart.scales.y;
+              var xScale = chart.scales.x;
+              var y = yScale.getPixelForValue(50);
+              var ctx = chart.ctx;
+              ctx.save();
+              ctx.beginPath();
+              ctx.setLineDash([5, 5]);
+              ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+              ctx.lineWidth = 1;
+              ctx.moveTo(xScale.left, y);
+              ctx.lineTo(xScale.right, y);
+              ctx.stroke();
+              ctx.restore();
+            }
+          }]
+        });
+        // 显示总体硬币胜率
+        var cwTotal = 0, ctTotal = history.length;
+        for (var i = 0; i < history.length; i++) {
+          if (history[i].coinToss === true) cwTotal++;
+        }
+        var lastWr = (cwTotal / ctTotal * 100).toFixed(1);
+        infoEl.innerHTML = '共 ' + ctTotal + ' 场 · 正 <span style="font-weight:700;color:#ffd700">' + cwTotal + '</span> 次 · 反 <span style="font-weight:700;color:#e8e8f0">' + (ctTotal - cwTotal) + '</span> 次 · 胜率 <span style="font-weight:700;color:' + (parseFloat(lastWr) >= 50 ? '#4cd964' : '#ff3b30') + '">' + fmt(lastWr) + '%</span>';
+      }
+
+      // ═══ 各卡组胜率趋势 ═══
+      var selectedDecks = [];
+      var _deckTrendInit = false;
+      var deckChartInstances = {};
+      function renderDeckTrends(stats) {
+        var selEl = document.getElementById('deck-trend-selector');
+        var chartsEl = document.getElementById('deck-trend-charts');
+        var emptyEl = document.getElementById('deck-trend-empty');
+        if (!selEl) return;
+        var deckData = stats.deckResults || {};
+        var deckNames = Object.keys(deckData).sort(function(a,b){
+          return deckData[b].length - deckData[a].length;
+        });
+        if (deckNames.length === 0) {
+          selEl.innerHTML = '';
+          chartsEl.innerHTML = '';
+          emptyEl.style.display = '';
+          return;
+        }
+        emptyEl.style.display = 'none';
+        // 首次加载时默认全选，后续用户操作不再自动重置
+        if (!_deckTrendInit) {
+          selectedDecks = deckNames.slice();
+          _deckTrendInit = true;
+        } else {
+          // 去掉已经不存在的卡组
+          selectedDecks = selectedDecks.filter(function(d){ return deckData[d]; });
+        }
+        // 渲染选择器按钮
+        selEl.innerHTML = '';
+        deckNames.forEach(function(deck) {
+          var btn = document.createElement('button');
+          btn.className = 'btn btn-sm' + (selectedDecks.indexOf(deck) !== -1 ? ' active' : '');
+          btn.textContent = deck + ' (' + deckData[deck].length + '场)';
+          btn.style.fontSize = '11px';
+          btn.addEventListener('click', function() {
+            var idx = selectedDecks.indexOf(deck);
+            if (idx !== -1) {
+              selectedDecks.splice(idx, 1);
+              btn.classList.remove('active');
+            } else {
+              selectedDecks.push(deck);
+              btn.classList.add('active');
+            }
+            renderDeckCharts(stats, deckData);
+          });
+          selEl.appendChild(btn);
+        });
+        // 全选/取消全选按钮
+        var btnSelectAll = document.createElement('button');
+        btnSelectAll.className = 'btn btn-sm';
+        btnSelectAll.textContent = '全选';
+        btnSelectAll.style.fontSize = '11px';
+        btnSelectAll.style.color = 'var(--accent)';
+        btnSelectAll.addEventListener('click', function() {
+          selectedDecks = deckNames.slice();
+          renderDeckTrends(stats);
+        });
+        selEl.appendChild(btnSelectAll);
+        var btnDeselectAll = document.createElement('button');
+        btnDeselectAll.className = 'btn btn-sm';
+        btnDeselectAll.textContent = '取消全选';
+        btnDeselectAll.style.fontSize = '11px';
+        btnDeselectAll.style.color = 'var(--accent)';
+        btnDeselectAll.addEventListener('click', function() {
+          selectedDecks = [];
+          renderDeckTrends(stats);
+        });
+        selEl.appendChild(btnDeselectAll);
+        // 渲染选中卡组的图表
+        renderDeckCharts(stats, deckData);
+      }
+      function renderDeckCharts(stats, deckData) {
+        var chartsEl = document.getElementById('deck-trend-charts');
+        if (!chartsEl) return;
+        // 清理旧 chart 实例
+        Object.keys(deckChartInstances).forEach(function(key) {
+          try { deckChartInstances[key].destroy(); } catch(e) {}
+        });
+        deckChartInstances = {};
+        if (selectedDecks.length === 0) {
+          chartsEl.innerHTML = '<div style="padding:10px;text-align:center;color:var(--text-dim);font-size:12px">请选择要显示的卡组</div>';
+          return;
+        }
+        var colors = ['#4cd964','#5ac8fa','#ffd700','#ff6b62','#ffc832','#64c8ff','#ff9500','#af52de','#34c759','#ff2d55'];
+        chartsEl.innerHTML = '';
+        selectedDecks.forEach(function(deck, idx) {
+          var results = deckData[deck];
+          if (!results || results.length < 2) return;
+          var points = [];
+          var w = 0;
+          for (var i = 0; i < results.length; i++) {
+            if (results[i] === 'win') w++;
+            points.push({ label: '#' + (i+1), rate: (w / (i+1) * 100).toFixed(1) });
+          }
+          var color = colors[idx % colors.length];
+          // 容器
+          var wrapper = document.createElement('div');
+          wrapper.style.cssText = 'border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px';
+          wrapper.innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
+              '<span style="font-size:12px;font-weight:600;color:' + color + '">' + deck + '</span>' +
+              '<span style="font-size:11px;color:var(--text-dim)">' + results.length + '场 · ' +
+                '<span style="font-weight:600;color:' + (parseFloat(points[points.length-1].rate) >= 50 ? '#4cd964' : '#ff3b30') + '">' + points[points.length-1].rate + '%</span></span>' +
+            '</div>' +
+            '<div style="height:80px;position:relative"><canvas id="deck-chart-' + deck.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'') + '"></canvas></div>';
+          chartsEl.appendChild(wrapper);
+          // 绘制小图
+          var canvas = wrapper.querySelector('canvas');
+          var ctx = canvas.getContext('2d');
+          var labelStep = points.length > 40 ? Math.ceil(points.length / 20) : 1;
+          var chartLabels = points.map(function(p, i){ return i % labelStep === 0 ? p.label : ''; });
+          var chartData = points.map(function(p){return parseFloat(p.rate);});
+          var chartId = 'deck-' + deck;
+          deckChartInstances[chartId] = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: chartLabels,
+              datasets: [{
+                label: deck,
+                data: chartData,
+                borderColor: color,
+                fill: false,
+                tension: 0.3,
+                pointRadius: 0,
+                pointHoverRadius: 3,
+                borderWidth: 1.5
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { stepSize: 50, font: {size:8}, callback: function(v){return v+'%';} } },
+                x: { display: false }
+              },
+              plugins: { legend: { display: false } }
+            },
+            plugins: [{
+              id: 'chartBg',
+              beforeDraw: function(chart) {
+                var ctx = chart.ctx;
+                var area = chart.chartArea;
+                ctx.save();
+              ctx.fillStyle = 'rgba(255,255,255,0.12)';
+                ctx.fillRect(area.left, area.top, area.width, area.height);
+                ctx.restore();
+              }
+            }]
+          });
+        });
       }
 
       // ═══ 提丰趣味统计 ═══
@@ -930,7 +1217,7 @@
             '<td style="text-align:center;color:#ff3b30">' + d.losses + '</td>' +
             '<td style="text-align:left">' +
               '<span style="display:inline-flex;align-items:center;gap:4px">' +
-              '<span style="display:inline-block;width:100px;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;vertical-align:middle">' +
+              '<span style="display:inline-block;width:100px;height:6px;background:rgba(255,255,255,0.12);border-radius:3px;vertical-align:middle">' +
               '<span style="display:block;height:100%;border-radius:3px;background:#4cd964;width:' + (d.wins + d.losses > 0 ? (d.wins / (d.wins + d.losses) * 100) : 0) + '%"></span></span>' +
               '<span style="font-weight:700;font-family:var(--font-mono);font-size:12px">' + d.winRate + '%</span></span>' +
             '</td></tr>';
@@ -979,7 +1266,7 @@
               '<td style="text-align:center;color:#ff3b30">' + m.losses + '</td>' +
               '<td style="text-align:left">' +
                 '<span style="display:inline-flex;align-items:center;gap:4px">' +
-                '<span style="display:inline-block;width:100px;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;vertical-align:middle">' +
+                '<span style="display:inline-block;width:100px;height:6px;background:rgba(255,255,255,0.12);border-radius:3px;vertical-align:middle">' +
                 '<span style="display:block;height:100%;border-radius:3px;background:#4cd964;width:' + barW + '%"></span></span>' +
                 '<span style="font-weight:700;font-family:var(--font-mono);font-size:12px">' + wr + '%</span></span>' +
               '</td></tr>';
@@ -1000,7 +1287,7 @@
 
         function renderTypeBlock(label, icon, data, color) {
           if (!data) return '';
-          var h = '<div style="margin-bottom:12px;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px;background:rgba(255,255,255,0.02)">' +
+          var h = '<div style="margin-bottom:12px;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px;background:rgba(255,255,255,0.02)">' +
             '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:16px">' + icon + '</span><span style="font-weight:700;font-size:14px;color:' + color + '">' + label + '</span><span style="font-size:11px;color:var(--text-dim)">共 ' + data.total + ' 场 · 胜率 ' + data.winRate + '%</span></div>' +
             '<div class="stat-row"><span class="label">对局胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill green" style="width:' + parseFloat(data.winRate) + '%"></div></div><span class="value good">' + data.winRate + '%</span></div></div>' +
             '<div class="stat-row"><span class="label">硬币胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + parseFloat(data.coinWinRate) + '%"></div></div><span class="value warn">' + data.coinWinRate + '%</span></div></div>' +
@@ -1070,6 +1357,8 @@
         renderTimeout(stats);
         renderBigHand(stats);
         renderWinTrend(stats);
+        renderCoinTrend(stats);
+        renderDeckTrends(stats);
         renderDeckTable(stats.myDeckStats, 'mydeck-content', 'W', 'L');
         renderDeckTable(stats.deckStats, 'oppdeck-content', 'W', 'L');
         renderMatchups(stats);

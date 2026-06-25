@@ -82,7 +82,7 @@
     }
     .cycle-slide .sub-line {
       font-size: 16px;
-      color: #a0a0b8;
+      color: #ffffff;
       margin-top: 3px;
       text-align: center;
     }
@@ -124,7 +124,7 @@
     }
     .cycle-slide .triple-row .col .dl {
       font-size: 15px;
-      color: #a0a0b8;
+      color: #ffffff;
     }
 
     .cycle-slide .dots-line {
@@ -146,7 +146,7 @@
     .cycle-slide .dots-line .dot.draw { background: #ffd700; }
     .cycle-slide .dots-line .dot.abnormal {
       background: transparent;
-      border: 2px solid #8888a0;
+      border: 2px solid #e8e8f0;
       position: relative;
       overflow: hidden;
     }
@@ -155,7 +155,7 @@
       position: absolute;
       top: 0; left: 0;
       width: 100%; height: 100%;
-      background: linear-gradient(45deg, transparent 40%, #8888a0 40%, #8888a0 60%, transparent 60%);
+      background: linear-gradient(45deg, transparent 40%, #e8e8f0 40%, #e8e8f0 60%, transparent 60%);
     }
     .cycle-slide .dots-line .dot.empty { background: rgba(255,255,255,0.1); }
 
@@ -208,7 +208,7 @@
   <div class="overlay">
     <div class="title-bar">
       <span class="title">🔄 循环显示</span>
-      <span style="font-size:11px;color:#8888a0;flex:1;text-align:center" id="cycle-time-range-label"></span>
+      <span style="font-size:11px;color:#e8e8f0;flex:1;text-align:center" id="cycle-time-range-label"></span>
       <div class="title-actions">
         <button id="btn-pause" title="暂停/继续">⏸</button>
         <button class="close-btn" id="btn-close" title="关闭">✕</button>
@@ -240,13 +240,25 @@
       var RENDERERS = {};
 
       RENDERERS.winRate = function(s) {
+        // 最近 15 场胜负小圆点
+        var dots = '';
+        var hist = s.resultHistory || [];
+        var lastN = Math.min(15, hist.length);
+        for (var i = hist.length - lastN; i < hist.length; i++) {
+          var r = hist[i];
+          if (r !== 'win' && r !== 'loss') continue;
+          var bg = r === 'win' ? '#4cd964' : '#ff3b30';
+          var tc = r === 'win' ? '#000' : '#fff';
+          dots += '<span style="display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;border-radius:50%;font-size:6px;font-weight:700;margin:1px;background:' + bg + ';color:' + tc + '">' + (r === 'win' ? 'W' : 'L') + '</span>';
+        }
         return {
           label: s.winRate + '%',
           subLabel: s.wins + '胜 ' + s.losses + '负',
           valueColor: '#64c8ff',
           html: '<div class="big-value" style="color:#64c8ff">' + s.winRate + '<span class="pct">%</span></div>' +
                 '<div class="big-label">总胜率</div>' +
-                '<div class="sub-line">' + s.wins + '胜 ' + s.losses + '负 · ' + (s.wins + s.losses) + '局</div>'
+                '<div class="sub-line">' + s.wins + '胜 ' + s.losses + '负 · ' + (s.wins + s.losses) + '局</div>' +
+                '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:1px;margin:3px 0 1px">' + dots + '</div>'
         };
       };
 
@@ -258,7 +270,7 @@
                   '<div class="col"><div class="dv" style="color:#4cd964">' + s.wins + '</div><div class="dl">胜场</div></div>' +
                   '<div class="col"><div class="dv" style="color:#ff3b30">' + s.losses + '</div><div class="dl">负场</div></div>' +
                   '<div class="col"><div class="dv" style="color:#ffd700">' + s.draws + '</div><div class="dl">平局</div></div>' +
-                  '<div class="col"><div class="dv" style="color:#8888a0">' + s.abnormals + '</div><div class="dl">异常</div></div>' +
+                  '<div class="col"><div class="dv" style="color:#e8e8f0">' + s.abnormals + '</div><div class="dl">异常</div></div>' +
                 '</div>' +
                 '<div class="big-label">胜负记录</div>' +
                 '<div class="sub-line">总对局 ' + s.total + ' 场</div>'
@@ -293,7 +305,7 @@
           return {
             label: '—',
             subLabel: '暂无连胜/连败',
-            html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无连胜</div>'
+            html: '<div class="big-value" style="color:#e8e8f0">—</div><div class="big-label">暂无连胜</div>'
           };
         }
         var isWin = st.type === 'win';
@@ -318,11 +330,11 @@
           subLabel: '吃锁率 ' + laR + '%',
           html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:2px">' +
                   '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 10px;width:100%;max-width:300px">' +
-                    '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#ffd700">' + fmt(agR) + '%</div><div style="font-size:12px;color:#a0a0b8">吃G率</div></div>' +
-                    '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#64c8ff">' + fmt(laR) + '%</div><div style="font-size:12px;color:#a0a0b8">锁鸟</div></div>' +
-                    '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#ff3b30">' + fmt(niR) + '%</div><div style="font-size:12px;color:#a0a0b8">陨石</div></div>' +
+                    '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#ffd700">' + fmt(agR) + '%</div><div style="font-size:12px;color:#ffffff">吃G率</div></div>' +
+                    '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#64c8ff">' + fmt(laR) + '%</div><div style="font-size:12px;color:#ffffff">锁鸟</div></div>' +
+                    '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#ff3b30">' + fmt(niR) + '%</div><div style="font-size:12px;color:#ffffff">陨石</div></div>' +
                   '</div>' +
-                  '<div style="font-size:12px;color:#a0a0b8;text-align:center;margin-top:2px">增殖G ' + ht.gotMaxxc + ' · 鸟G ' + ht.gotDroll + ' · 水母G ' + ht.gotJellyfish + ' · 锁鸟 ' + ht.gotLancea + ' · 陨石 ' + ht.gotNibiru + ' · 大宇宙人 ' + ht.gotDimension + ' · 其他 ' + ht.gotSmallHT + '</div>' +
+                  '<div style="font-size:12px;color:#ffffff;text-align:center;margin-top:2px">增殖G ' + ht.gotMaxxc + ' · 鸟G ' + ht.gotDroll + ' · 水母G ' + ht.gotJellyfish + ' · 锁鸟 ' + ht.gotLancea + ' · 陨石 ' + ht.gotNibiru + ' · 大宇宙人 ' + ht.gotDimension + ' · 其他 ' + ht.gotSmallHT + '</div>' +
                 '</div>' +
                 '<div style="font-size:16px;color:var(--text-dim);margin-top:4px;text-align:center">手坑统计</div>'
         };
@@ -358,7 +370,7 @@
           return {
             label: '0',
             subLabel: '还没吓跑过对手',
-            html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">还没吓跑过对手</div>'
+            html: '<div class="big-value" style="color:#e8e8f0">0</div><div class="big-label">还没吓跑过对手</div>'
           };
         }
         var best = or.byDeck && or.byDeck.length > 0 ? or.byDeck[0] : null;
@@ -375,7 +387,7 @@
       RENDERERS.endboard = function(s) {
         var eb = s.endboard;
         if (!eb || eb.total === 0) {
-          return { label: '—', subLabel: '暂无先手对局', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无先手数据</div>' };
+          return { label: '—', subLabel: '暂无先手对局', html: '<div class="big-value" style="color:#e8e8f0">—</div><div class="big-label">暂无先手数据</div>' };
         }
         var nP = (eb.normal / eb.total * 100).toFixed(1);
         var cP = (eb.compromised / eb.total * 100).toFixed(1);
@@ -386,12 +398,12 @@
           subLabel: '正常终场率',
           html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:3px">' +
                 '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;width:100%;max-width:280px">' +
-                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#4cd964">' + nP + '%</div><div style="font-size:12px;color:#a0a0b8">正常终场</div></div>' +
-                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#ffd700">' + cP + '%</div><div style="font-size:12px;color:#a0a0b8">妥协场</div></div>' +
-                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#ff3b30">' + sP + '%</div><div style="font-size:12px;color:#a0a0b8">没做出来</div></div>' +
-                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#8888a0">' + suP + '%</div><div style="font-size:12px;color:#a0a0b8">投降</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#4cd964">' + nP + '%</div><div style="font-size:12px;color:#ffffff">正常终场</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#ffd700">' + cP + '%</div><div style="font-size:12px;color:#ffffff">妥协场</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#ff3b30">' + sP + '%</div><div style="font-size:12px;color:#ffffff">没做出来</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#e8e8f0">' + suP + '%</div><div style="font-size:12px;color:#ffffff">投降</div></div>' +
                 '</div>' +
-                '<div style="font-size:12px;color:#a0a0b8;text-align:center">共 ' + eb.total + ' 场先手 · 正常 ' + eb.normal + ' · 妥协 ' + eb.compromised + ' · 没做出来 ' + eb.stopped + ' · 投降 ' + eb.surrender + '</div>' +
+                '<div style="font-size:12px;color:#ffffff;text-align:center">共 ' + eb.total + ' 场先手 · 正常 ' + eb.normal + ' · 妥协 ' + eb.compromised + ' · 没做出来 ' + eb.stopped + ' · 投降 ' + eb.surrender + '</div>' +
                 '</div>' +
                 '<div style="font-size:16px;color:var(--text-dim);margin-top:4px;text-align:center">先手终场质量</div>'
         };
@@ -400,7 +412,7 @@
       RENDERERS.breakBoard = function(s) {
         var bb = s.breakBoard;
         if (!bb || bb.total === 0) {
-          return { label: '—', subLabel: '暂无后手对局', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无后手数据</div>' };
+          return { label: '—', subLabel: '暂无后手对局', html: '<div class="big-value" style="color:#e8e8f0">—</div><div class="big-label">暂无后手数据</div>' };
         }
         var sr = parseFloat(bb.successRate) || 0;
         var swr = parseFloat(bb.successWinRate) || 0;
@@ -409,10 +421,10 @@
           subLabel: '突破成功率',
           html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%">' +
                 '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;width:100%;max-width:300px;margin-bottom:4px">' +
-                  '<div style="text-align:center"><div style="font-size:32px;font-weight:800;color:#ff9632">' + fmt(bb.successRate) + '%</div><div style="font-size:13px;color:#a0a0b8">突破成功率</div></div>' +
-                  '<div style="text-align:center"><div style="font-size:32px;font-weight:800;color:#64c8ff">' + fmt(bb.successWinRate) + '%</div><div style="font-size:13px;color:#a0a0b8">突破后胜率</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:32px;font-weight:800;color:#ff9632">' + fmt(bb.successRate) + '%</div><div style="font-size:13px;color:#ffffff">突破成功率</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:32px;font-weight:800;color:#64c8ff">' + fmt(bb.successWinRate) + '%</div><div style="font-size:13px;color:#ffffff">突破后胜率</div></div>' +
                 '</div>' +
-                '<div style="font-size:12px;color:#a0a0b8;text-align:center">共 ' + bb.total + ' 场后手 · 成功 ' + bb.success + ' · 失败 ' + bb.failed + ' · 投降 ' + bb.surrender + ' · 不需要 ' + bb.notNeeded + ' · 突破后胜 ' + bb.successWins + '</div>' +
+                '<div style="font-size:12px;color:#ffffff;text-align:center">共 ' + bb.total + ' 场后手 · 成功 ' + bb.success + ' · 失败 ' + bb.failed + ' · 投降 ' + bb.surrender + ' · 不需要 ' + bb.notNeeded + ' · 突破后胜 ' + bb.successWins + '</div>' +
                 '</div>' +
                 '<div class="big-label">后手突破统计</div>'
         };
@@ -434,7 +446,7 @@
         var hs = s.handState;
         var total = (hs.cantPlay||0) + (hs.bothStuck||0);
         if (total === 0) {
-          return { label: '0', subLabel: '暂无制裁记录', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无制裁记录</div>' };
+          return { label: '0', subLabel: '暂无制裁记录', html: '<div class="big-value" style="color:#e8e8f0">0</div><div class="big-label">暂无制裁记录</div>' };
         }
         var cpRate = s.total > 0 ? ((hs.cantPlay||0) / s.total * 100).toFixed(1) : '0.0';
         var bsRate = s.total > 0 ? ((hs.bothStuck||0) / s.total * 100).toFixed(1) : '0.0';
@@ -443,10 +455,10 @@
           subLabel: '被制裁 ' + total + ' 次',
           html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:2px">' +
                 '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;width:100%;max-width:300px">' +
-                  '<div style="text-align:center"><div style="font-size:36px;font-weight:800;color:#ff3b30">' + (hs.cantPlay||0) + '</div><div style="font-size:12px;color:#a0a0b8">完全动不了</div></div>' +
-                  '<div style="text-align:center"><div style="font-size:36px;font-weight:800;color:#ff9f0a">' + (hs.bothStuck||0) + '</div><div style="font-size:12px;color:#a0a0b8">互卡</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:36px;font-weight:800;color:#ff3b30">' + (hs.cantPlay||0) + '</div><div style="font-size:12px;color:#ffffff">完全动不了</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:36px;font-weight:800;color:#ff9f0a">' + (hs.bothStuck||0) + '</div><div style="font-size:12px;color:#ffffff">互卡</div></div>' +
                 '</div>' +
-                '<div style="font-size:12px;color:#a0a0b8;text-align:center;margin-top:2px">完全动不了率 ' + cpRate + '% · 互卡率 ' + bsRate + '%</div>' +
+                '<div style="font-size:12px;color:#ffffff;text-align:center;margin-top:2px">完全动不了率 ' + cpRate + '% · 互卡率 ' + bsRate + '%</div>' +
                 '</div>' +
                 '<div class="big-label">被发牌员制裁</div>'
         };
@@ -455,7 +467,7 @@
       RENDERERS.mistake = function(s) {
         var m = s.mistake;
         if (!m || m.total === 0) {
-          return { label: '0', subLabel: '暂无严重失误', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无严重失误</div>' };
+          return { label: '0', subLabel: '暂无严重失误', html: '<div class="big-value" style="color:#e8e8f0">0</div><div class="big-label">暂无严重失误</div>' };
         }
         return {
           label: m.total + '',
@@ -469,7 +481,7 @@
       RENDERERS.bigHand = function(s) {
         var bh = s.bigHand;
         if (!bh || bh === 0) {
-          return { label: '0', subLabel: '暂无遇到大牌哥记录', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无遇到大牌哥记录</div>' };
+          return { label: '0', subLabel: '暂无遇到大牌哥记录', html: '<div class="big-value" style="color:#e8e8f0">0</div><div class="big-label">暂无遇到大牌哥记录</div>' };
         }
         var rate = s.total > 0 ? (bh / s.total * 100).toFixed(1) : '0.0';
         return {
@@ -484,7 +496,7 @@
       RENDERERS.opponentT0 = function(s) {
         var t0 = s.opponentT0;
         if (!t0 || t0.total === 0) {
-          return { label: '0', subLabel: '暂无对手T0动记录', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无对手T0动</div>' };
+          return { label: '0', subLabel: '暂无对手T0动记录', html: '<div class="big-value" style="color:#e8e8f0">0</div><div class="big-label">暂无对手T0动</div>' };
         }
         return {
           label: t0.total + '',
@@ -498,12 +510,12 @@
       RENDERERS.disconnect = function(s) {
         var con = s.connectivity;
         if (!con || con.disconnect === 0) {
-          return { label: '0', subLabel: '暂无掉线', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无掉线</div>' };
+          return { label: '0', subLabel: '暂无掉线', html: '<div class="big-value" style="color:#e8e8f0">0</div><div class="big-label">暂无掉线</div>' };
         }
         return {
           label: con.disconnect + '',
           subLabel: '掉线率 ' + fmt(con.disconnectRate) + '%',
-          html: '<div class="big-value" style="color:#8888a0">' + con.disconnect + ' 🔌</div>' +
+          html: '<div class="big-value" style="color:#e8e8f0">' + con.disconnect + ' 🔌</div>' +
                 '<div class="big-label">掉线统计</div>' +
                 '<div class="sub-line">自己掉线 ' + con.disconnectSelf + ' · 对手掉线 ' + con.disconnectOpponent + '</div>'
         };
@@ -512,7 +524,7 @@
       RENDERERS.timeout = function(s) {
         var con = s.connectivity;
         if (!con || con.timeout === 0) {
-          return { label: '0', subLabel: '暂无超时', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无超时</div>' };
+          return { label: '0', subLabel: '暂无超时', html: '<div class="big-value" style="color:#e8e8f0">0</div><div class="big-label">暂无超时</div>' };
         }
         return {
           label: con.timeout + '',
@@ -526,7 +538,7 @@
       RENDERERS.typhon = function(s) {
         var t = s.typhon;
         if (!t || t.total === 0) {
-          return { label: '0', subLabel: '暂无提丰', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无提丰登场</div>' };
+          return { label: '0', subLabel: '暂无提丰', html: '<div class="big-value" style="color:#e8e8f0">0</div><div class="big-label">暂无提丰登场</div>' };
         }
         var blackened = t.enemyBlack + t.selfBlack;
         var whitened = t.enemyWhite + t.selfWhite;
@@ -542,7 +554,7 @@
       RENDERERS.deckOut = function(s) {
         var d = s.deckOut;
         if (!d || d.total === 0) {
-          return { label: '0', subLabel: '暂无抽干牌组', html: '<div class="big-value" style="color:#8888a0">0</div><div class="big-label">暂无抽干牌组</div>' };
+          return { label: '0', subLabel: '暂无抽干牌组', html: '<div class="big-value" style="color:#e8e8f0">0</div><div class="big-label">暂无抽干牌组</div>' };
         }
         return {
           label: d.total + '',
@@ -556,7 +568,7 @@
       RENDERERS.myDeckStats = function(s) {
         var decks = s.myDeckStats;
         if (!decks || decks.length === 0) {
-          return { label: '—', subLabel: '暂无卡组数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label" style="font-size:16px">暂无卡组数据</div>' };
+          return { label: '—', subLabel: '暂无卡组数据', html: '<div class="big-value" style="color:#e8e8f0">—</div><div class="big-label" style="font-size:16px">暂无卡组数据</div>' };
         }
         var top = decks.filter(function(d) { return d.deck !== '未知'; }).slice(0, 3);
         var list = top.map(function(d) {
@@ -578,7 +590,7 @@
       RENDERERS.oppDeckStats = function(s) {
         var decks = s.deckStats;
         if (!decks || decks.length === 0) {
-          return { label: '—', subLabel: '暂无对手卡组数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label" style="font-size:16px">暂无对手数据</div>' };
+          return { label: '—', subLabel: '暂无对手卡组数据', html: '<div class="big-value" style="color:#e8e8f0">—</div><div class="big-label" style="font-size:16px">暂无对手数据</div>' };
         }
         var top = decks.filter(function(d) { return d.deck !== '未知'; }).slice(0, 3);
         var list = top.map(function(d) {
@@ -600,7 +612,7 @@
       RENDERERS.matchupStats = function(s) {
         var matchups = s.matchupStats;
         if (!matchups || matchups.length === 0) {
-          return { label: '—', subLabel: '暂无交叉数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label" style="font-size:16px">暂无交叉数据</div>' };
+          return { label: '—', subLabel: '暂无交叉数据', html: '<div class="big-value" style="color:#e8e8f0">—</div><div class="big-label" style="font-size:16px">暂无交叉数据</div>' };
         }
         var top = matchups.filter(function(m) { return m.myDeck !== '未知' && m.opponentDeck !== '未知'; }).slice(0, 3);
         var list = top.map(function(m) {
@@ -618,32 +630,106 @@
         };
       };
 
-      RENDERERS.rankedStats = function(s) {
+      RENDERERS.promotionStats = function(s) {
         var rs = s.rankedStats;
-        var hasPromo = rs && rs.promotion;
-        var hasReleg = rs && rs.relegation;
-        if (!hasPromo && !hasReleg) {
-          return { label: '—', subLabel: '暂无晋级/保级赛数据', html: '<div class="big-value" style="color:#8888a0">—</div><div class="big-label">暂无晋级/保级赛数据</div>' };
+        if (!rs || !rs.promotion) {
+          return { label: '—', subLabel: '暂无晋级赛数据', html: '<div class="big-value" style="color:#e8e8f0">—</div><div class="big-label">暂无晋级赛数据</div>' };
         }
-        function block(data, icon, label, color) {
-          if (!data) return '';
-          return '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">' +
-            '<div style="font-size:28px;font-weight:800;color:' + color + '">' + icon + ' ' + data.winRate + '%</div>' +
-            '<div style="font-size:12px;color:var(--text-dim)">' + label + ' 胜率</div>' +
-            '<div style="font-size:11px;color:var(--text-dim)">' + data.total + '场 · 硬币' + data.coinWinRate + '% · 卡手' + data.cantPlayRate + '%</div>' +
-            '<div style="font-size:11px;color:var(--text-dim)">遇到大牌哥 ' + data.bigHandRate + '%</div>' +
-            '</div>';
-        }
-        var cols = '';
-        if (hasPromo) cols += block(rs.promotion, '🔥', '晋级赛', '#ffc832');
-        if (hasReleg) cols += block(rs.relegation, '💧', '保级赛', '#ff6b62');
-        if (hasPromo && hasReleg) cols = '<div style="width:1px;height:80px;background:rgba(255,255,255,0.08);margin:0 6px"></div>' + cols;
-        if (hasPromo && hasReleg) cols = block(rs.promotion, '🔥', '晋级赛', '#ffc832') + cols;
+        var d = rs.promotion;
         return {
-          label: (hasPromo ? '晋级' + rs.promotion.winRate + '%' : '') + (hasPromo && hasReleg ? ' / ' : '') + (hasReleg ? '保级' + rs.relegation.winRate + '%' : ''),
-          subLabel: '晋级赛 vs 保级赛',
-          html: '<div class="double-row" style="gap:4px">' + cols + '</div>' +
-                '<div class="big-label">晋级赛 / 保级赛</div>'
+          label: '晋级' + d.winRate + '%',
+          subLabel: '晋级赛胜率',
+          html: '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0">' +
+            '<div style="font-size:28px;font-weight:800;color:#ffc832">' + d.winRate + '%</div>' +
+            '<div style="font-size:12px;color:var(--text-dim)">晋级赛 胜率</div>' +
+            '<div style="font-size:11px;color:var(--text-dim)">' + d.total + '场 · 硬币' + d.coinWinRate + '% · 卡手' + d.cantPlayRate + '%</div>' +
+            '<div style="font-size:11px;color:var(--text-dim)">遇到大牌哥 ' + d.bigHandRate + '%</div>' +
+            '</div>' +
+            '<div class="big-label">晋级赛</div>'
+        };
+      };
+
+      RENDERERS.relegationStats = function(s) {
+        var rs = s.rankedStats;
+        if (!rs || !rs.relegation) {
+          return { label: '—', subLabel: '暂无保级赛数据', html: '<div class="big-value" style="color:#e8e8f0">—</div><div class="big-label">暂无保级赛数据</div>' };
+        }
+        var d = rs.relegation;
+        return {
+          label: '保级' + d.winRate + '%',
+          subLabel: '保级赛胜率',
+          html: '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0">' +
+            '<div style="font-size:28px;font-weight:800;color:#ff6b62">' + d.winRate + '%</div>' +
+            '<div style="font-size:12px;color:var(--text-dim)">保级赛 胜率</div>' +
+            '<div style="font-size:11px;color:var(--text-dim)">' + d.total + '场 · 硬币' + d.coinWinRate + '% · 卡手' + d.cantPlayRate + '%</div>' +
+            '<div style="font-size:11px;color:var(--text-dim)">遇到大牌哥 ' + d.bigHandRate + '%</div>' +
+            '</div>' +
+            '<div class="big-label">保级赛</div>'
+        };
+      };
+
+      RENDERERS.coinTrend = function(s) {
+        var history = s.coinHistory || [];
+        if (history.length === 0) {
+          return { label: '—', subLabel: '暂无硬币数据', html: '<div class="big-value" style="color:#e8e8f0">—</div><div class="big-label">暂无硬币数据</div>' };
+        }
+        var cw = 0, cTotal = history.length;
+        var dots = '';
+        var maxDots = Math.min(15, history.length);
+        for (var i = history.length - 1; i >= history.length - maxDots; i--) {
+          var r = history[i];
+          if (r.coinToss === true) cw++;
+          var bg = r.coinToss === true ? '#ffd700' : 'rgba(255,255,255,0.15)';
+          var tc = r.coinToss === true ? '#000' : '#e8e8f0';
+          dots += '<span style="display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;border-radius:50%;font-size:6px;font-weight:700;margin:1px;background:' + bg + ';color:' + tc + '">' + (r.coinToss === true ? '正' : '反') + '</span>';
+        }
+        // 补算剩余场次
+        for (var i = history.length - maxDots - 1; i >= 0; i--) {
+          if (history[i].coinToss === true) cw++;
+        }
+        var cwr = (cw / cTotal * 100).toFixed(1);
+        return {
+          label: '硬币 ' + cwr + '%',
+          subLabel: '共 ' + cTotal + ' 场',
+          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%">' +
+                  '<div style="font-size:32px;font-weight:800;color:#ffd700;line-height:1.1">' + cwr + '%</div>' +
+                  '<div style="font-size:11px;color:var(--text-dim);margin-top:1px">硬币胜率</div>' +
+                  '<div style="font-size:10px;color:var(--text-dim);margin-top:0px">正 ' + cw + ' 次 · 反 ' + (cTotal - cw) + ' 次</div>' +
+                  '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:1px;margin:2px 0 1px">' + dots + '</div>' +
+                '</div>' +
+                '<div class="big-label">硬币趋势 · 最近' + maxDots + '场</div>'
+        };
+      };
+
+      RENDERERS.deckTrend = function(s, item) {
+        var deckName = (item && item.deck) || '';
+        var deckData = s.deckResults || {};
+        var results = deckName ? deckData[deckName] : null;
+        if (!results || results.length === 0) {
+          return { label: '—', subLabel: deckName || '未选择卡组', html: '<div class="big-value" style="color:#e8e8f0">—</div><div class="big-label">' + (deckName || '未选择卡组') + '</div>' };
+        }
+        var w = 0, t = results.length;
+        for (var i = 0; i < results.length; i++) { if (results[i] === 'win') w++; }
+        var wr = (w / t * 100).toFixed(1);
+        // 该卡组最近 15 场胜负小圆点
+        var dots = '';
+        var lastN = Math.min(15, results.length);
+        for (var i = results.length - lastN; i < results.length; i++) {
+          var bg = results[i] === 'win' ? '#4cd964' : '#ff3b30';
+          var tc = results[i] === 'win' ? '#000' : '#fff';
+          dots += '<span style="display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;border-radius:50%;font-size:6px;font-weight:700;margin:1px;background:' + bg + ';color:' + tc + '">' + (results[i] === 'win' ? 'W' : 'L') + '</span>';
+        }
+        return {
+          label: deckName + ' ' + wr + '%',
+          subLabel: deckName + ' 胜率',
+          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%">' +
+                  '<div style="font-size:11px;color:var(--text-dim);margin-bottom:1px">' + deckName + '</div>' +
+                  '<div style="font-size:36px;font-weight:800;color:#ffc832;line-height:1.1">' + wr + '%</div>' +
+                  '<div style="font-size:10px;color:var(--text-dim);margin-top:2px">胜率</div>' +
+                  '<div style="font-size:11px;color:var(--text-dim);margin-top:1px">' + t + ' 场 · 胜 ' + w + ' 负 ' + (t - w) + '</div>' +
+                  '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:1px;margin:3px 0 1px">' + dots + '</div>' +
+                '</div>' +
+                '<div class="big-label">' + deckName + ' · 最近' + lastN + '场</div>'
         };
       };
 
@@ -673,7 +759,7 @@
           var slide = document.createElement('div');
           slide.className = 'cycle-slide' + (i === 0 ? ' active' : '');
           slide.id = 'cyc-slide-' + i;
-          slide.innerHTML = renderer(stats).html;
+          slide.innerHTML = renderer(stats, item).html;
           vp.appendChild(slide);
         });
       }
