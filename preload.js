@@ -26,9 +26,10 @@ contextBridge.exposeInMainWorld('mdStats', {
 
   // ── 时间范围过滤 ──
   getTimeRange: () => ipcRenderer.invoke('stats:get-time-range'),
-  setTimeRange: (range, selectedDate) => ipcRenderer.invoke('stats:set-time-range', range, selectedDate),
+  setTimeRange: (range, selectedDate, customStart, customEnd) => ipcRenderer.invoke('stats:set-time-range', range, selectedDate, customStart, customEnd),
   getAvailableDates: () => ipcRenderer.invoke('stats:get-available-dates'),
   getSelectedDate: () => ipcRenderer.invoke('stats:get-selected-date'),
+  getCustomRange: () => ipcRenderer.invoke('stats:get-custom-range'),
 
   // ── 循环显示面板 ──
   openCycleWindow: () => ipcRenderer.invoke('cycle:open-window'),

@@ -396,7 +396,7 @@
         <div class="card-icon" style="background:rgba(255,150,50,0.12)">🏃</div>
         <div>
           <div class="card-title-text">吓跑对手情况</div>
-          <div class="card-subtitle">开局对手吓跑次数 · 按自用卡组分布</div>
+          <div class="card-subtitle">吓跑对手次数 · 按自用卡组分布</div>
         </div>
       </div>
       <div id="opponent-ran-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
@@ -625,9 +625,9 @@
         var gfRate = parseFloat(gf.winRate) || 0;
         var gsRate = parseFloat(gs.winRate) || 0;
         document.getElementById('first-second-content').innerHTML =
-          '<div class="stat-row"><span class="label">先手</span><span class="value info">' + gf.wins + '胜 ' + gf.losses + '负</span></div>' +
+          '<div class="stat-row"><span class="label">先手</span><span class="value info">' + gf.wins + '胜 ' + gf.losses + '负</span><span style="font-size:11px;color:var(--text-dim)">共 ' + gf.total + ' 场</span></div>' +
           '<div class="stat-row"><span class="label"></span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill blue" style="width:' + gfRate + '%"></div></div><span class="value info">' + fmt(gf.winRate) + '%</span></div></div>' +
-          '<div class="stat-row"><span class="label">后手</span><span class="value warn">' + gs.wins + '胜 ' + gs.losses + '负</span></div>' +
+          '<div class="stat-row"><span class="label">后手</span><span class="value warn">' + gs.wins + '胜 ' + gs.losses + '负</span><span style="font-size:11px;color:var(--text-dim)">共 ' + gs.total + ' 场</span></div>' +
           '<div class="stat-row"><span class="label"></span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + gsRate + '%"></div></div><span class="value warn">' + fmt(gs.winRate) + '%</span></div></div>' +
           '<div class="stat-row" style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">' +
             '<span class="label">先手平局</span><span class="value">' + gf.draws + '</span>' +
@@ -1329,15 +1329,44 @@
         if (!stats) return;
         // 更新时间范围标签
         api.getTimeRange().then(async function(range) {
-          var labels = { all: '', today: '📅 一天', week: '📅 [本周]', month: '📅 [本月]' };
+          var labels = { all: '', today: '📅 一天', week: '📅 [一整周]', month: '📅 [一整月]', custom: '📅 [自定义]' };
           var label = labels[range] || '';
+          var selDate = await api.getSelectedDate();
           if (range === 'today') {
-            var selDate = await api.getSelectedDate();
             if (selDate) {
               var today = new Date();
               var todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
               label = '📅 ' + (selDate === todayStr ? selDate + '「今天」' : selDate);
             }
+          } else if (range === 'week') {
+            var ref = selDate ? new Date(selDate) : new Date();
+            var day = ref.getDay();
+            var diff = (day === 0 ? 6 : day - 1);
+            var ws = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() - diff);
+            var we = new Date(ws);
+            we.setDate(we.getDate() + 6);
+            var wsStr = ws.getFullYear() + '-' + String(ws.getMonth() + 1).padStart(2, '0') + '-' + String(ws.getDate()).padStart(2, '0');
+            var weStr = we.getFullYear() + '-' + String(we.getMonth() + 1).padStart(2, '0') + '-' + String(we.getDate()).padStart(2, '0');
+            // 判断是否当前周
+            var now = new Date();
+            var nd = now.getDay();
+            var ndiff = (nd === 0 ? 6 : nd - 1);
+            var nws = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ndiff);
+            var nwsStr = nws.getFullYear() + '-' + String(nws.getMonth() + 1).padStart(2, '0') + '-' + String(nws.getDate()).padStart(2, '0');
+            label = '📅 ' + wsStr + ' ~ ' + weStr + (wsStr === nwsStr ? '「本周」' : '');
+          } else if (range === 'month') {
+            var ref = selDate ? new Date(selDate) : new Date();
+            var ms = new Date(ref.getFullYear(), ref.getMonth(), 1);
+            var me = new Date(ref.getFullYear(), ref.getMonth() + 1, 0);
+            var msStr = ms.getFullYear() + '-' + String(ms.getMonth() + 1).padStart(2, '0') + '-' + String(ms.getDate()).padStart(2, '0');
+            var meStr = me.getFullYear() + '-' + String(me.getMonth() + 1).padStart(2, '0') + '-' + String(me.getDate()).padStart(2, '0');
+            // 判断是否当前月
+            var nms = new Date();
+            var nmsStr = nms.getFullYear() + '-' + String(nms.getMonth() + 1).padStart(2, '0');
+            label = '📅 ' + msStr + ' ~ ' + meStr + (msStr.substring(0, 7) === nmsStr ? '「本月」' : '');
+          } else if (range === 'custom') {
+            var cr = await api.getCustomRange();
+            if (cr.start && cr.end) label = '📅 ' + cr.start + ' ~ ' + cr.end;
           }
           document.getElementById('stats-tr-label').textContent = label;
         });

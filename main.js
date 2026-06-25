@@ -12,7 +12,7 @@ function getRuntimeDir() {
 const RUNTIME_DATA = () => path.join(getRuntimeDir(), 'stats.json');
 const RUNTIME_WSTATE = () => path.join(getRuntimeDir(), 'window-state.json');
 
-let data = { matches: [], version: 4, deckPresets: [], myDeckPresets: [], cycleConfig: null, timeRange: 'all', selectedDate: null };
+let data = { matches: [], version: 4, deckPresets: [], myDeckPresets: [], cycleConfig: null, timeRange: 'all', selectedDate: null, customStart: null, customEnd: null };
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -75,12 +75,20 @@ function filterMatchesByTimeRange(matches, range) {
       end.setDate(end.getDate() + 1);
     }
   } else if (range === 'week') {
-    // 周一起算
-    const day = now.getDay();
+    // 使用选中日期所在周（周一起算），否则用当前周
+    const ref = data.selectedDate ? new Date(data.selectedDate) : now;
+    const day = ref.getDay();
     const diff = (day === 0 ? 6 : day - 1);
-    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
+    start = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() - diff);
   } else if (range === 'month') {
-    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    // 使用选中日期所在月，否则用当前月
+    const ref = data.selectedDate ? new Date(data.selectedDate) : now;
+    start = new Date(ref.getFullYear(), ref.getMonth(), 1);
+  } else if (range === 'custom') {
+    start = data.customStart ? new Date(data.customStart) : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (start) start.setHours(0, 0, 0, 0);
+    end = data.customEnd ? new Date(data.customEnd) : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (end) { end.setDate(end.getDate() + 1); end.setHours(0, 0, 0, 0); }
   } else {
     return matches;
   }
@@ -799,13 +807,16 @@ ipcMain.handle('stats:get-time-range', () => {
   return data.timeRange || 'all';
 });
 
-ipcMain.handle('stats:set-time-range', (event, range, selectedDate) => {
-  if (['all', 'today', 'week', 'month'].includes(range)) {
+ipcMain.handle('stats:set-time-range', (event, range, selectedDate, customStart, customEnd) => {
+  if (['all', 'today', 'week', 'month', 'custom'].includes(range)) {
     data.timeRange = range;
-    if (range === 'today') {
-      data.selectedDate = selectedDate || null;
+    data.selectedDate = selectedDate || null;
+    if (range === 'custom') {
+      data.customStart = customStart || null;
+      data.customEnd = customEnd || null;
     } else {
-      data.selectedDate = null;
+      data.customStart = null;
+      data.customEnd = null;
     }
     saveData();
     notifyWindows();
@@ -828,6 +839,10 @@ ipcMain.handle('stats:get-available-dates', () => {
 
 ipcMain.handle('stats:get-selected-date', () => {
   return data.selectedDate || null;
+});
+
+ipcMain.handle('stats:get-custom-range', () => {
+  return { start: data.customStart || null, end: data.customEnd || null };
 });
 
 // ── 预设卡组管理 ─────────────────────────────────────────────────────────

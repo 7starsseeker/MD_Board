@@ -409,10 +409,11 @@
     <div class="btn-group" id="time-range-btns">
       <button class="btn btn-time-range active" data-val="all">全部</button>
       <button class="btn btn-time-range" data-val="today">一天</button>
-      <button class="btn btn-time-range" data-val="week">本周</button>
-      <button class="btn btn-time-range" data-val="month">本月</button>
+      <button class="btn btn-time-range" data-val="week">一整周</button>
+      <button class="btn btn-time-range" data-val="month">一整月</button>
+      <button class="btn btn-time-range" data-val="custom">自定义</button>
     </div>
-    <div id="date-selector" style="display:none;margin-top:6px;max-height:160px;overflow-y:auto;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px">
+    <div id="date-selector" style="display:none;margin-top:6px;max-height:240px;overflow-y:auto;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px">
       <div style="font-size:11px;color:var(--text-dim);padding:4px 6px">选择日期：</div>
       <div id="date-list"></div>
     </div>
@@ -1417,7 +1418,30 @@
     });
 
     // ═══ 时间范围过滤 ═══
-    var TIME_RANGE_LABELS = { all: '全部历史数据', today: '一天的明细', week: '本周的数据（周一起算）', month: '本月的数据' };
+    var TIME_RANGE_LABELS = { all: '全部历史数据', today: '一天的明细', week: '一整周的数据', month: '一整月的数据', custom: '自定义范围' };
+
+    function getWeekRange(refDate) {
+      var ref = refDate ? new Date(refDate) : new Date();
+      var day = ref.getDay();
+      var diff = (day === 0 ? 6 : day - 1);
+      var start = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() - diff);
+      var end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      return {
+        start: start.getFullYear() + '-' + String(start.getMonth() + 1).padStart(2, '0') + '-' + String(start.getDate()).padStart(2, '0'),
+        end: end.getFullYear() + '-' + String(end.getMonth() + 1).padStart(2, '0') + '-' + String(end.getDate()).padStart(2, '0')
+      };
+    }
+
+    function getMonthRange(refDate) {
+      var ref = refDate ? new Date(refDate) : new Date();
+      var start = new Date(ref.getFullYear(), ref.getMonth(), 1);
+      var end = new Date(ref.getFullYear(), ref.getMonth() + 1, 0);
+      return {
+        start: start.getFullYear() + '-' + String(start.getMonth() + 1).padStart(2, '0') + '-' + String(start.getDate()).padStart(2, '0'),
+        end: end.getFullYear() + '-' + String(end.getMonth() + 1).padStart(2, '0') + '-' + String(end.getDate()).padStart(2, '0')
+      };
+    }
 
     function todayStr() {
       var d = new Date();
@@ -1434,13 +1458,31 @@
       });
       // 显示/隐藏日期选择器
       var dateSelector = document.getElementById('date-selector');
+      var hint = document.getElementById('time-range-hint');
       if (range === 'today') {
         dateSelector.style.display = 'block';
-        document.getElementById('time-range-hint').textContent = '当前：一天 · ' + formatDateLabel(todayStr());
+        hint.textContent = '当前：一天 · ' + formatDateLabel(todayStr());
         loadDateList();
+      } else if (range === 'week') {
+        dateSelector.style.display = 'block';
+        api.getSelectedDate().then(function(sd) {
+          var wr = getWeekRange(sd || undefined);
+          hint.textContent = '当前：一整周 · ' + wr.start + ' ~ ' + wr.end;
+        });
+        loadWeekList();
+      } else if (range === 'month') {
+        dateSelector.style.display = 'block';
+        api.getSelectedDate().then(function(sd) {
+          var mr = getMonthRange(sd || undefined);
+          hint.textContent = '当前：一整月 · ' + mr.start + ' ~ ' + mr.end;
+        });
+        loadMonthList();
+      } else if (range === 'custom') {
+        dateSelector.style.display = 'block';
+        loadCustomRange();
       } else {
         dateSelector.style.display = 'none';
-        document.getElementById('time-range-hint').textContent = '当前：' + (TIME_RANGE_LABELS[range] || '全部历史数据');
+        hint.textContent = '当前：' + (TIME_RANGE_LABELS[range] || '全部历史数据');
       }
     }
 
@@ -1479,6 +1521,161 @@
       });
     }
 
+    function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+
+    function formatDateShort(d) {
+      return (d.getMonth() + 1) + '/' + d.getDate();
+    }
+
+    async function loadWeekList() {
+      var dates = await api.getAvailableDates();
+      var dateObjs = dates.map(function(d) { return new Date(d); });
+      dateObjs.sort(function(a, b) { return a - b; });
+      // 始终把当前周加入列表（即使无数据），保证当前周可选
+      var today = new Date();
+      var tDay = today.getDay();
+      var tDiff = (tDay === 0 ? 6 : tDay - 1);
+      var tMon = new Date(today.getFullYear(), today.getMonth(), today.getDate() - tDiff);
+      var todayWeekKey = tMon.getFullYear() + '-' + pad2(tMon.getMonth() + 1) + '-' + pad2(tMon.getDate());
+      dateObjs.push(tMon);
+      var weeks = {};
+      dateObjs.forEach(function(d) {
+        var day = d.getDay();
+        var diff = (day === 0 ? 6 : day - 1);
+        var mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - diff);
+        var key = mon.getFullYear() + '-' + pad2(mon.getMonth() + 1) + '-' + pad2(mon.getDate());
+        if (!weeks[key]) {
+          var sun = new Date(mon);
+          sun.setDate(sun.getDate() + 6);
+          weeks[key] = { start: mon, end: sun, key: key };
+        }
+      });
+      var selDate = await api.getSelectedDate();
+      var selKey = null;
+      if (selDate) {
+        var sd = new Date(selDate);
+        var sday = sd.getDay();
+        var sdiff = (sday === 0 ? 6 : sday - 1);
+        var smon = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate() - sdiff);
+        selKey = smon.getFullYear() + '-' + pad2(smon.getMonth() + 1) + '-' + pad2(smon.getDate());
+      } else {
+        // 无选中时默认高亮当前周
+        selKey = todayWeekKey;
+      }
+      var sorted = Object.keys(weeks).sort().reverse();
+      var list = document.getElementById('date-list');
+      list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);padding:4px 6px">选择一整周：</div>';
+      sorted.forEach(function(key) {
+        var w = weeks[key];
+        var label = formatDateShort(w.start) + ' ~ ' + formatDateShort(w.end);
+        if (key === todayWeekKey) label += '「本周」';
+        var fullLabel = w.start.getFullYear() + '-' + pad2(w.start.getMonth() + 1) + '-' + pad2(w.start.getDate()) + ' ~ ' +
+          w.end.getFullYear() + '-' + pad2(w.end.getMonth() + 1) + '-' + pad2(w.end.getDate());
+        var btn = document.createElement('button');
+        btn.className = 'btn btn-sm' + (key === selKey ? ' active' : '');
+        btn.style.display = 'block';
+        btn.style.width = '100%';
+        btn.style.textAlign = 'left';
+        btn.style.margin = '2px 0';
+        btn.style.fontSize = '12px';
+        btn.textContent = label;
+        btn.title = fullLabel;
+        btn.addEventListener('click', async function() {
+          document.querySelectorAll('#date-list .btn').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          await api.setTimeRange('week', key);
+          document.getElementById('time-range-hint').textContent = '当前：一整周 · ' + fullLabel;
+        });
+        list.appendChild(btn);
+      });
+    }
+
+    async function loadMonthList() {
+      var dates = await api.getAvailableDates();
+      var dateObjs = dates.map(function(d) { return new Date(d); });
+      dateObjs.sort(function(a, b) { return a - b; });
+      // 始终把当前月加入列表（即使无数据），保证当前月可选
+      var today = new Date();
+      var todayMonthKey = today.getFullYear() + '-' + pad2(today.getMonth() + 1);
+      dateObjs.push(today);
+      var months = {};
+      dateObjs.forEach(function(d) {
+        var key = d.getFullYear() + '-' + pad2(d.getMonth() + 1);
+        if (!months[key]) {
+          var start = new Date(d.getFullYear(), d.getMonth(), 1);
+          var end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+          months[key] = { start: start, end: end, key: key };
+        }
+      });
+      var selDate = await api.getSelectedDate();
+      var selKey = null;
+      if (selDate) {
+        var sd = new Date(selDate);
+        selKey = sd.getFullYear() + '-' + pad2(sd.getMonth() + 1);
+      } else {
+        // 无选中时默认高亮当前月
+        selKey = todayMonthKey;
+      }
+      var sorted = Object.keys(months).sort().reverse();
+      var list = document.getElementById('date-list');
+      list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);padding:4px 6px">选择一整月：</div>';
+      sorted.forEach(function(key) {
+        var m = months[key];
+        var fullLabel = m.start.getFullYear() + '-' + pad2(m.start.getMonth() + 1) + '（' +
+          m.start.getFullYear() + '-' + pad2(m.start.getMonth() + 1) + '-' + pad2(m.start.getDate()) + ' ~ ' +
+          m.end.getFullYear() + '-' + pad2(m.end.getMonth() + 1) + '-' + pad2(m.end.getDate()) + '）';
+        var btn = document.createElement('button');
+        btn.className = 'btn btn-sm' + (key === selKey ? ' active' : '');
+        btn.style.display = 'block';
+        btn.style.width = '100%';
+        btn.style.textAlign = 'left';
+        btn.style.margin = '2px 0';
+        btn.style.fontSize = '12px';
+        btn.textContent = key + (key === todayMonthKey ? '「本月」' : '');
+        btn.title = fullLabel;
+        btn.addEventListener('click', async function() {
+          document.querySelectorAll('#date-list .btn').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          await api.setTimeRange('month', key + '-01');
+          var mr = getMonthRange(key + '-01');
+          document.getElementById('time-range-hint').textContent = '当前：一整月 · ' + mr.start + ' ~ ' + mr.end;
+        });
+        list.appendChild(btn);
+      });
+    }
+
+    async function loadCustomRange() {
+      var cr = await api.getCustomRange();
+      var s = cr.start || todayStr();
+      var e = cr.end || todayStr();
+      var list = document.getElementById('date-list');
+      list.innerHTML =
+        '<div style="font-size:11px;color:var(--text-dim);padding:4px 6px;margin-bottom:4px">自定义起止日期：</div>' +
+        '<div style="display:flex;align-items:center;gap:6px;padding:4px 6px">' +
+          '<span style="font-size:11px;color:var(--text-dim);white-space:nowrap">从</span>' +
+          '<input type="date" id="custom-start" value="' + s + '" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:4px;color:#e8e8f0;padding:4px 6px;font-size:12px">' +
+          '<span style="font-size:11px;color:var(--text-dim);white-space:nowrap">到</span>' +
+          '<input type="date" id="custom-end" value="' + e + '" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:4px;color:#e8e8f0;padding:4px 6px;font-size:12px">' +
+          '<button id="btn-custom-apply" class="btn btn-primary btn-sm" style="white-space:nowrap;flex-shrink:0">应用</button>' +
+        '</div>';
+      document.getElementById('btn-custom-apply').addEventListener('click', async function() {
+        var startVal = document.getElementById('custom-start').value;
+        var endVal = document.getElementById('custom-end').value;
+        if (!startVal || !endVal) return;
+        // 如果起始日期晚于终止日期，自动互换
+        if (startVal > endVal) {
+          var tmp = startVal; startVal = endVal; endVal = tmp;
+          document.getElementById('custom-start').value = startVal;
+          document.getElementById('custom-end').value = endVal;
+        }
+        var result = await api.setTimeRange('custom', null, startVal, endVal);
+        if (result.success) {
+          applyTimeRange('custom');
+          document.getElementById('time-range-hint').textContent = '当前：自定义 · ' + startVal + ' ~ ' + endVal;
+        }
+      });
+    }
+
     api.getTimeRange().then(async function(range) {
       applyTimeRange(range);
       if (range === 'today') {
@@ -1490,6 +1687,23 @@
           await api.setTimeRange('today', todayStr());
           document.getElementById('time-range-hint').textContent = '当前：一天 · ' + formatDateLabel(todayStr());
         }
+      } else if (range === 'week') {
+        var selDate = await api.getSelectedDate();
+        if (selDate) {
+          var wr = getWeekRange(selDate);
+          document.getElementById('time-range-hint').textContent = '当前：一整周 · ' + wr.start + ' ~ ' + wr.end;
+        }
+      } else if (range === 'month') {
+        var selDate = await api.getSelectedDate();
+        if (selDate) {
+          var mr = getMonthRange(selDate);
+          document.getElementById('time-range-hint').textContent = '当前：一整月 · ' + mr.start + ' ~ ' + mr.end;
+        }
+      } else if (range === 'custom') {
+        var cr = await api.getCustomRange();
+        if (cr.start && cr.end) {
+          document.getElementById('time-range-hint').textContent = '当前：自定义 · ' + cr.start + ' ~ ' + cr.end;
+        }
       }
     });
 
@@ -1500,6 +1714,20 @@
           // 默认选中今天
           var result = await api.setTimeRange('today', todayStr());
           if (result.success) applyTimeRange('today');
+        } else if (range === 'week') {
+          // 默认选中当前周
+          var wr = getWeekRange();
+          var result = await api.setTimeRange('week', wr.start);
+          if (result.success) applyTimeRange('week');
+        } else if (range === 'month') {
+          // 默认选中当前月
+          var mr = getMonthRange();
+          var result = await api.setTimeRange('month', mr.start);
+          if (result.success) applyTimeRange('month');
+        } else if (range === 'custom') {
+          // 自定义 — 不自动设置，打开输入框
+          var result = await api.setTimeRange('custom');
+          if (result.success) applyTimeRange('custom');
         } else {
           var result = await api.setTimeRange(range);
           if (result.success) applyTimeRange(range);
