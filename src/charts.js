@@ -767,6 +767,111 @@ function renderCoinPie(canvas, stats, options) {
 }
 
 /**
+ * 9b. 硬币异常检测（双项水平柱状图：连续异常率 + 偏斜异常率）
+ */
+function renderCoinAnomaly(canvas, stats, options) {
+  destroyChart(canvas._chart);
+  var ctx = canvas.getContext('2d');
+  var c = stats.coin || {};
+  if (!c.streak && (!c.bias || c.bias.severity === '—')) { canvas._chart = null; return null; }
+  // 数据准备
+  var hasStreak = !!c.streak;
+  var hasBias = !!(c.bias && c.bias.severity !== '—');
+  var labels = [];
+  var values = [];
+  var colors = [];
+  if (hasStreak) {
+    labels.push('连续异常');
+    values.push(c.streak.severityScore);
+    colors.push(c.streak.severityScore > 50 ? '#ff6b62' : (c.streak.severityScore > 20 ? '#ffd700' : '#4cd964'));
+  }
+  if (hasBias) {
+    labels.push('偏斜异常');
+    values.push(c.bias.severityScore);
+    colors.push(c.bias.severityScore > 50 ? '#ff6b62' : (c.bias.severityScore > 20 ? '#ffd700' : '#4cd964'));
+  }
+  canvas._chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        borderColor: colors,
+        borderWidth: 1,
+        borderRadius: 4,
+        barPercentage: 0.5
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      indexAxis: 'y',
+      scales: {
+        x: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { stepSize: 20, callback: function(v){return v+'%';} } },
+        y: { grid: { display: false } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var idx = ctx.dataIndex;
+              var sev = hasStreak && idx === 0 ? c.streak.severity : (hasBias ? c.bias.severity : '');
+              return ctx.raw + '% · ' + sev;
+            }
+          }
+        }
+      }
+    },
+    plugins: [{
+      id: 'barLabels',
+      afterDatasetsDraw: function(chart) {
+        var ctx2 = chart.ctx;
+        var meta = chart.getDatasetMeta(0);
+        ctx2.save();
+        ctx2.textAlign = 'right';
+        ctx2.textBaseline = 'middle';
+        ctx2.font = 'bold 14px monospace';
+        meta.data.forEach(function(bar, i) {
+          var val = values[i];
+          var sev = hasStreak && i === 0 ? c.streak.severity : (hasBias ? c.bias.severity : '');
+          ctx2.fillStyle = colors[i];
+          ctx2.fillText(val + '%', bar.x - 4, bar.y);
+          ctx2.font = '10px sans-serif';
+          ctx2.fillStyle = '#e8e8f0';
+          ctx2.fillText(sev, bar.x - 4, bar.y + 14);
+          ctx2.font = 'bold 14px monospace';
+        });
+        ctx2.restore();
+      }
+    }]
+  });
+  // info 面板
+  var infoEl = options && options.infoEl;
+  if (infoEl) {
+    var s = c.streak;
+    var b = c.bias;
+    var curLabel = function(v) { return v === true ? '正' : (v === false ? '反' : '—'); };
+    var html = '';
+    if (s) {
+      html += infoSection('连续异常检测');
+      html += infoRow('最长连续', curLabel(s.longest.type) + ' × ' + s.longest.length);
+      if (s.current) html += infoRow('当前连续', curLabel(s.current.type) + ' × ' + s.current.length);
+      html += infoRow('纯随机上限', '~' + s.expectedMax + '连');
+      html += infoBar('异常率', s.severityScore, s.severityScore > 50 ? 'red' : (s.severityScore > 20 ? 'gold' : 'green'));
+    }
+    if (b && b.severity !== '—') {
+      html += infoSection('偏斜异常检测');
+      html += infoRow('正:反', b.heads + ':' + b.tails + ' (期望 1:1)');
+      html += infoRow('正面率', b.pct + '%');
+      html += infoBar('异常率', b.severityScore, b.severityScore > 50 ? 'red' : (b.severityScore > 20 ? 'gold' : 'green'));
+    }
+    infoEl.innerHTML = html;
+  }
+  return canvas._chart;
+}
+
+/**
  * 10. 卡手原因分布（横向柱状图 — 仅卡手相关，不含完全动不了和互卡）
  */
 function renderHandStatePie(canvas, stats, options) {

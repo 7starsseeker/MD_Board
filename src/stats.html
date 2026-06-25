@@ -641,11 +641,35 @@
       function renderCoin(stats) {
         var c = stats.coin;
         var cr = parseFloat(c.winRate) || 0;
-        document.getElementById('coin-content').innerHTML =
+        var coinLabel = function(v) { return v === true ? '正' : (v === false ? '反' : '—'); };
+        var html =
           '<div class="stat-row"><span class="label">硬币胜</span><span class="value good">' + c.wins + '</span></div>' +
           '<div class="stat-row"><span class="label">硬币负</span><span class="value bad">' + c.losses + '</span></div>' +
           '<div class="stat-row"><span class="label">硬币胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + cr + '%"></div></div><span class="value warn">' + fmt(c.winRate) + '%</span></div></div>' +
           '<div class="stat-row"><span class="label">记录次数</span><span class="value">' + c.total + '/' + stats.total + '</span></div>';
+        // 连正/连反分析
+        if (c.streak && c.total > 0) {
+          var s = c.streak;
+          var curLabel = coinLabel(s.current.type);
+          var lonLabel = coinLabel(s.longest.type);
+          html +=
+            '<div style="padding:6px 0 2px 0;font-size:13px;font-weight:700;color:#ffd700;margin-top:6px;border-top:1px solid var(--border)">📊 硬币随机性检测</div>' +
+            '<div class="stat-row"><span class="label">当前连续</span><span class="value">' + curLabel + ' × ' + s.current.length + '</span></div>' +
+            '<div class="stat-row"><span class="label">最长连续</span><span class="value">' + lonLabel + ' × ' + s.longest.length + '</span></div>' +
+            '<div class="stat-row"><span class="label">· 纯随机上限</span><span class="value" style="color:var(--text-dim)">~' + s.expectedMax + '连</span><span style="font-size:10px;color:var(--text-dim);margin-left:4px">(公平硬币最长一般不超过此值)</span></div>' +
+            '<div class="stat-row"><span class="label">· 异常率</span><span class="value ' + (s.severityScore > 50 ? 'bad' : (s.severityScore > 20 ? 'warn' : '')) + '">' + s.severity + ' (' + s.severityScore + '%)</span></div>';
+        }
+        // 硬币偏斜检测
+        if (c.bias && c.bias.severity !== '—') {
+          var b = c.bias;
+          var pctClass = Math.abs(parseFloat(b.pct) - 50) > 15 ? 'bad' : (Math.abs(parseFloat(b.pct) - 50) > 8 ? 'warn' : '');
+          html +=
+            '<div style="padding:6px 0 2px 0;font-size:13px;font-weight:700;color:#ffd700;margin-top:6px;border-top:1px solid var(--border)">📐 硬币偏斜检测</div>' +
+            '<div class="stat-row"><span class="label">正:反比例</span><span class="value">' + b.heads + ':' + b.tails + '</span><span style="font-size:11px;color:var(--text-dim);margin-left:4px">(期望 1:1)</span></div>' +
+            '<div class="stat-row"><span class="label">· 正面率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + parseFloat(b.pct) + '%"></div></div><span class="value ' + pctClass + '">' + b.pct + '%</span></div></div>' +
+            '<div class="stat-row"><span class="label">· 异常率</span><span class="value ' + (b.severityScore > 50 ? 'bad' : (b.severityScore > 20 ? 'warn' : '')) + '">' + b.severity + ' (' + b.severityScore + '%)</span></div>';
+        }
+        document.getElementById('coin-content').innerHTML = html;
       }
 
       // ═══ 手坑 ═══

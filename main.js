@@ -369,6 +369,11 @@ function computeStats() {
     relegation: computeTypeStats(relegationMatches)
   };
 
+  // ── 硬币历史记录（供 streak 分析和返回共用）──
+  var coinHistory = matches.filter(function(m) { return m.coinToss === true || m.coinToss === false; }).map(function(m) {
+    return { coinToss: m.coinToss, result: m.result, goingFirst: m.goingFirst };
+  });
+
   return {
     total, wins, losses, draws, abnormals,
     winRate: playable > 0 ? ((wins / playable) * 100).toFixed(1) : '0.0',
@@ -376,11 +381,81 @@ function computeStats() {
       total: coinMatches.length,
       wins: coinWins,
       losses: coinLosses,
-      winRate: coinMatches.length > 0 ? ((coinWins / coinMatches.length) * 100).toFixed(1) : '0.0'
+      winRate: coinMatches.length > 0 ? ((coinWins / coinMatches.length) * 100).toFixed(1) : '0.0',
+      // ── 硬币连正/连反分析 ──
+      streak: (function() {
+        var arr = coinHistory;
+        var n = arr.length;
+        if (n === 0) return { current: null, longest: 0, longestType: null, severity: '—', severityScore: 0, pValue: 1 };
+        // 扫描所有连续段
+        var curType = arr[0].coinToss;
+        var curLen = 1;
+        var maxLen = 1;
+        var maxType = curType;
+        for (var si = 1; si < n; si++) {
+          if (arr[si].coinToss === curType) {
+            curLen++;
+          } else {
+            curType = arr[si].coinToss;
+            curLen = 1;
+          }
+          if (curLen > maxLen) { maxLen = curLen; maxType = curType; }
+        }
+        // 当前连续（从尾部向前扫描）
+        var curCoin = arr[n - 1].coinToss;
+        var curStreak = 1;
+        for (var si2 = n - 2; si2 >= 0; si2--) {
+          if (arr[si2].coinToss === curCoin) curStreak++;
+          else break;
+        }
+        // 统计显著性：最长连续段长度 L 在 N 次抛掷中出现的概率
+        // 近似公式 P(最长连续 ≥ L) ≈ 1 - exp(-N / 2^(L+1))
+        var L = maxLen;
+        var pVal = 1;
+        if (n > 0 && L > 0) {
+          pVal = 1 - Math.exp(-n / Math.pow(2, L + 1));
+          if (pVal < 0) pVal = 0;
+        }
+        // 期望最长连续长度 ≈ log2(N) + 1/3
+        var expectedMax = Math.log2(n) + 0.333;
+        // 严重程度评分 0~100（基于与期望值的偏离程度）
+        var diff = L - expectedMax;
+        var score = Math.min(100, Math.max(0, Math.round((diff / (expectedMax > 3 ? 3 : 2)) * 100)));
+        // 严重程度等级
+        var severity;
+        if (pVal > 0.05) severity = '正常';
+        else if (pVal > 0.01) severity = '⚠️ 偏高';
+        else if (pVal > 0.001) severity = '🔴 显著';
+        else severity = '🔥 异常';
+        // 极端情况：L 很小但 n 很大时 pVal 也小，但此时不视为异常
+        if (L <= 2) { severity = '正常'; score = 0; }
+        return {
+          current: { type: curCoin, length: curStreak },
+          longest: { type: maxType, length: maxLen },
+          severity: severity,
+          severityScore: score,
+          pValue: pVal,
+          expectedMax: expectedMax.toFixed(1)
+        };
+      })(),
+      // ── 硬币偏斜检测（总体比例是否偏离 50%）──
+      bias: (function() {
+        var h = coinWins, t = coinLosses, n = h + t;
+        if (n < 10) return { heads: h, tails: t, pct: '—', zScore: 0, severity: '—', severityScore: 0 };
+        var expected = n / 2;
+        var se = Math.sqrt(n) / 2;  // 标准误 = sqrt(n * 0.5 * 0.5)
+        var z = Math.abs(h - expected) / se;
+        var pct = ((h / n) * 100).toFixed(1);
+        var score = Math.min(100, Math.round((z / 4) * 100));
+        var severity;
+        if (z < 2) severity = '正常';
+        else if (z < 3) severity = '⚠️ 偏高';
+        else if (z < 4) severity = '🔴 显著';
+        else severity = '🔥 异常';
+        return { heads: h, tails: t, pct: pct, zScore: z, severity: severity, severityScore: score };
+      })()
     },
-    coinHistory: matches.filter(function(m) { return m.coinToss === true || m.coinToss === false; }).map(function(m) {
-      return { coinToss: m.coinToss, result: m.result, goingFirst: m.goingFirst };
-    }),
+    coinHistory: coinHistory,
     resultHistory: matches.map(function(m) { return m.result; }),
     deckResults: (function() {
       var dr = {};
@@ -928,6 +1003,7 @@ function getDefaultCycleConfig() {
       { type: 'handtrapRate', enabled: true, label: '吃G率' },
       { type: 'coinRate', enabled: true, label: '硬币率' },
       { type: 'coinTrend', enabled: true, label: '硬币胜率趋势' },
+      { type: 'coinAnomaly', enabled: true, label: '硬币异常检测' },
       { type: 'totalMatches', enabled: true, label: '总场次' },
       { type: 'opponentRan', enabled: true, label: '吓跑对手' },
       { type: 'bigHand', enabled: true, label: '遇到大牌哥' },

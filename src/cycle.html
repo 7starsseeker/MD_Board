@@ -668,6 +668,48 @@
         };
       };
 
+      RENDERERS.coinAnomaly = function(s) {
+        var c = s.coin;
+        var curLabel = function(v) { return v === true ? '正' : (v === false ? '反' : '—'); };
+        // 默认值
+        var heads = c.wins, tails = c.losses, total = c.total;
+        var pct = total > 0 ? (heads / total * 100).toFixed(1) : '—';
+        var streakHtml = '', biasHtml = '', detailHtml = '';
+        // 连续检测
+        if (c.streak && c.total > 0) {
+          var st = c.streak;
+          var stClass = st.severityScore > 50 ? 'color:#ff6b62' : (st.severityScore > 20 ? 'color:#ffd700' : 'color:#e8e8f0');
+          streakHtml = '<div style="font-size:14px;color:var(--text-dim)">连续异常 </div><div style="font-size:22px;font-weight:800;line-height:1.2;' + stClass + '">' + st.severity + ' (' + st.severityScore + '%)</div>';
+          detailHtml += '<span style="color:#ffffff">最长 ' + curLabel(st.longest.type) + '×' + st.longest.length + '</span>';
+          if (st.current && st.current.length > 0) {
+            detailHtml += '  <span style="color:var(--text-dim)">· 当前 ' + curLabel(st.current.type) + '×' + st.current.length + '</span>';
+          }
+        }
+        // 偏斜检测
+        if (c.bias && c.bias.severity !== '—') {
+          var b = c.bias;
+          var bClass = b.severityScore > 50 ? 'color:#ff6b62' : (b.severityScore > 20 ? 'color:#ffd700' : 'color:#e8e8f0');
+          biasHtml = '<div style="font-size:14px;color:var(--text-dim)">偏斜异常 </div><div style="font-size:22px;font-weight:800;line-height:1.2;' + bClass + '">' + b.severity + ' (' + b.severityScore + '%)</div>';
+          if (detailHtml) detailHtml += '  ';
+          detailHtml += '<span style="color:var(--text-dim)">正:反 ' + b.heads + ':' + b.tails + '</span>';
+        }
+        var label = total > 0 ? pct + '%' : '—';
+        return {
+          label: label,
+          subLabel: '硬币 ' + heads + ':' + tails + ' · 共 ' + total + ' 场',
+          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:2px">' +
+                  '<div style="font-size:13px;color:var(--text-dim)">硬币 正:反 ' + heads + ':' + tails + '</div>' +
+                  '<div style="font-size:32px;font-weight:800;color:#ffd700;line-height:1.1">' + pct + '%</div>' +
+                  '<div style="display:flex;gap:24px;margin-top:4px">' +
+                    '<div style="text-align:center">' + streakHtml + '</div>' +
+                    '<div style="text-align:center">' + biasHtml + '</div>' +
+                  '</div>' +
+                  '<div style="font-size:12px;color:var(--text-dim);margin-top:3px">' + detailHtml + '</div>' +
+                '</div>' +
+                '<div class="big-label">硬币异常检测</div>'
+        };
+      };
+
       RENDERERS.coinTrend = function(s) {
         var history = s.coinHistory || [];
         if (history.length === 0) {
