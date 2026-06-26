@@ -18,6 +18,8 @@ function fmt(v) {
   var n = typeof v === 'string' ? parseFloat(v) : v;
   return isNaN(n) ? '0.0' : n.toFixed(1);
 }
+// 胜率颜色 >50%绿 <50%红 =50%白
+function winBarCls(r) { var v = parseFloat(r); return v > 50 ? 'green' : v < 50 ? 'red' : ''; }
 
 /** 填充 info 面板：单行 */
 function infoRow(label, value, cls) {
@@ -125,7 +127,7 @@ function renderWinPie(canvas, stats, options) {
       infoRow('平局', stats.draws, 'warn') +
       infoRow('异常', stats.abnormals) +
       infoSection('汇总') +
-      infoBar('胜率', wr, 'green') +
+      infoBar('胜率', wr, winBarCls(wr)) +
       (dw > 0 ? infoRow('平+异常', dw, 'warn') : '');
   }
   return canvas._chart;
@@ -178,13 +180,13 @@ function renderFirstSecondBar(canvas, stats, options) {
       infoRow('负', gf.losses, 'bad') +
       infoRow('平局', gf.draws || 0, 'warn') +
       infoRow('异常', gf.abnormals || 0) +
-      infoBar('胜率', gf.winRate || 0, 'green') +
+      infoBar('胜率', gf.winRate || 0, winBarCls(gf.winRate || 0)) +
       infoSection('后手') +
       infoRow('胜', gs.wins, 'good') +
       infoRow('负', gs.losses, 'bad') +
       infoRow('平局', gs.draws || 0, 'warn') +
       infoRow('异常', gs.abnormals || 0) +
-      infoBar('胜率', gs.winRate || 0, 'green');
+      infoBar('胜率', gs.winRate || 0, winBarCls(gs.winRate || 0));
   }
   return canvas._chart;
 }
@@ -239,6 +241,7 @@ function renderHandtrapPie(canvas, stats, options) {
     var gTotal = ht.gotMaxxc + ht.gotDroll + ht.gotJellyfish;
     var gRate = stats.total > 0 ? (gTotal / stats.total * 100) : 0;
     var nRate = stats.total > 0 ? (ht.gotNibiru / stats.total * 100) : 0;
+    var bf = ht.byFirst || {}, bs = ht.bySecond || {};
     var infoHtml =
       infoSection('精确计数') +
       infoRow('增殖的G', ht.gotMaxxc + ' 次') +
@@ -248,14 +251,20 @@ function renderHandtrapPie(canvas, stats, options) {
       infoRow('陨石', ht.gotNibiru + ' 次') +
       infoRow('大宇宙人', ht.gotDimension + ' 次') +
       infoRow('其他手坑', ht.gotSmallHT + ' 次') +
+      infoSection('先后手细分') +
+      infoRow('增殖的G', '先 ' + (bf.gotMaxxc||0) + ' / 后 ' + (bs.gotMaxxc||0)) +
+      infoRow('鸟G', '先 ' + (bf.gotDroll||0) + ' / 后 ' + (bs.gotDroll||0)) +
+      infoRow('水母G', '先 ' + (bf.gotJellyfish||0) + ' / 后 ' + (bs.gotJellyfish||0)) +
+      infoRow('锁鸟', '先 ' + (bf.gotLancea||0) + ' / 后 ' + (bs.gotLancea||0)) +
+      infoRow('陨石', '先 ' + (bf.gotNibiru||0) + ' / 后 ' + (bs.gotNibiru||0)) +
+      infoRow('大宇宙人', '先 ' + (bf.gotDimension||0) + ' / 后 ' + (bs.gotDimension||0)) +
+      infoRow('其他手坑', '先 ' + (bf.gotSmallHT||0) + ' / 后 ' + (bs.gotSmallHT||0)) +
       infoSection('汇总');
     // G 系列合计
-    infoHtml += infoRow('G系列合计', gTotal + ' 次') +
+    infoHtml += infoRow('先手吃G率', (stats.total > 0 ? ((bf.gotAnyG||0) / stats.total * 100).toFixed(1) : '0.0') + '%') +
+      infoRow('后手吃G率', (stats.total > 0 ? ((bs.gotAnyG||0) / stats.total * 100).toFixed(1) : '0.0') + '%') +
+      infoRow('G系列合计', gTotal + ' 次') +
       infoBar('吃G率', gRate, 'gold');
-    // 吃陨率
-    if (ht.gotNibiru > 0) {
-      infoHtml += infoBar('吃陨率', nRate, 'red');
-    }
     info.innerHTML = infoHtml;
   }
   return canvas._chart;
@@ -389,7 +398,7 @@ function renderBreakBoardPie(canvas, stats, options) {
       infoSection('汇总') +
       infoBar('突破成功率', sr, 'gold') +
       infoRow('', '(' + bb.success + '/' + totalSecond + ')') +
-      (bb.success > 0 ? infoBar('突破后胜率', swr, 'blue') : '') +
+      (bb.success > 0 ? infoBar('突破后胜率', swr, winBarCls(swr)) : '') +
       (bb.success > 0 ? infoRow('', '(' + bb.successWins + '/' + bb.success + ')') : '');
   }
   return canvas._chart;
@@ -443,7 +452,7 @@ function renderWinTrendLine(canvas, stats, options) {
       maintainAspectRatio: false,
       scales: {
         y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: function(v){return v+'%';} } },
-        x: { grid: { display: false } }
+        x: { grid: { display: false }, ticks: { display: false } }
       },
       plugins: {
         legend: { display: false }
@@ -530,7 +539,7 @@ function renderCoinTrendLine(canvas, stats, options) {
       maintainAspectRatio: false,
       scales: {
         y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { stepSize: 10, callback: function(v){return v+'%';} } },
-        x: { grid: { display: false }, ticks: { maxRotation: 0, font: { size: 9 } } }
+        x: { grid: { display: false }, ticks: { display: false } }
       },
       plugins: { legend: { display: false } }
     },
@@ -761,7 +770,7 @@ function renderCoinPie(canvas, stats, options) {
       infoRow('硬币局数', c.total + ' 场', 'info') +
       infoRow('占总对局', cRatio + '%') +
       infoSection('汇总') +
-      infoBar('硬币胜率', cWR, 'gold');
+      infoBar('硬币胜率', cWR, winBarCls(cWR));
   }
   return canvas._chart;
 }
@@ -1032,7 +1041,7 @@ function renderMistakeDoughnut(canvas, stats, options) {
       infoRow('无失误', noMistake, 'good') +
       infoSection('汇总') +
       infoBar('失误率', m.rate || 0, 'red') +
-      infoBar('失误时胜率', m.winRate || 0, 'gold');
+      infoBar('失误时胜率', m.winRate || 0, winBarCls(m.winRate || 0));
     // 按卡组分布
     if (m.byDeck && m.byDeck.length > 0) {
       ihtml += infoSection('按卡组分布');
@@ -1091,7 +1100,7 @@ function renderOpponentT0Doughnut(canvas, stats, options) {
       infoSection('被T0时') +
       infoRow('胜', t.wins, 'good') +
       infoRow('负', t.losses, 'bad') +
-      infoBar('胜率', t0Wr, 'gold');
+      infoBar('胜率', t0Wr, winBarCls(t0Wr));
     // 按卡组分布
     if (t.byDeck && t.byDeck.length > 0) {
       ihtml += infoSection('遇到T0动最多的对手卡组');
@@ -1153,6 +1162,22 @@ function renderOpponentRanGauge(canvas, stats, options) {
     var ihtml =
       infoRow('吓跑次数', or.total + ' 次', 'warn') +
       infoBar('占总对局比', ranRate, 'gold');
+    // 先手细分
+    if (or.firstTotal > 0) {
+      var fe = or.firstEndboard;
+      ihtml += infoSection('先手·跑时终场状况');
+      ihtml += infoRow('正常终场后跑了', fe.normal + ' 次');
+      ihtml += infoRow('妥协场后跑了', fe.compromised + ' 次');
+      ihtml += infoRow('没做出来对方跑了', fe.stopped + ' 次');
+    }
+    // 后手细分
+    if (or.secondTotal > 0) {
+      var sb = or.secondBroke;
+      ihtml += infoSection('后手·跑时突破状况');
+      ihtml += infoRow('不须突破直接跑了', sb.notNeeded + ' 次');
+      ihtml += infoRow('成功突破后跑了', sb.success + ' 次');
+      ihtml += infoRow('没突破成功也跑了', sb.failed + ' 次');
+    }
     // 按卡组分布
     if (or.byDeck && or.byDeck.length > 0) {
       ihtml += infoSection('按自用卡组');
@@ -1377,14 +1402,14 @@ function renderTimeoutPie(canvas, stats, options) {
 function renderBigHandGauge(canvas, stats, options) {
   destroyChart(canvas._chart);
   var ctx = canvas.getContext('2d');
-  var bh = stats.bigHand || 0;
-  if (bh === 0) { canvas._chart = null; return null; }
+  var bh = stats.bigHand || { total: 0 };
+  if (bh.total === 0) { canvas._chart = null; return null; }
   canvas._chart = new Chart(ctx, {
     type: 'doughnut',
     data: {
       labels: ['遇到大牌哥', ''],
       datasets: [{
-        data: [bh, Math.max(bh, 5)],
+        data: [bh.total, Math.max(bh.total, 5)],
         backgroundColor: ['#ff2d55', 'rgba(255,255,255,0.12)'],
         borderWidth: 0
       }]
@@ -1404,7 +1429,7 @@ function renderBigHandGauge(canvas, stats, options) {
         ctx2.textBaseline = 'middle';
         ctx2.font = 'bold 32px monospace';
         ctx2.fillStyle = '#ff2d55';
-        ctx2.fillText(bh + '🃏', w / 2, h / 2 - 6);
+        ctx2.fillText(bh.total + '🃏', w / 2, h / 2 - 6);
         ctx2.font = '13px sans-serif';
         ctx2.fillStyle = '#e8e8f0';
         ctx2.fillText('遇到大牌哥', w / 2, h / 2 + 20);
@@ -1415,11 +1440,14 @@ function renderBigHandGauge(canvas, stats, options) {
   var info = options && options.infoEl;
   if (info) {
     info.className = 'chart-info active';
-    var bhRate = stats.total > 0 ? (bh / stats.total * 100) : 0;
+    var bhRate = stats.total > 0 ? (bh.total / stats.total * 100) : 0;
     var hs = stats.handState || {};
     info.innerHTML =
-      infoRow('遇到大牌哥次数', bh + ' 次', 'bad') +
+      infoRow('遇到大牌哥次数', bh.total + ' 次', 'bad') +
       infoBar('占总对局比', bhRate, 'red') +
+      infoSection('先后手细分') +
+      infoRow('先手', bh.first + ' 次') +
+      infoRow('后手', bh.second + ' 次') +
       infoSection('关联统计') +
       infoRow('自己卡手次数', ((hs.cantPlay||0) + (hs.cantPlayGarnet||0) + (hs.cantPlayDuplicate||0) + (hs.cantPlayHT||0)) + ' 次');
   }
@@ -1505,13 +1533,10 @@ function renderDeckOutChart(canvas, stats, options) {
   var info = options && options.infoEl;
   if (info) {
     info.className = 'chart-info active';
-    var swr = parseFloat(d.selfWinRate) || 0;
     info.innerHTML =
       infoRow('抽干总次数', d.total + ' 次', 'info') +
       infoRow('抽干对手', d.opponent + ' 次', 'good') +
-      infoRow('自己抽干', d.self + ' 次', 'bad') +
-      infoSection('汇总') +
-      infoBar('自己抽干时胜率', swr, 'blue');
+      infoRow('自己抽干', d.self + ' 次', 'bad');
   }
   return canvas._chart;
 }
@@ -1701,13 +1726,13 @@ function renderRankedStats(canvas, stats, options) {
     if (hasPromo && rs.promotion.oppDecks && rs.promotion.oppDecks.length > 0) {
       ihtml += infoSection('🔥 晋级赛对手');
       rs.promotion.oppDecks.slice(0, 5).forEach(function(d) {
-        ihtml += infoRow(d.deck, d.wins + 'W ' + d.losses + 'L ' + d.winRate + '%');
+        ihtml += infoRow(d.deck, d.wins + 'W ' + d.losses + 'L ' + d.winRate + '%', winBarCls(d.winRate));
       });
     }
     if (hasReleg && rs.relegation.oppDecks && rs.relegation.oppDecks.length > 0) {
       ihtml += infoSection('💧 保级赛对手');
       rs.relegation.oppDecks.slice(0, 5).forEach(function(d) {
-        ihtml += infoRow(d.deck, d.wins + 'W ' + d.losses + 'L ' + d.winRate + '%');
+        ihtml += infoRow(d.deck, d.wins + 'W ' + d.losses + 'L ' + d.winRate + '%', winBarCls(d.winRate));
       });
     }
     info.innerHTML = ihtml || infoRow('', '暂无对手卡组数据');

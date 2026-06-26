@@ -157,6 +157,24 @@ function computeStats() {
   const gotAnyG = matches.filter(m => m.gotMaxxc || m.gotDroll || m.gotJellyfish).length;
   const gotDimension = matches.filter(m => m.gotDimension).length;
   const gotSmallHT = matches.filter(m => m.gotSmallHT).length;
+  // 手坑先后手细分
+  const gotMaxxcFirst = matches.filter(m => m.gotMaxxc && m.goingFirst).length;
+  const gotMaxxcSecond = matches.filter(m => m.gotMaxxc && !m.goingFirst).length;
+  const gotDrollFirst = matches.filter(m => m.gotDroll && m.goingFirst).length;
+  const gotDrollSecond = matches.filter(m => m.gotDroll && !m.goingFirst).length;
+  const gotJellyfishFirst = matches.filter(m => m.gotJellyfish && m.goingFirst).length;
+  const gotJellyfishSecond = matches.filter(m => m.gotJellyfish && !m.goingFirst).length;
+  const gotLanceaFirst = matches.filter(m => m.gotLancea && m.goingFirst).length;
+  const gotLanceaSecond = matches.filter(m => m.gotLancea && !m.goingFirst).length;
+  const gotNibiruFirst = matches.filter(m => m.gotNibiru && m.goingFirst).length;
+  const gotNibiruSecond = matches.filter(m => m.gotNibiru && !m.goingFirst).length;
+  const gotDimensionFirst = matches.filter(m => m.gotDimension && m.goingFirst).length;
+  const gotDimensionSecond = matches.filter(m => m.gotDimension && !m.goingFirst).length;
+  const gotSmallHTFirst = matches.filter(m => m.gotSmallHT && m.goingFirst).length;
+  const gotSmallHTSecond = matches.filter(m => m.gotSmallHT && !m.goingFirst).length;
+  // 吃G率先后手细分
+  const gotAnyGFirst = matches.filter(m => (m.gotMaxxc || m.gotDroll || m.gotJellyfish) && m.goingFirst).length;
+  const gotAnyGSecond = matches.filter(m => (m.gotMaxxc || m.gotDroll || m.gotJellyfish) && !m.goingFirst).length;
 
   // ── 卡手统计 ──
   const cantPlay = matches.filter(m => m.cantPlay || m.bothStuck).length;
@@ -193,7 +211,10 @@ function computeStats() {
   });
 
   // ── 对手大牌哥 ──
-  const bigHand = matches.filter(m => m.opponentBigHand).length;
+  const bigHandMatches = matches.filter(m => m.opponentBigHand);
+  const bigHandTotal = bigHandMatches.length;
+  const bigHandFirst = bigHandMatches.filter(m => m.goingFirst).length;
+  const bigHandSecond = bigHandMatches.filter(m => !m.goingFirst).length;
 
   // ── 对手 T0 动 ──
   const opponentT0 = matches.filter(m => m.opponentT0).length;
@@ -264,6 +285,24 @@ function computeStats() {
     if (!opponentRanByDeck[deck]) opponentRanByDeck[deck] = 0;
     opponentRanByDeck[deck]++;
   });
+  // 吓跑对手 - 先手终场类型细分
+  const opponentRanFirst = opponentRanMatches.filter(m => m.goingFirst);
+  const opponentRanFirstEndboard = {
+    normal: opponentRanFirst.filter(m => m.endboardState === 'normal').length,
+    compromised: opponentRanFirst.filter(m => m.endboardState === 'compromised').length,
+    stopped: opponentRanFirst.filter(m => m.endboardState === 'stopped').length,
+    other: opponentRanFirst.filter(m => m.endboardState && m.endboardState !== 'normal' && m.endboardState !== 'compromised' && m.endboardState !== 'stopped').length,
+    noEndboard: opponentRanFirst.filter(m => !m.endboardState).length
+  };
+  // 吓跑对手 - 后手突破类型细分
+  const opponentRanSecond = opponentRanMatches.filter(m => !m.goingFirst);
+  const opponentRanSecondBroke = {
+    notNeeded: opponentRanSecond.filter(m => m.brokeBoard === 'not_applicable').length,
+    success: opponentRanSecond.filter(m => m.brokeBoard === true || m.brokeBoard === 'true').length,
+    failed: opponentRanSecond.filter(m => m.brokeBoard === false || m.brokeBoard === 'false').length,
+    other: opponentRanSecond.filter(m => m.brokeBoard && m.brokeBoard !== 'not_applicable' && m.brokeBoard !== true && m.brokeBoard !== 'true' && m.brokeBoard !== false && m.brokeBoard !== 'false').length,
+    noBroke: opponentRanSecond.filter(m => !m.brokeBoard).length
+  };
 
   // ── 自用卡组统计 ──
   const myDeckStats = {};
@@ -492,7 +531,10 @@ function computeStats() {
       gotMaxxc, gotDroll, gotJellyfish, gotLancea, gotNibiru, gotAnyG, gotDimension, gotSmallHT,
       maxxcRate: total > 0 ? ((gotMaxxc / total) * 100).toFixed(1) : '0.0',
       anyGRate: total > 0 ? ((gotAnyG / total) * 100).toFixed(1) : '0.0',
-      nibiruRate: total > 0 ? ((gotNibiru / total) * 100).toFixed(1) : '0.0'
+      nibiruRate: total > 0 ? ((gotNibiru / total) * 100).toFixed(1) : '0.0',
+      // 先后手细分（向后兼容，原有字段不变）
+      byFirst: { gotMaxxc: gotMaxxcFirst, gotDroll: gotDrollFirst, gotJellyfish: gotJellyfishFirst, gotLancea: gotLanceaFirst, gotNibiru: gotNibiruFirst, gotDimension: gotDimensionFirst, gotSmallHT: gotSmallHTFirst, gotAnyG: gotAnyGFirst },
+      bySecond: { gotMaxxc: gotMaxxcSecond, gotDroll: gotDrollSecond, gotJellyfish: gotJellyfishSecond, gotLancea: gotLanceaSecond, gotNibiru: gotNibiruSecond, gotDimension: gotDimensionSecond, gotSmallHT: gotSmallHTSecond, gotAnyG: gotAnyGSecond }
     },
     handState: {
       cantPlay, cantPlayGarnet, cantPlayDuplicate, cantPlayHT,
@@ -513,7 +555,11 @@ function computeStats() {
         .sort((a, b) => b[1] - a[1])
         .map(([deck, count]) => ({ deck, count }))
     },
-    bigHand,
+    bigHand: {
+      total: bigHandTotal,
+      first: bigHandFirst,
+      second: bigHandSecond
+    },
     opponentT0: {
       total: opponentT0,
       wins: opponentT0Wins,
@@ -574,7 +620,13 @@ function computeStats() {
       rate: total > 0 ? ((opponentRanCount / total) * 100).toFixed(1) : '0.0',
       byDeck: Object.entries(opponentRanByDeck)
         .sort((a, b) => b[1] - a[1])
-        .map(([deck, count]) => ({ deck, count }))
+        .map(([deck, count]) => ({ deck, count })),
+      // 先手细分：对手跑时场面状态
+      firstTotal: opponentRanFirst.length,
+      firstEndboard: opponentRanFirstEndboard,
+      // 后手细分：对手跑时突破状态
+      secondTotal: opponentRanSecond.length,
+      secondBroke: opponentRanSecondBroke
     },
     // 趣味统计
     typhon: {
@@ -681,7 +733,7 @@ function createControlWindow() {
   const state = loadWindowState();
 
   controlWin = new BrowserWindow({
-    width: state.controlWidth || 520,
+    width: state.controlWidth || 580,
     height: state.controlHeight || 640,
     x: state.controlX || 100,
     y: state.controlY || 100,
@@ -737,10 +789,11 @@ ipcMain.handle('stats:open-window', () => {
   }
 
   statsWin = new BrowserWindow({
-    width: 800,
+    width: 1100,
     height: 640,
     frame: false,
     resizable: true,
+    alwaysOnTop: true,
     title: 'MD Stats - 详细统计',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

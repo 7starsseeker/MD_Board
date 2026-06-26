@@ -184,10 +184,24 @@
       padding: 5px 0;
       font-size: 13px;
       border-bottom: 1px solid rgba(255,255,255,0.03);
+      gap: 6px;
     }
     .stat-row:last-child { border-bottom: none; }
-    .stat-row .label { color: var(--text-dim); }
-    .stat-row .value { font-weight: 700; font-family: var(--font-mono); color: var(--text-bright); }
+    .stat-row .label {
+      color: var(--text-dim);
+      min-width: 185px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .stat-row .value {
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--text-bright);
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
     .stat-row .value.good { color: #4cd964; }
     .stat-row .value.bad { color: #ff3b30; }
     .stat-row .value.warn { color: #ffc832; }
@@ -198,6 +212,8 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-shrink: 0;
+      white-space: nowrap;
     }
     .bar-track {
       width: 100px;
@@ -360,7 +376,7 @@
         <div class="card-icon" style="background:rgba(200,100,255,0.12)">🛡️</div>
         <div>
           <div class="card-title-text">吃手坑统计</div>
-          <div class="card-subtitle">增殖的G / 陨石 / 鸟G / 锁鸟 / 大宇宙人 / 其他</div>
+          <div class="card-subtitle">增殖的G / 陨石 / 鸟G / 锁鸟 / 大宇宙人 / 其他 · 含先后手细分</div>
         </div>
       </div>
       <div id="handtrap-content"></div>
@@ -396,7 +412,7 @@
         <div class="card-icon" style="background:rgba(255,150,50,0.12)">🏃</div>
         <div>
           <div class="card-title-text">吓跑对手情况</div>
-          <div class="card-subtitle">吓跑对手次数 · 按自用卡组分布</div>
+          <div class="card-subtitle">吓跑对手次数 · 含终场/突破细分</div>
         </div>
       </div>
       <div id="opponent-ran-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
@@ -480,7 +496,7 @@
         <div class="card-icon" style="background:rgba(100,200,255,0.12)">📦</div>
         <div>
           <div class="card-title-text">抽干牌组统计</div>
-          <div class="card-subtitle">抽干牌组次数及胜负</div>
+          <div class="card-subtitle">抽干牌组次数</div>
         </div>
       </div>
       <div id="deckout-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
@@ -492,7 +508,7 @@
         <div class="card-icon" style="background:rgba(255,45,85,0.12)">🃏</div>
         <div>
           <div class="card-title-text">遇到大牌哥情况统计</div>
-          <div class="card-subtitle">遇到大牌哥登场次数</div>
+          <div class="card-subtitle">遇到大牌哥次数 · 含先后手细分</div>
         </div>
       </div>
       <div id="bighand-content"><span style="color:var(--text-dim);font-size:12px">暂无数据</span></div>
@@ -608,6 +624,9 @@
       Chart.defaults.color = '#ffffff';
 
       function fmt(v) { return v === '0.0' ? '0.0' : v; }
+      // 胜率颜色：>50%绿 <50%红 =50%白
+      function winCls(rate) { var v = parseFloat(rate); return v > 50 ? 'good' : v < 50 ? 'bad' : ''; }
+      function winColor(rate) { var v = parseFloat(rate); return v > 50 ? '#4cd964' : v < 50 ? '#ff3b30' : '#e8e8f0'; }
 
       // ═══ 概览大数字 ═══
       function renderHero(stats) {
@@ -625,10 +644,10 @@
         var gfRate = parseFloat(gf.winRate) || 0;
         var gsRate = parseFloat(gs.winRate) || 0;
         document.getElementById('first-second-content').innerHTML =
-          '<div class="stat-row"><span class="label">先手</span><span class="value info">' + gf.wins + '胜 ' + gf.losses + '负</span><span style="font-size:11px;color:var(--text-dim)">共 ' + gf.total + ' 场</span></div>' +
-          '<div class="stat-row"><span class="label"></span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill blue" style="width:' + gfRate + '%"></div></div><span class="value info">' + fmt(gf.winRate) + '%</span></div></div>' +
-          '<div class="stat-row"><span class="label">后手</span><span class="value warn">' + gs.wins + '胜 ' + gs.losses + '负</span><span style="font-size:11px;color:var(--text-dim)">共 ' + gs.total + ' 场</span></div>' +
-          '<div class="stat-row"><span class="label"></span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + gsRate + '%"></div></div><span class="value warn">' + fmt(gs.winRate) + '%</span></div></div>' +
+          '<div class="stat-row"><span class="label">先手</span><span class="value ' + winCls(gf.winRate) + '">' + gf.wins + '胜 ' + gf.losses + '负</span><span style="font-size:11px;color:var(--text-dim)">共 ' + gf.total + ' 场</span></div>' +
+          '<div class="stat-row"><span class="label"></span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill blue" style="width:' + gfRate + '%"></div></div><span class="value ' + winCls(gf.winRate) + '">' + fmt(gf.winRate) + '%</span></div></div>' +
+          '<div class="stat-row"><span class="label">后手</span><span class="value ' + winCls(gs.winRate) + '">' + gs.wins + '胜 ' + gs.losses + '负</span><span style="font-size:11px;color:var(--text-dim)">共 ' + gs.total + ' 场</span></div>' +
+          '<div class="stat-row"><span class="label"></span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + gsRate + '%"></div></div><span class="value ' + winCls(gs.winRate) + '">' + fmt(gs.winRate) + '%</span></div></div>' +
           '<div class="stat-row" style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">' +
             '<span class="label">先手平局</span><span class="value">' + gf.draws + '</span>' +
             '<span class="label">先手异常</span><span class="value">' + gf.abnormals + '</span></div>' +
@@ -645,7 +664,7 @@
         var html =
           '<div class="stat-row"><span class="label">硬币胜</span><span class="value good">' + c.wins + '</span></div>' +
           '<div class="stat-row"><span class="label">硬币负</span><span class="value bad">' + c.losses + '</span></div>' +
-          '<div class="stat-row"><span class="label">硬币胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + cr + '%"></div></div><span class="value warn">' + fmt(c.winRate) + '%</span></div></div>' +
+          '<div class="stat-row"><span class="label">硬币胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + cr + '%"></div></div><span class="value ' + winCls(c.winRate) + '">' + fmt(c.winRate) + '%</span></div></div>' +
           '<div class="stat-row"><span class="label">记录次数</span><span class="value">' + c.total + '/' + stats.total + '</span></div>';
         // 连正/连反分析
         if (c.streak && c.total > 0) {
@@ -684,7 +703,8 @@
         var agR = t > 0 ? ((h.gotAnyG / t) * 100).toFixed(1) : '0.0';
         var diR = t > 0 ? ((h.gotDimension / t) * 100).toFixed(1) : '0.0';
         var smR = t > 0 ? ((h.gotSmallHT / t) * 100).toFixed(1) : '0.0';
-        document.getElementById('handtrap-content').innerHTML =
+        var bf = h.byFirst || {}, bs = h.bySecond || {};
+        var html =
           '<div class="stat-row"><span class="label">增殖的G</span><span class="value">' + h.gotMaxxc + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + mxR + '%</span></div>' +
           '<div class="stat-row"><span class="label">鸟G</span><span class="value">' + h.gotDroll + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + drR + '%</span></div>' +
           '<div class="stat-row"><span class="label">水母G</span><span class="value">' + h.gotJellyfish + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + jfR + '%</span></div>' +
@@ -692,8 +712,18 @@
           '<div class="stat-row"><span class="label">陨石</span><span class="value">' + h.gotNibiru + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + niR + '%</span></div>' +
           '<div class="stat-row"><span class="label">大宇宙人 / 次元系</span><span class="value">' + h.gotDimension + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + diR + '%</span></div>' +
           '<div class="stat-row"><span class="label">其他手坑</span><span class="value">' + h.gotSmallHT + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + smR + '%</span></div>' +
-          '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label">吃G率（G+鸟G+水母G）</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill purple" style="width:' + parseFloat(agR) + '%"></div></div><span class="value info">' + fmt(agR) + '%</span></div></div>' +
-          '<div class="stat-row"><span class="label">吃陨率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(niR) + '%"></div></div><span class="value info">' + fmt(niR) + '%</span></div></div>';
+          '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label">吃G率（一场对局中吃到G+鸟G+水母G）</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill purple" style="width:' + parseFloat(agR) + '%"></div></div><span class="value info">' + fmt(agR) + '%</span><span style="font-size:11px;color:var(--text-dim)">（' + h.gotAnyG + ' 次）</span></div></div>' +
+          '<div style="margin-top:5px;border-top:1px solid var(--border);padding-top:5px"><span style="font-size:11px;color:var(--accent);font-weight:600">先后手细分</span></div>' +
+          '<div class="stat-row"><span class="label">增殖的G</span><span class="value">先 ' + (bf.gotMaxxc||0) + ' / 后 ' + (bs.gotMaxxc||0) + '</span></div>' +
+          '<div class="stat-row"><span class="label">鸟G</span><span class="value">先 ' + (bf.gotDroll||0) + ' / 后 ' + (bs.gotDroll||0) + '</span></div>' +
+          '<div class="stat-row"><span class="label">水母G</span><span class="value">先 ' + (bf.gotJellyfish||0) + ' / 后 ' + (bs.gotJellyfish||0) + '</span></div>' +
+          '<div class="stat-row"><span class="label">锁鸟</span><span class="value">先 ' + (bf.gotLancea||0) + ' / 后 ' + (bs.gotLancea||0) + '</span></div>' +
+          '<div class="stat-row"><span class="label">陨石</span><span class="value">先 ' + (bf.gotNibiru||0) + ' / 后 ' + (bs.gotNibiru||0) + '</span></div>' +
+          '<div class="stat-row"><span class="label">大宇宙人</span><span class="value">先 ' + (bf.gotDimension||0) + ' / 后 ' + (bs.gotDimension||0) + '</span></div>' +
+          '<div class="stat-row"><span class="label">其他手坑</span><span class="value">先 ' + (bf.gotSmallHT||0) + ' / 后 ' + (bs.gotSmallHT||0) + '</span></div>' +
+          '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:5px;margin-top:3px"><span class="label">先手吃G率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill purple" style="width:' + (t > 0 ? ((bf.gotAnyG||0) / t * 100) : 0) + '%"></div></div><span class="value info">' + (t > 0 ? ((bf.gotAnyG||0) / t * 100).toFixed(1) : '0.0') + '%</span><span style="font-size:11px;color:var(--text-dim)">（' + (bf.gotAnyG||0) + ' 次）</span></div></div>' +
+          '<div class="stat-row"><span class="label">后手吃G率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill purple" style="width:' + (t > 0 ? ((bs.gotAnyG||0) / t * 100) : 0) + '%"></div></div><span class="value info">' + (t > 0 ? ((bs.gotAnyG||0) / t * 100).toFixed(1) : '0.0') + '%</span><span style="font-size:11px;color:var(--text-dim)">（' + (bs.gotAnyG||0) + ' 次）</span></div></div>';
+        document.getElementById('handtrap-content').innerHTML = html;
       }
 
       // ═══ 手牌状态 ═══
@@ -724,7 +754,7 @@
           '<div class="stat-row"><span class="label">严重失误次数</span><span class="value bad">' + m.total + ' 次</span><span style="font-size:11px;color:var(--text-dim)">占 ' + fmt(m.rate) + '%</span></div>' +
           '<div class="stat-row"><span class="label">严重失误时胜场</span><span class="value good">' + m.wins + '</span></div>' +
           '<div class="stat-row"><span class="label">严重失误时负场</span><span class="value bad">' + m.losses + '</span></div>' +
-          '<div class="stat-row"><span class="label">严重失误时胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(m.winRate) + '%"></div></div><span class="value warn">' + fmt(m.winRate) + '%</span></div></div>';
+          '<div class="stat-row"><span class="label">严重失误时胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(m.winRate) + '%"></div></div><span class="value ' + winCls(m.winRate) + '">' + fmt(m.winRate) + '%</span></div></div>';
         if (m.byDeck && m.byDeck.length > 0) {
           html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span style="font-size:11px;color:var(--accent);font-weight:600">各卡组严重失误分布</span></div>';
           m.byDeck.forEach(function(d) {
@@ -744,6 +774,26 @@
         var html =
           '<div class="stat-row"><span class="label">吓跑对手次数</span><span class="value warn">' + or.total + ' 次</span></div>' +
           '<div class="stat-row"><span class="label">占总对局</span><span class="value">' + fmt(or.rate) + '%</span></div>';
+        // 先手细分
+        if (or.firstTotal > 0) {
+          var fe = or.firstEndboard;
+          html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span style="font-size:11px;color:var(--accent);font-weight:600">先手 · 对手跑时终场状况</span></div>' +
+            '<div class="stat-row"><span class="label">正常终场后跑了</span><span class="value">' + fe.normal + ' 次</span></div>' +
+            '<div class="stat-row"><span class="label">妥协场后跑了</span><span class="value">' + fe.compromised + ' 次</span></div>' +
+            '<div class="stat-row"><span class="label">没做出来对方跑了</span><span class="value">' + fe.stopped + ' 次</span></div>';
+          if (fe.other > 0) html += '<div class="stat-row"><span class="label">其他</span><span class="value">' + fe.other + ' 次</span></div>';
+          if (fe.noEndboard > 0) html += '<div class="stat-row"><span class="label">未记录终场</span><span class="value text-dim">' + fe.noEndboard + ' 次</span></div>';
+        }
+        // 后手细分
+        if (or.secondTotal > 0) {
+          var sb = or.secondBroke;
+          html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span style="font-size:11px;color:var(--accent);font-weight:600">后手 · 对手跑时突破状况</span></div>' +
+            '<div class="stat-row"><span class="label">不需要突破直接跑了</span><span class="value">' + sb.notNeeded + ' 次</span></div>' +
+            '<div class="stat-row"><span class="label">成功突破后跑了</span><span class="value">' + sb.success + ' 次</span></div>' +
+            '<div class="stat-row"><span class="label">没突破成功也跑了</span><span class="value">' + sb.failed + ' 次</span></div>';
+          if (sb.other > 0) html += '<div class="stat-row"><span class="label">其他</span><span class="value">' + sb.other + ' 次</span></div>';
+          if (sb.noBroke > 0) html += '<div class="stat-row"><span class="label">未记录突破</span><span class="value text-dim">' + sb.noBroke + ' 次</span></div>';
+        }
         if (or.byDeck && or.byDeck.length > 0) {
           html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span style="font-size:11px;color:var(--accent);font-weight:600">按自己卡组分布</span></div>';
           html += '<table class="deck-table"><thead><tr><th>卡组</th><th style="text-align:center">吓跑次数</th></tr></thead><tbody>';
@@ -766,7 +816,7 @@
           '<div class="stat-row"><span class="label">对手T0动次数</span><span class="value warn">' + t.total + ' 次</span></div>' +
           '<div class="stat-row"><span class="label">其中赢了</span><span class="value good">' + t.wins + '</span></div>' +
           '<div class="stat-row"><span class="label">其中输了</span><span class="value bad">' + t.losses + '</span></div>' +
-          '<div class="stat-row"><span class="label">被T0动时胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + parseFloat(t.winRate) + '%"></div></div><span class="value warn">' + fmt(t.winRate) + '%</span></div></div>';
+          '<div class="stat-row"><span class="label">被T0动时胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + parseFloat(t.winRate) + '%"></div></div><span class="value ' + winCls(t.winRate) + '">' + fmt(t.winRate) + '%</span></div></div>';
         if (t.byDeck && t.byDeck.length > 0) {
           html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span style="font-size:11px;color:var(--accent);font-weight:600">遇到T0动最多的对手卡组</span></div>';
           t.byDeck.forEach(function(d) {
@@ -807,7 +857,7 @@
           (totalSecond > 0 ?
           '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label">突破成功率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + sr + '%"></div></div><span class="value warn">' + fmt(bb.successRate) + '%</span><span style="font-size:11px;color:var(--text-dim)">(' + bb.success + '/' + totalSecond + ')</span></div></div>' : '') +
           (bb.success > 0 ?
-          '<div class="stat-row"><span class="label">突破后胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill blue" style="width:' + swr + '%"></div></div><span class="value info">' + fmt(bb.successWinRate) + '%</span><span style="font-size:11px;color:var(--text-dim)">(' + bb.successWins + '/' + bb.success + ')</span></div></div>' : '');
+          '<div class="stat-row"><span class="label">突破后胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill blue" style="width:' + swr + '%"></div></div><span class="value ' + winCls(bb.successWinRate) + '">' + fmt(bb.successWinRate) + '%</span><span style="font-size:11px;color:var(--text-dim)">(' + bb.successWins + '/' + bb.success + ')</span></div></div>' : '');
       }
 
       // ═══ 连接异常 ═══
@@ -844,18 +894,25 @@
 
       // ═══ 对手大牌统计 ═══
       function renderBigHand(stats) {
-        var bh = stats.bigHand || 0;
+        var bh = stats.bigHand || { total: 0 };
         var el = document.getElementById('bighand-content');
-        if (bh === 0) {
+        if (bh.total === 0) {
           el.innerHTML = '<div style="padding:10px;text-align:center;color:var(--text-dim);font-size:12px">还没有对手大牌哥记录</div>'; return;
         }
-        var bhRate = stats.total > 0 ? (bh / stats.total * 100).toFixed(1) : '0.0';
+        var bhRate = stats.total > 0 ? (bh.total / stats.total * 100).toFixed(1) : '0.0';
         var hs = stats.handState || {};
         var selfStuck = (hs.cantPlay||0) + (hs.cantPlayGarnet||0) + (hs.cantPlayDuplicate||0) + (hs.cantPlayHT||0);
-        el.innerHTML =
-          '<div class="stat-row"><span class="label">遇到大牌哥次数</span><span class="value bad" style="font-size:18px">' + bh + ' 次</span></div>' +
-          '<div class="stat-row"><span class="label">占总对局比</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(bhRate) + '%"></div></div><span class="value bad">' + fmt(bhRate) + '%</span></div></div>' +
+        var html =
+          '<div class="stat-row"><span class="label">遇到大牌哥次数</span><span class="value bad" style="font-size:18px">' + bh.total + ' 次</span></div>' +
+          '<div class="stat-row"><span class="label">占总对局比</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(bhRate) + '%"></div></div><span class="value bad">' + fmt(bhRate) + '%</span></div></div>';
+        // 先后手细分
+        html += '<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:5px"><span style="font-size:11px;color:var(--accent);font-weight:600">先后手细分</span></div>' +
+          '<div class="stat-row"><span class="label">先手遇到大牌哥</span><span class="value">' + bh.first + ' 次</span>' +
+            '<span style="font-size:11px;color:var(--text-dim)">' + (bh.total > 0 ? ((bh.first / bh.total) * 100).toFixed(1) : '0.0') + '%</span></div>' +
+          '<div class="stat-row"><span class="label">后手遇到大牌哥</span><span class="value">' + bh.second + ' 次</span>' +
+            '<span style="font-size:11px;color:var(--text-dim)">' + (bh.total > 0 ? ((bh.second / bh.total) * 100).toFixed(1) : '0.0') + '%</span></div>' +
           '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label">自己卡手次数</span><span class="value warn">' + selfStuck + ' 次</span><span style="font-size:11px;color:var(--text-dim)">（参考对比）</span></div>';
+        el.innerHTML = html;
       }
 
       // ═══ 胜率趋势 ═══
@@ -916,7 +973,7 @@
             maintainAspectRatio: false,
             scales: {
               y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { callback: function(v){return v+'%';} } },
-              x: { grid: { display: false } }
+              x: { grid: { display: false }, ticks: { display: false } }
             },
             plugins: { legend: { display: false } }
           },
@@ -994,7 +1051,7 @@
             maintainAspectRatio: false,
             scales: {
               y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { stepSize: 10, callback: function(v){return v+'%';} } },
-              x: { grid: { display: false }, ticks: { maxRotation: 0, font: { size: 9 } } }
+              x: { grid: { display: false }, ticks: { display: false } }
             },
             plugins: { legend: { display: false } }
           },
@@ -1218,8 +1275,7 @@
         var html =
           '<div class="stat-row"><span class="label">抽干牌组次数</span><span class="value info">' + d.total + ' 次</span></div>' +
           '<div class="stat-row"><span class="label">抽干对手</span><span class="value good">' + d.opponent + '</span></div>' +
-          '<div class="stat-row"><span class="label">自己抽干</span><span class="value bad">' + d.self + '</span></div>' +
-          '<div class="stat-row"><span class="label">自己抽干时胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill blue" style="width:' + parseFloat(d.selfWinRate) + '%"></div></div><span class="value warn">' + fmt(d.selfWinRate) + '%</span></div></div>';
+          '<div class="stat-row"><span class="label">自己抽干</span><span class="value bad">' + d.self + '</span></div>';
         el.innerHTML = html;
       }
 
@@ -1242,8 +1298,8 @@
             '<td style="text-align:left">' +
               '<span style="display:inline-flex;align-items:center;gap:4px">' +
               '<span style="display:inline-block;width:100px;height:6px;background:rgba(255,255,255,0.12);border-radius:3px;vertical-align:middle">' +
-              '<span style="display:block;height:100%;border-radius:3px;background:#4cd964;width:' + (d.wins + d.losses > 0 ? (d.wins / (d.wins + d.losses) * 100) : 0) + '%"></span></span>' +
-              '<span style="font-weight:700;font-family:var(--font-mono);font-size:12px">' + d.winRate + '%</span></span>' +
+              '<span style="display:block;height:100%;border-radius:3px;width:' + (d.wins + d.losses > 0 ? (d.wins / (d.wins + d.losses) * 100) : 0) + '%;background:' + winColor(d.winRate) + '"></span></span>' +
+              '<span style="font-weight:700;font-family:var(--font-mono);font-size:12px;color:' + winColor(d.winRate) + '">' + d.winRate + '%</span></span>' +
             '</td></tr>';
         });
         html += '</tbody></table>';
@@ -1278,7 +1334,7 @@
           var subRate = (subWins + subLosses) > 0 ? ((subWins / (subWins + subLosses)) * 100).toFixed(1) : '0.0';
           html += '<div style="margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
             '<span style="font-weight:700;font-size:13px;color:var(--accent-bright)">🃏 ' + myDeck + '</span>' +
-            '<span style="font-size:11px;color:var(--text-dim)">共 ' + subTotal + ' 场 · 胜率 ' + subRate + '%</span></div>' +
+            '<span style="font-size:11px;color:var(--text-dim)">共 ' + subTotal + ' 场 · 胜率 </span><span style="font-weight:700;font-size:12px;color:' + winColor(subRate) + '">' + subRate + '%</span></div>' +
             '<table class="deck-table"><thead><tr><th>对手卡组</th><th style="text-align:center">总</th><th style="text-align:center;color:#4cd964">W</th><th style="text-align:center;color:#ff3b30">L</th><th style="text-align:left">胜率</th></tr></thead><tbody>';
           items.forEach(function(m) {
             var wr = (m.wins + m.losses) > 0 ? ((m.wins / (m.wins + m.losses)) * 100).toFixed(1) : '0.0';
@@ -1291,8 +1347,8 @@
               '<td style="text-align:left">' +
                 '<span style="display:inline-flex;align-items:center;gap:4px">' +
                 '<span style="display:inline-block;width:100px;height:6px;background:rgba(255,255,255,0.12);border-radius:3px;vertical-align:middle">' +
-                '<span style="display:block;height:100%;border-radius:3px;background:#4cd964;width:' + barW + '%"></span></span>' +
-                '<span style="font-weight:700;font-family:var(--font-mono);font-size:12px">' + wr + '%</span></span>' +
+                '<span style="display:block;height:100%;border-radius:3px;width:' + barW + '%;background:' + winColor(wr) + '"></span></span>' +
+                '<span style="font-weight:700;font-family:var(--font-mono);font-size:12px;color:' + winColor(wr) + '">' + wr + '%</span></span>' +
               '</td></tr>';
           });
           html += '</tbody></table></div>';
@@ -1313,10 +1369,10 @@
           if (!data) return '';
           var h = '<div style="margin-bottom:12px;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px;background:rgba(255,255,255,0.02)">' +
             '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:16px">' + icon + '</span><span style="font-weight:700;font-size:14px;color:' + color + '">' + label + '</span><span style="font-size:11px;color:var(--text-dim)">共 ' + data.total + ' 场 · 胜率 ' + data.winRate + '%</span></div>' +
-            '<div class="stat-row"><span class="label">对局胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill green" style="width:' + parseFloat(data.winRate) + '%"></div></div><span class="value good">' + data.winRate + '%</span></div></div>' +
-            '<div class="stat-row"><span class="label">硬币胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + parseFloat(data.coinWinRate) + '%"></div></div><span class="value warn">' + data.coinWinRate + '%</span></div></div>' +
-            '<div class="stat-row"><span class="label">先手胜率</span><span class="value info">' + data.firstWinRate + '%</span></div>' +
-            '<div class="stat-row"><span class="label">后手胜率</span><span class="value warn">' + data.secondWinRate + '%</span></div>' +
+            '<div class="stat-row"><span class="label">对局胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill green" style="width:' + parseFloat(data.winRate) + '%"></div></div><span class="value ' + winCls(data.winRate) + '">' + data.winRate + '%</span></div></div>' +
+            '<div class="stat-row"><span class="label">硬币胜率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + parseFloat(data.coinWinRate) + '%"></div></div><span class="value ' + winCls(data.coinWinRate) + '">' + data.coinWinRate + '%</span></div></div>' +
+            '<div class="stat-row"><span class="label">先手胜率</span><span class="value ' + winCls(data.firstWinRate) + '">' + data.firstWinRate + '%</span></div>' +
+            '<div class="stat-row"><span class="label">后手胜率</span><span class="value ' + winCls(data.secondWinRate) + '">' + data.secondWinRate + '%</span></div>' +
             '<div class="stat-row"><span class="label">卡手率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(data.cantPlayRate) + '%"></div></div><span class="value bad">' + data.cantPlayRate + '%</span></div></div>' +
             '<div class="stat-row"><span class="label">对手大牌率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(data.bigHandRate) + '%"></div></div><span class="value bad">' + data.bigHandRate + '%</span></div></div>';
           // 吃手坑情况
@@ -1329,15 +1385,12 @@
             '<div class="stat-row"><span class="label">陨石</span><span class="value">' + ht.gotNibiru + ' 次</span></div>' +
             '<div class="stat-row"><span class="label">大宇宙人</span><span class="value">' + ht.gotDimension + ' 次</span></div>' +
             '<div class="stat-row"><span class="label">其他手坑</span><span class="value">' + ht.gotSmallHT + ' 次</span></div>';
-          // 对手卡组分布
+          // 对手卡组分布（详细统计显示全部）
           if (data.oppDecks && data.oppDecks.length > 0) {
             h += '<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span style="font-size:11px;color:var(--accent);font-weight:600">对手卡组分布</span></div>';
-            data.oppDecks.slice(0, 5).forEach(function(d) {
-              h += '<div class="stat-row"><span class="label">' + d.deck + '</span><span class="value">' + d.wins + 'W ' + d.losses + 'L</span><span style="font-size:11px;color:var(--text-dim)">' + d.winRate + '%</span></div>';
+            data.oppDecks.forEach(function(d) {
+              h += '<div class="stat-row"><span class="label">' + d.deck + '</span><span class="value">' + d.wins + 'W ' + d.losses + 'L</span><span style="font-size:12px;font-weight:700;font-family:var(--font-mono);color:' + winColor(d.winRate) + '">' + d.winRate + '%</span></div>';
             });
-            if (data.oppDecks.length > 5) {
-              h += '<div style="font-size:10px;color:var(--text-dim);margin-top:2px">还有 ' + (data.oppDecks.length - 5) + ' 个卡组未显示</div>';
-            }
           }
           h += '</div>';
           return h;

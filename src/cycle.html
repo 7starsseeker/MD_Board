@@ -325,6 +325,8 @@
         var laR = t > 0 ? (ht.gotLancea / t * 100).toFixed(1) : '0.0';
         var niR = t > 0 ? (ht.gotNibiru / t * 100).toFixed(1) : '0.0';
         var agR = ht.anyGRate || (t > 0 ? (ht.gotAnyG / t * 100).toFixed(1) : '0.0');
+        var bf = ht.byFirst || {}, bs = ht.bySecond || {};
+        var detailHtml = '<div style="font-size:12px;color:var(--text-dim);margin-top:2px">先手 G' + (bf.gotMaxxc||0) + ' 鸟' + (bf.gotDroll||0) + ' 水母' + (bf.gotJellyfish||0) + ' 锁' + (bf.gotLancea||0) + ' 陨' + (bf.gotNibiru||0) + ' 宇宙人' + (bf.gotDimension||0) + ' 其他' + (bf.gotSmallHT||0) + ' · 后手 G' + (bs.gotMaxxc||0) + ' 鸟' + (bs.gotDroll||0) + ' 水母' + (bs.gotJellyfish||0) + ' 锁' + (bs.gotLancea||0) + ' 陨' + (bs.gotNibiru||0) + ' 宇宙人' + (bs.gotDimension||0) + ' 其他' + (bs.gotSmallHT||0) + '</div>';
         return {
           label: '吃G率 ' + agR + '%',
           subLabel: '吃锁率 ' + laR + '%',
@@ -334,7 +336,7 @@
                     '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#64c8ff">' + fmt(laR) + '%</div><div style="font-size:12px;color:#ffffff">锁鸟</div></div>' +
                     '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#ff3b30">' + fmt(niR) + '%</div><div style="font-size:12px;color:#ffffff">陨石</div></div>' +
                   '</div>' +
-                  '<div style="font-size:12px;color:#ffffff;text-align:center;margin-top:2px">增殖G ' + ht.gotMaxxc + ' · 鸟G ' + ht.gotDroll + ' · 水母G ' + ht.gotJellyfish + ' · 锁鸟 ' + ht.gotLancea + ' · 陨石 ' + ht.gotNibiru + ' · 大宇宙人 ' + ht.gotDimension + ' · 其他 ' + ht.gotSmallHT + '</div>' +
+                  '<div style="font-size:12px;color:#ffffff;text-align:center;margin-top:2px">增殖G ' + ht.gotMaxxc + ' · 鸟G ' + ht.gotDroll + ' · 水母G ' + ht.gotJellyfish + ' · 锁鸟 ' + ht.gotLancea + ' · 陨石 ' + ht.gotNibiru + ' · 大宇宙人 ' + ht.gotDimension + ' · 其他 ' + ht.gotSmallHT + '</div>' + detailHtml +
                 '</div>' +
                 '<div style="font-size:16px;color:var(--text-dim);margin-top:4px;text-align:center">手坑统计</div>'
         };
@@ -370,17 +372,29 @@
           return {
             label: '0',
             subLabel: '还没吓跑过对手',
-            html: '<div class="big-value" style="color:#e8e8f0">0</div><div class="big-label">还没吓跑过对手</div>'
+            html: '<div class="big-value" style="color:#e8e8f0;font-size:56px;line-height:1">0</div><div class="big-label" style="font-size:16px;margin-top:4px">还没吓跑过对手</div>'
           };
+        }
+        // 细分行
+        var detailHtml = '';
+        if (or.firstTotal > 0) {
+          var fe = or.firstEndboard;
+          detailHtml += '<div style="font-size:12px;color:var(--text-dim);margin-top:3px">先手: 正常终场后跑 ' + fe.normal +
+            ' · 妥协后跑 ' + fe.compromised + ' · 没做出来也跑 ' + fe.stopped + '</div>';
+        }
+        if (or.secondTotal > 0) {
+          var sb = or.secondBroke;
+          detailHtml += '<div style="font-size:12px;color:var(--text-dim);margin-top:3px">后手: 不需突破时跑 ' + sb.notNeeded +
+            ' · 成功突破后跑 ' + sb.success + ' · 没突破成也跑 ' + sb.failed + '</div>';
         }
         var best = or.byDeck && or.byDeck.length > 0 ? or.byDeck[0] : null;
         return {
           label: or.total + '',
           subLabel: '吓跑对手 ' + or.total + ' 次',
-          html: '<div class="big-value" style="color:#ffd700">' + or.total + ' <span style="font-size:36px">🏃</span></div>' +
-                '<div class="big-label">吓跑对手</div>' +
+          html: '<div class="big-value" style="color:#ffd700;font-size:56px;line-height:1">' + or.total + ' <span style="font-size:26px">🏃</span></div>' +
+                '<div class="big-label" style="font-size:16px;margin-top:4px">吓跑对手</div>' +
                 '<div class="sub-line" style="font-size:14px">占总对局 ' + fmt(or.rate) + '%' +
-                (best ? ' · 最多: ' + best.deck + ' (' + best.count + ')' : '') + '</div>'
+                (best ? ' · 最多: ' + best.deck + ' (' + best.count + ')' : '') + '</div>' + detailHtml
         };
       };
 
@@ -480,16 +494,17 @@
 
       RENDERERS.bigHand = function(s) {
         var bh = s.bigHand;
-        if (!bh || bh === 0) {
+        if (!bh || bh.total === 0) {
           return { label: '0', subLabel: '暂无遇到大牌哥记录', html: '<div class="big-value" style="color:#e8e8f0">0</div><div class="big-label">暂无遇到大牌哥记录</div>' };
         }
-        var rate = s.total > 0 ? (bh / s.total * 100).toFixed(1) : '0.0';
+        var rate = s.total > 0 ? (bh.total / s.total * 100).toFixed(1) : '0.0';
+        var detailHtml = '<div style="font-size:12px;color:var(--text-dim);margin-top:3px">先手 ' + bh.first + ' 次 · 后手 ' + bh.second + ' 次</div>';
         return {
-          label: bh + '',
-          subLabel: '遇到大牌哥 ' + bh + ' 次',
-          html: '<div class="big-value" style="color:#bf5af2">' + bh + ' <span style="font-size:36px">🃏</span></div>' +
+          label: bh.total + '',
+          subLabel: '遇到大牌哥 ' + bh.total + ' 次',
+          html: '<div class="big-value" style="color:#bf5af2">' + bh.total + ' <span style="font-size:36px">🃏</span></div>' +
                 '<div class="big-label">遇到大牌哥</div>' +
-                '<div class="sub-line">遭遇率 ' + fmt(rate) + '% · 总对局 ' + s.total + ' 场</div>'
+                '<div class="sub-line">遭遇率 ' + fmt(rate) + '% · 总对局 ' + s.total + ' 场</div>' + detailHtml
         };
       };
 
@@ -561,7 +576,7 @@
           subLabel: '抽干牌组 ' + d.total + ' 次',
           html: '<div class="big-value" style="color:#64c8ff">' + d.total + ' 📦</div>' +
                 '<div class="big-label">抽干牌组统计</div>' +
-                '<div class="sub-line">抽干对手 ' + d.opponent + ' · 自己抽干 ' + d.self + ' · 自己抽干时胜率 ' + fmt(d.selfWinRate) + '%</div>'
+                '<div class="sub-line">抽干对手 ' + d.opponent + ' · 自己抽干 ' + d.self + '</div>'
         };
       };
 
@@ -577,7 +592,7 @@
             '<span><span style="color:#4cd964;font-weight:700;font-family:var(--font-mono);font-size:15px">' + d.wins + '</span>' +
             '<span style="color:var(--text-dim);font-size:13px">/</span>' +
             '<span style="color:#ff3b30;font-weight:700;font-family:var(--font-mono);font-size:15px">' + d.losses + '</span>' +
-            ' <span style="font-weight:700;font-family:var(--font-mono);color:#64c8ff;font-size:15px">' + d.winRate + '%</span></span></div>';
+            ' <span style="font-weight:700;font-family:var(--font-mono);color:' + winClr(d.winRate) + ';font-size:15px">' + d.winRate + '%</span></span></div>';
         }).join('');
         return {
           label: decks.length + ' 套卡组',
@@ -599,7 +614,7 @@
             '<span><span style="color:#4cd964;font-weight:700;font-family:var(--font-mono);font-size:15px">' + d.wins + '</span>' +
             '<span style="color:var(--text-dim);font-size:13px">/</span>' +
             '<span style="color:#ff3b30;font-weight:700;font-family:var(--font-mono);font-size:15px">' + d.losses + '</span>' +
-            ' <span style="font-weight:700;font-family:var(--font-mono);color:#64c8ff;font-size:15px">' + d.winRate + '%</span></span></div>';
+            ' <span style="font-weight:700;font-family:var(--font-mono);color:' + winClr(d.winRate) + ';font-size:15px">' + d.winRate + '%</span></span></div>';
         }).join('');
         return {
           label: decks.length + ' 种对手',
@@ -620,7 +635,7 @@
             '<span style="color:var(--text-bright);font-size:12px">' + m.myDeck + '</span>' +
             '<span style="color:var(--text-dim);font-size:11px">vs</span>' +
             '<span style="color:var(--text);font-size:12px">' + m.opponentDeck + '</span>' +
-            ' <span style="font-weight:700;font-family:var(--font-mono);color:#64c8ff;font-size:13px">' + m.winRate + '%</span></span></div>';
+            ' <span style="font-weight:700;font-family:var(--font-mono);color:' + winClr(m.winRate) + ';font-size:13px">' + m.winRate + '%</span></span></div>';
         }).join('');
         return {
           label: matchups.length + ' 组对阵',
@@ -954,6 +969,7 @@
         var n = typeof v === 'string' ? parseFloat(v) : v;
         return isNaN(n) ? '0.0' : n.toFixed(1);
       }
+      function winClr(r) { var v = parseFloat(r); return v > 50 ? '#4cd964' : v < 50 ? '#ff3b30' : '#e8e8f0'; }
 
       // ═══ 绑定事件 ═══
       document.getElementById('btn-close').addEventListener('click', function() { window.close(); });

@@ -327,11 +327,11 @@
         </div>
       </div>
 
-      <!-- 对手直接跑了（仅先手+胜时显示） -->
+      <!-- 对手跑了（仅先手+胜时显示） -->
       <div class="conditional-section" id="section-opponent-ran">
         <div class="checkbox-row">
           <input type="checkbox" id="chk-opponent-ran">
-          <label for="chk-opponent-ran">🏃 对手直接跑了</label>
+          <label for="chk-opponent-ran">🏃 对手跑了</label>
         </div>
       </div>
     </div>
@@ -686,10 +686,9 @@
         return;
       }
       document.getElementById('section-firstmover').classList.remove('visible');
-      // 如果对手直接跑了，隐藏终场情况
-      var showEndboard = state.goingFirst === true && !state.opponentRan;
-      document.getElementById('section-first').classList.toggle('visible', showEndboard);
-      document.getElementById('section-t0').classList.toggle('visible', showEndboard);
+      // 对手跑了时仍显示终场情况（记录对手跑时的场面状态）
+      document.getElementById('section-first').classList.toggle('visible', state.goingFirst === true);
+      document.getElementById('section-t0').classList.toggle('visible', state.goingFirst === true);
       document.getElementById('section-opponent-ran').classList.toggle('visible', state.result === 'win');
       document.getElementById('section-second').classList.toggle('visible', state.goingFirst === false);
       // 切换先后手时重置条件区域的选中状态
@@ -708,15 +707,19 @@
     }
     firstBtn.addEventListener('click', updateConditionalSections);
     secondBtn.addEventListener('click', updateConditionalSections);
+    // 先后手切换时同时刷新投降锁状态
+    firstBtn.addEventListener('click', updateSurrenderLock);
+    secondBtn.addEventListener('click', updateSurrenderLock);
     updateConditionalSections();
 
     // 终场情况 (先手)
-    bindGroup([
+    var endboardBtns = [
       document.getElementById('endboard-stopped'),
       document.getElementById('endboard-compromise'),
       document.getElementById('endboard-normal'),
       document.getElementById('endboard-surrender')
-    ], 'endboardState');
+    ];
+    bindGroup(endboardBtns, 'endboardState');
 
     // 突破 (后手)
     var brokeBtns = [
@@ -726,6 +729,44 @@
       document.getElementById('broke-unnecessary')
     ];
     bindGroup(brokeBtns, 'brokeBoard');
+
+    // ── 投降 → 自动设结果为负，禁止改成胜 ──
+    function updateSurrenderLock() {
+      var isSurrender = state.endboardState === 'surrender' || state.brokeBoard === 'surrender';
+      if (isSurrender) {
+        // 自动设结果为负
+        state.result = 'loss';
+        document.querySelectorAll('#input-win, #input-loss, #input-draw, #input-abnormal').forEach(function(b) { b.classList.remove('active'); });
+        document.getElementById('input-loss').classList.add('active');
+        // 禁用胜按钮（视觉 + 点击隔离）
+        document.getElementById('input-win').style.opacity = '0.3';
+        document.getElementById('input-win').style.pointerEvents = 'none';
+        document.getElementById('input-win').title = '已投降，不可设为胜';
+        // 投降与对手跑互斥：投降时清除 opponentRan
+        if (state.opponentRan) {
+          state.opponentRan = false;
+          document.getElementById('chk-opponent-ran').checked = false;
+        }
+      } else {
+        // 恢复胜按钮
+        document.getElementById('input-win').style.opacity = '';
+        document.getElementById('input-win').style.pointerEvents = '';
+        document.getElementById('input-win').title = '';
+      }
+      updateConditionalSections();
+    }
+    // 终场投降点击
+    document.getElementById('endboard-surrender').addEventListener('click', updateSurrenderLock);
+    // 终场其他选项点击 → 解除锁
+    document.getElementById('endboard-stopped').addEventListener('click', updateSurrenderLock);
+    document.getElementById('endboard-compromise').addEventListener('click', updateSurrenderLock);
+    document.getElementById('endboard-normal').addEventListener('click', updateSurrenderLock);
+    // 突破投降点击
+    document.getElementById('broke-surrender').addEventListener('click', updateSurrenderLock);
+    // 突破其他选项点击 → 解除锁
+    document.getElementById('broke-yes').addEventListener('click', updateSurrenderLock);
+    document.getElementById('broke-no').addEventListener('click', updateSurrenderLock);
+    document.getElementById('broke-unnecessary').addEventListener('click', updateSurrenderLock);
 
     // 突破选择时显示/隐藏一回合斩杀
     function updateOtkSection() {
@@ -765,10 +806,7 @@
     bindCheckbox('chk-mistake', 'mistake');
     bindCheckbox('chk-opponent-ran', 'opponentRan');
     document.getElementById('chk-opponent-ran').addEventListener('change', function() {
-      if (this.checked) {
-        state.endboardState = null;
-        document.querySelectorAll('#section-first .btn').forEach(function(b) { b.classList.remove('active'); });
-      }
+      // opponentRan 不再清除终场选项，保留用户选择的终场/突破状态
       updateConditionalSections();
     });
     bindCheckbox('chk-t0', 'opponentT0');
@@ -997,6 +1035,10 @@
       document.getElementById('section-endboard').classList.remove('visible');
       document.getElementById('section-t0').classList.remove('visible');
       document.getElementById('chk-t0').checked = false;
+      // 恢复胜按钮（解除投降锁）
+      document.getElementById('input-win').style.opacity = '';
+      document.getElementById('input-win').style.pointerEvents = '';
+      document.getElementById('input-win').title = '';
       updateConditionalSections();
       document.getElementById('match-normal').classList.add('active');
     }
@@ -1258,7 +1300,7 @@
       { type: 'coinTrend', label: '硬币胜率趋势', desc: '硬币正反累计胜率变化曲线' },
       { type: 'coinAnomaly', label: '硬币异常检测', desc: '连正/连反异常及正反偏斜检测' },
       { type: 'totalMatches', label: '总场次', desc: '对局总场数量' },
-      { type: 'opponentRan', label: '吓跑对手', desc: '先手胜利时对手逃跑次数' },
+      { type: 'opponentRan', label: '吓跑对手', desc: '吓跑对手次数（含先手终场/后手突破细分）' },
       { type: 'bigHand', label: '遇到大牌哥', desc: '遇到大牌哥次数/率' },
       { type: 'endboard', label: '先手终场', desc: '正常/妥协/没做出来/投降 各终场率' },
       { type: 'breakBoard', label: '后手突破', desc: '突破成功率 / 突破后胜率' },
