@@ -187,6 +187,22 @@ function computeStats() {
   // 有效卡手 = 任一卡手情况被选中即计为一场（同一场多项也只计一次）
   const totalCantPlay = matches.filter(m => m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck).length;
 
+  // ── 卡手统计 · 先后手细分 ──
+  const gfTotal = gfAll.length;
+  const gsTotal = gsAll.length;
+  const cantPlayFirst = matches.filter(m => (m.cantPlay || m.bothStuck) && m.goingFirst).length;
+  const cantPlaySecond = matches.filter(m => (m.cantPlay || m.bothStuck) && !m.goingFirst).length;
+  const cantPlayGarnetFirst = matches.filter(m => m.cantPlayGarnet && m.goingFirst).length;
+  const cantPlayGarnetSecond = matches.filter(m => m.cantPlayGarnet && !m.goingFirst).length;
+  const cantPlayDuplicateFirst = matches.filter(m => m.cantPlayDuplicate && m.goingFirst).length;
+  const cantPlayDuplicateSecond = matches.filter(m => m.cantPlayDuplicate && !m.goingFirst).length;
+  const cantPlayHTFirst = matches.filter(m => m.cantPlayHT && m.goingFirst).length;
+  const cantPlayHTSecond = matches.filter(m => m.cantPlayHT && !m.goingFirst).length;
+  const bothStuckFirst = matches.filter(m => m.bothStuck && m.goingFirst).length;
+  const bothStuckSecond = matches.filter(m => m.bothStuck && !m.goingFirst).length;
+  const totalCantPlayFirst = matches.filter(m => (m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck) && m.goingFirst).length;
+  const totalCantPlaySecond = matches.filter(m => (m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck) && !m.goingFirst).length;
+
   // ── 掉线 / 超时 ──
   const disconnect = matches.filter(m => m.disconnect).length;
   const disconnectSelf = matches.filter(m => m.disconnect && m.disconnectWho === 'self').length;
@@ -460,11 +476,11 @@ function computeStats() {
         // 严重程度评分 0~100（基于与期望值的偏离程度）
         var diff = L - expectedMax;
         var score = Math.min(100, Math.max(0, Math.round((diff / (expectedMax > 3 ? 3 : 2)) * 100)));
-        // 严重程度等级
+        // 严重程度等级：基于 severityScore（与展示颜色阈值对齐）
         var severity;
-        if (pVal > 0.05) severity = '正常';
-        else if (pVal > 0.01) severity = '⚠️ 偏高';
-        else if (pVal > 0.001) severity = '🔴 显著';
+        if (score <= 20) severity = '正常';
+        else if (score <= 50) severity = '⚠️ 偏高';
+        else if (score <= 75) severity = '🔴 显著';
         else severity = '🔥 异常';
         // 极端情况：L 很小但 n 很大时 pVal 也小，但此时不视为异常
         if (L <= 2) { severity = '正常'; score = 0; }
@@ -487,9 +503,9 @@ function computeStats() {
         var pct = ((h / n) * 100).toFixed(1);
         var score = Math.min(100, Math.round((z / 4) * 100));
         var severity;
-        if (z < 2) severity = '正常';
-        else if (z < 3) severity = '⚠️ 偏高';
-        else if (z < 4) severity = '🔴 显著';
+        if (score <= 20) severity = '正常';
+        else if (score <= 50) severity = '⚠️ 偏高';
+        else if (score <= 75) severity = '🔴 显著';
         else severity = '🔥 异常';
         return { heads: h, tails: t, pct: pct, zScore: z, severity: severity, severityScore: score };
       })()
@@ -541,7 +557,11 @@ function computeStats() {
       totalCantPlay,
       cantPlayRate: total > 0 ? ((totalCantPlay / total) * 100).toFixed(1) : '0.0',
       bothStuck,
-      bothStuckRate: total > 0 ? ((bothStuck / total) * 100).toFixed(1) : '0.0'
+      bothStuckRate: total > 0 ? ((bothStuck / total) * 100).toFixed(1) : '0.0',
+      // 先后手细分
+      gfTotal, gsTotal,
+      byFirst: { cantPlay: cantPlayFirst, cantPlayGarnet: cantPlayGarnetFirst, cantPlayDuplicate: cantPlayDuplicateFirst, cantPlayHT: cantPlayHTFirst, bothStuck: bothStuckFirst, totalCantPlay: totalCantPlayFirst },
+      bySecond: { cantPlay: cantPlaySecond, cantPlayGarnet: cantPlayGarnetSecond, cantPlayDuplicate: cantPlayDuplicateSecond, cantPlayHT: cantPlayHTSecond, bothStuck: bothStuckSecond, totalCantPlay: totalCantPlaySecond }
     },
     connectivity: {
       disconnect, disconnectSelf, disconnectOpponent,

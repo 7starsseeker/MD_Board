@@ -672,7 +672,7 @@
           var curLabel = coinLabel(s.current.type);
           var lonLabel = coinLabel(s.longest.type);
           html +=
-            '<div style="padding:6px 0 2px 0;font-size:13px;font-weight:700;color:#ffd700;margin-top:6px;border-top:1px solid var(--border)">📊 硬币随机性检测</div>' +
+            '<div style="padding:6px 0 2px 0;font-size:13px;font-weight:700;color:#ffd700;margin-top:6px;border-top:1px solid var(--border)">连续异常检测</div>' +
             '<div class="stat-row"><span class="label">当前连续</span><span class="value">' + curLabel + ' × ' + s.current.length + '</span></div>' +
             '<div class="stat-row"><span class="label">最长连续</span><span class="value">' + lonLabel + ' × ' + s.longest.length + '</span></div>' +
             '<div class="stat-row"><span class="label">· 纯随机上限</span><span class="value" style="color:var(--text-dim)">~' + s.expectedMax + '连</span><span style="font-size:10px;color:var(--text-dim);margin-left:4px">(公平硬币最长一般不超过此值)</span></div>' +
@@ -681,9 +681,9 @@
         // 硬币偏斜检测
         if (c.bias && c.bias.severity !== '—') {
           var b = c.bias;
-          var pctClass = Math.abs(parseFloat(b.pct) - 50) > 15 ? 'bad' : (Math.abs(parseFloat(b.pct) - 50) > 8 ? 'warn' : '');
+          var pctClass = b.severityScore > 50 ? 'bad' : (b.severityScore > 20 ? 'warn' : '');
           html +=
-            '<div style="padding:6px 0 2px 0;font-size:13px;font-weight:700;color:#ffd700;margin-top:6px;border-top:1px solid var(--border)">📐 硬币偏斜检测</div>' +
+            '<div style="padding:6px 0 2px 0;font-size:13px;font-weight:700;color:#ffd700;margin-top:6px;border-top:1px solid var(--border)">偏斜异常检测</div>' +
             '<div class="stat-row"><span class="label">正:反比例</span><span class="value">' + b.heads + ':' + b.tails + '</span><span style="font-size:11px;color:var(--text-dim);margin-left:4px">(期望 1:1)</span></div>' +
             '<div class="stat-row"><span class="label">· 正面率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill gold" style="width:' + parseFloat(b.pct) + '%"></div></div><span class="value ' + pctClass + '">' + b.pct + '%</span></div></div>' +
             '<div class="stat-row"><span class="label">· 异常率</span><span class="value ' + (b.severityScore > 50 ? 'bad' : (b.severityScore > 20 ? 'warn' : '')) + '">' + b.severity + ' (' + b.severityScore + '%)</span></div>';
@@ -731,16 +731,24 @@
         var hs = stats.handState;
         var cr = parseFloat(hs.cantPlayRate) || 0;
         var br = parseFloat(hs.bothStuckRate) || 0;
-        var cantPlaySelfRate = stats.total > 0 ? ((hs.cantPlay||0) / stats.total * 100).toFixed(1) : '0.0';
+        var bf = hs.byFirst || {}, bs = hs.bySecond || {};
+        var gft = hs.gfTotal || 0, gst = hs.gsTotal || 0;
+        var fs = function(vf, vs) { return '<span style="color:var(--accent)">先</span> ' + (vf||0) + '/' + gft + ' · <span style="color:#ff9f0a">后</span> ' + (vs||0) + '/' + gst; };
+        var fsr = function(vf, vs) {
+          var rf = gft > 0 ? ((vf||0) / gft * 100).toFixed(1) : '0.0';
+          var rs = gst > 0 ? ((vs||0) / gst * 100).toFixed(1) : '0.0';
+          return '<span style="color:var(--accent)">先</span> ' + (vf||0) + ' (' + rf + '%) · <span style="color:#ff9f0a">后</span> ' + (vs||0) + ' (' + rs + '%)';
+        };
         document.getElementById('handstate-content').innerHTML =
           '<div style="padding:6px 0 2px 0;font-size:13px;font-weight:700;color:#ffd700">📋 卡手原因</div>' +
-          '<div class="stat-row"><span class="label">　卡废件</span><span class="value">' + hs.cantPlayGarnet + '</span></div>' +
-          '<div class="stat-row"><span class="label">　卡同名牌</span><span class="value">' + hs.cantPlayDuplicate + '</span></div>' +
-          '<div class="stat-row"><span class="label">　卡后手牌</span><span class="value">' + hs.cantPlayHT + '</span></div>' +
+          '<div class="stat-row"><span class="label">　卡废件</span><span class="value">' + fs(bf.cantPlayGarnet, bs.cantPlayGarnet) + '</span></div>' +
+          '<div class="stat-row"><span class="label">　卡同名牌</span><span class="value">' + fs(bf.cantPlayDuplicate, bs.cantPlayDuplicate) + '</span></div>' +
+          '<div class="stat-row"><span class="label">　卡后手牌</span><span class="value">' + fs(bf.cantPlayHT, bs.cantPlayHT) + '</span></div>' +
           '<div style="padding:6px 0 2px 0;font-size:13px;font-weight:700;color:#ff6b62">🔨 被发牌员制裁</div>' +
-          '<div class="stat-row"><span class="label">　完全动不了</span><span class="value bad">' + (hs.cantPlay||0) + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + cantPlaySelfRate + '%</span></div>' +
-          '<div class="stat-row"><span class="label">　互卡</span><span class="value warn">' + hs.bothStuck + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + fmt(hs.bothStuckRate) + '%</span></div>' +
-          '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label">合计卡手率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + cr + '%"></div></div><span class="value bad">' + fmt(hs.cantPlayRate) + '%</span></div></div>';
+          '<div class="stat-row"><span class="label">　完全动不了</span><span class="value bad">' + fsr(bf.cantPlay, bs.cantPlay) + '</span></div>' +
+          '<div class="stat-row"><span class="label">　互卡</span><span class="value warn">' + fsr(bf.bothStuck, bs.bothStuck) + '</span></div>' +
+          '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label">合计卡手率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + cr + '%"></div></div><span class="value bad">' + fmt(hs.cantPlayRate) + '%</span></div></div>' +
+          '<div style="font-size:10px;color:var(--text-dim);margin-top:3px;text-align:right">先后手明细 &nbsp;<span style="color:var(--accent)">■先</span> <span style="color:#ff9f0a">■后</span></div>';
       }
 
       // ═══ 严重失误统计 ═══

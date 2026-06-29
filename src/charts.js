@@ -816,8 +816,8 @@ function renderCoinAnomaly(canvas, stats, options) {
       responsive: true, maintainAspectRatio: false,
       indexAxis: 'y',
       scales: {
-        x: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { stepSize: 20, callback: function(v){return v+'%';} } },
-        y: { grid: { display: false } }
+        x: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { stepSize: 20, callback: function(v){return v+'%';}, color: '#ffffff' } },
+        y: { grid: { display: false }, ticks: { color: '#ffffff', font: { size: 12, weight: 'bold' } } }
       },
       plugins: {
         legend: { display: false },
@@ -840,16 +840,24 @@ function renderCoinAnomaly(canvas, stats, options) {
         ctx2.save();
         ctx2.textAlign = 'right';
         ctx2.textBaseline = 'middle';
-        ctx2.font = 'bold 14px monospace';
+        ctx2.font = 'bold 13px monospace';
         meta.data.forEach(function(bar, i) {
           var val = values[i];
           var sev = hasStreak && i === 0 ? c.streak.severity : (hasBias ? c.bias.severity : '');
-          ctx2.fillStyle = colors[i];
-          ctx2.fillText(val + '%', bar.x - 4, bar.y);
-          ctx2.font = '10px sans-serif';
-          ctx2.fillStyle = '#e8e8f0';
-          ctx2.fillText(sev, bar.x - 4, bar.y + 14);
-          ctx2.font = 'bold 14px monospace';
+          // 分数：白色大字 + 深色阴影
+          ctx2.fillStyle = '#ffffff';
+          ctx2.shadowColor = 'rgba(0,0,0,0.8)';
+          ctx2.shadowBlur = 4;
+          ctx2.fillText(val + '%', bar.x - 6, bar.y - 2);
+          ctx2.shadowBlur = 0;
+          // 严重度标签：加大加粗 + 半透明底色衬托
+          ctx2.font = 'bold 12px sans-serif';
+          ctx2.shadowColor = 'rgba(0,0,0,0.8)';
+          ctx2.shadowBlur = 3;
+          ctx2.fillStyle = '#ffffff';
+          ctx2.fillText(sev, bar.x - 6, bar.y + 15);
+          ctx2.shadowBlur = 0;
+          ctx2.font = 'bold 13px monospace';
         });
         ctx2.restore();
       }
@@ -926,15 +934,21 @@ function renderHandStatePie(canvas, stats, options) {
   var info = options && options.infoEl;
   if (info) {
     info.className = 'chart-info active';
-    var cantPlayTotal = (hs.cantPlayGarnet||0) + (hs.cantPlayDuplicate||0) + (hs.cantPlayHT||0);
-    var stuckRate = stats.total > 0 ? (cantPlayTotal / stats.total * 100) : 0;
+    var bf = hs.byFirst || {}, bs = hs.bySecond || {};
+    var gft = hs.gfTotal || 0, gst = hs.gsTotal || 0;
+    var fmtRate = function(n, d) { return d > 0 ? ((n/d)*100).toFixed(1)+'%' : '—'; };
     info.innerHTML =
-      infoRow('卡废件', hs.cantPlayGarnet || 0) +
-      infoRow('卡同名牌', hs.cantPlayDuplicate || 0) +
-      infoRow('卡后手牌', hs.cantPlayHT || 0) +
-      infoSection('汇总') +
-      infoBar('卡手率', stuckRate, 'red') +
-      infoRow('卡手总次数', cantPlayTotal);
+      infoSection('卡手原因') +
+      infoRow('卡废件', (hs.cantPlayGarnet||0) + '  先 ' + (bf.cantPlayGarnet||0) + '/' + gft + '  后 ' + (bs.cantPlayGarnet||0) + '/' + gst) +
+      infoRow('卡同名牌', (hs.cantPlayDuplicate||0) + '  先 ' + (bf.cantPlayDuplicate||0) + '/' + gft + '  后 ' + (bs.cantPlayDuplicate||0) + '/' + gst) +
+      infoRow('卡后手牌', (hs.cantPlayHT||0) + '  先 ' + (bf.cantPlayHT||0) + '/' + gft + '  后 ' + (bs.cantPlayHT||0) + '/' + gst) +
+      infoSection('被发牌员制裁') +
+      infoRow('完全动不了', (hs.cantPlay||0) + '  先 ' + (bf.cantPlay||0) + ' · 后 ' + (bs.cantPlay||0)) +
+      infoRow('互卡', (hs.bothStuck||0) + '  先 ' + (bf.bothStuck||0) + ' · 后 ' + (bs.bothStuck||0)) +
+      infoSection('卡手率') +
+      infoBar('全局', hs.cantPlayRate, 'red') +
+      infoBar('先手', fmtRate(bf.totalCantPlay, gft), 'gold') +
+      infoBar('后手', fmtRate(bs.totalCantPlay, gst), 'gold');
   }
   return canvas._chart;
 }
@@ -984,13 +998,14 @@ function renderDealerScrewed(canvas, stats, options) {
   var info = options && options.infoEl;
   if (info) {
     info.className = 'chart-info active';
+    var bf = hs.byFirst || {}, bs = hs.bySecond || {};
     var totalScrewed = (hs.cantPlay||0) + (hs.bothStuck||0);
     var cantPlayRate = stats.total > 0 ? ((hs.cantPlay||0) / stats.total * 100) : 0;
     var bothStuckRate = stats.total > 0 ? ((hs.bothStuck||0) / stats.total * 100) : 0;
     var totalRate = stats.total > 0 ? (totalScrewed / stats.total * 100) : 0;
     info.innerHTML =
-      infoRow('完全动不了', hs.cantPlay || 0) +
-      infoRow('互卡', hs.bothStuck || 0) +
+      infoRow('完全动不了', (hs.cantPlay||0) + '  先 ' + (bf.cantPlay||0) + ' · 后 ' + (bs.cantPlay||0)) +
+      infoRow('互卡', (hs.bothStuck||0) + '  先 ' + (bf.bothStuck||0) + ' · 后 ' + (bs.bothStuck||0)) +
       infoSection('汇总') +
       infoBar('完全动不了率', cantPlayRate, 'red') +
       infoBar('互卡率', bothStuckRate, 'gold') +

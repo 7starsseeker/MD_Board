@@ -447,12 +447,15 @@
       RENDERERS.handState = function(s) {
         var hs = s.handState;
         var cp = parseFloat(hs.cantPlayRate) || 0;
+        var bf = hs.byFirst || {}, bs = hs.bySecond || {};
+        var firstTotal = bf.totalCantPlay || 0, secondTotal = bs.totalCantPlay || 0;
         return {
           label: cp + '%',
           subLabel: '卡手率',
           html: '<div class="big-value" style="color:' + (cp > 20 ? '#ff3b30' : '#ffd700') + '">' + fmt(hs.cantPlayRate) + '<span class="pct">%</span></div>' +
                 '<div class="big-label">卡手率</div>' +
-                '<div class="sub-line">卡废件 ' + hs.cantPlayGarnet + ' · 卡同名牌 ' + hs.cantPlayDuplicate + ' · 卡后手牌 ' + hs.cantPlayHT + ' · 合计 ' + hs.totalCantPlay + ' 次</div>'
+                '<div class="sub-line">· 先手 ' + firstTotal + ' 次 · 后手 ' + secondTotal + ' 次 · 合计 ' + hs.totalCantPlay + ' 次</div>' +
+                '<div class="sub-line" style="font-size:11px;color:var(--text-dim)">卡废件 ' + hs.cantPlayGarnet + ' · 卡同名牌 ' + hs.cantPlayDuplicate + ' · 卡后手牌 ' + hs.cantPlayHT + '</div>'
         };
       };
 
@@ -462,6 +465,7 @@
         if (total === 0) {
           return { label: '0', subLabel: '暂无制裁记录', html: '<div class="big-value" style="color:#e8e8f0">0</div><div class="big-label">暂无制裁记录</div>' };
         }
+        var bf = hs.byFirst || {}, bs = hs.bySecond || {};
         var cpRate = s.total > 0 ? ((hs.cantPlay||0) / s.total * 100).toFixed(1) : '0.0';
         var bsRate = s.total > 0 ? ((hs.bothStuck||0) / s.total * 100).toFixed(1) : '0.0';
         return {
@@ -469,8 +473,8 @@
           subLabel: '被制裁 ' + total + ' 次',
           html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:2px">' +
                 '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;width:100%;max-width:300px">' +
-                  '<div style="text-align:center"><div style="font-size:36px;font-weight:800;color:#ff3b30">' + (hs.cantPlay||0) + '</div><div style="font-size:12px;color:#ffffff">完全动不了</div></div>' +
-                  '<div style="text-align:center"><div style="font-size:36px;font-weight:800;color:#ff9f0a">' + (hs.bothStuck||0) + '</div><div style="font-size:12px;color:#ffffff">互卡</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:36px;font-weight:800;color:#ff3b30">' + (hs.cantPlay||0) + '</div><div style="font-size:12px;color:#ffffff">完全动不了</div><div style="font-size:11px;color:var(--text-dim)">先 ' + (bf.cantPlay||0) + ' · 后 ' + (bs.cantPlay||0) + '</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:36px;font-weight:800;color:#ff9f0a">' + (hs.bothStuck||0) + '</div><div style="font-size:12px;color:#ffffff">互卡</div><div style="font-size:11px;color:var(--text-dim)">先 ' + (bf.bothStuck||0) + ' · 后 ' + (bs.bothStuck||0) + '</div></div>' +
                 '</div>' +
                 '<div style="font-size:12px;color:#ffffff;text-align:center;margin-top:2px">完全动不了率 ' + cpRate + '% · 互卡率 ' + bsRate + '%</div>' +
                 '</div>' +
@@ -693,8 +697,8 @@
         // 连续检测
         if (c.streak && c.total > 0) {
           var st = c.streak;
-          var stClass = st.severityScore > 50 ? 'color:#ff6b62' : (st.severityScore > 20 ? 'color:#ffd700' : 'color:#e8e8f0');
-          streakHtml = '<div style="font-size:14px;color:var(--text-dim)">连续异常 </div><div style="font-size:22px;font-weight:800;line-height:1.2;' + stClass + '">' + st.severity + ' (' + st.severityScore + '%)</div>';
+          var stClass = st.severityScore > 50 ? 'color:#ff6b62' : (st.severityScore > 20 ? 'color:#ffd700' : 'color:#4cd964');
+          streakHtml = '<div style="font-size:11px;color:var(--text-dim)">连续异常</div><div style="font-size:17px;font-weight:800;line-height:1.2;' + stClass + '">' + st.severity + ' (' + st.severityScore + '%)</div>';
           detailHtml += '<span style="color:#ffffff">最长 ' + curLabel(st.longest.type) + '×' + st.longest.length + '</span>';
           if (st.current && st.current.length > 0) {
             detailHtml += '  <span style="color:var(--text-dim)">· 当前 ' + curLabel(st.current.type) + '×' + st.current.length + '</span>';
@@ -703,8 +707,8 @@
         // 偏斜检测
         if (c.bias && c.bias.severity !== '—') {
           var b = c.bias;
-          var bClass = b.severityScore > 50 ? 'color:#ff6b62' : (b.severityScore > 20 ? 'color:#ffd700' : 'color:#e8e8f0');
-          biasHtml = '<div style="font-size:14px;color:var(--text-dim)">偏斜异常 </div><div style="font-size:22px;font-weight:800;line-height:1.2;' + bClass + '">' + b.severity + ' (' + b.severityScore + '%)</div>';
+          var bClass = b.severityScore > 50 ? 'color:#ff6b62' : (b.severityScore > 20 ? 'color:#ffd700' : 'color:#4cd964');
+          biasHtml = '<div style="font-size:11px;color:var(--text-dim)">偏斜异常</div><div style="font-size:17px;font-weight:800;line-height:1.2;' + bClass + '">' + b.severity + ' (' + b.severityScore + '%)</div>';
           if (detailHtml) detailHtml += '  ';
           detailHtml += '<span style="color:var(--text-dim)">正:反 ' + b.heads + ':' + b.tails + '</span>';
         }
@@ -712,14 +716,14 @@
         return {
           label: label,
           subLabel: '硬币 ' + heads + ':' + tails + ' · 共 ' + total + ' 场',
-          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:2px">' +
-                  '<div style="font-size:13px;color:var(--text-dim)">硬币 正:反 ' + heads + ':' + tails + '</div>' +
-                  '<div style="font-size:32px;font-weight:800;color:#ffd700;line-height:1.1">' + pct + '%</div>' +
-                  '<div style="display:flex;gap:24px;margin-top:4px">' +
+          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:1px">' +
+                  '<div style="font-size:12px;color:var(--text-dim)">硬币 正:反 ' + heads + ':' + tails + '</div>' +
+                  '<div style="font-size:26px;font-weight:800;color:#ffd700;line-height:1.1">' + pct + '%</div>' +
+                  '<div style="display:flex;gap:16px;margin-top:2px">' +
                     '<div style="text-align:center">' + streakHtml + '</div>' +
                     '<div style="text-align:center">' + biasHtml + '</div>' +
                   '</div>' +
-                  '<div style="font-size:12px;color:var(--text-dim);margin-top:3px">' + detailHtml + '</div>' +
+                  '<div style="font-size:11px;color:var(--text-dim);margin-top:2px">' + detailHtml + '</div>' +
                 '</div>' +
                 '<div class="big-label">硬币异常检测</div>'
         };
