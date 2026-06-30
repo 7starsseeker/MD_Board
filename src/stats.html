@@ -739,7 +739,7 @@
           var rs = gst > 0 ? ((vs||0) / gst * 100).toFixed(1) : '0.0';
           return '<span style="color:var(--accent)">先</span> ' + (vf||0) + ' (' + rf + '%) · <span style="color:#ff9f0a">后</span> ' + (vs||0) + ' (' + rs + '%)';
         };
-        document.getElementById('handstate-content').innerHTML =
+        var html =
           '<div style="padding:6px 0 2px 0;font-size:13px;font-weight:700;color:#ffd700">📋 卡手原因</div>' +
           '<div class="stat-row"><span class="label">　卡废件</span><span class="value">' + fs(bf.cantPlayGarnet, bs.cantPlayGarnet) + '</span></div>' +
           '<div class="stat-row"><span class="label">　卡同名牌</span><span class="value">' + fs(bf.cantPlayDuplicate, bs.cantPlayDuplicate) + '</span></div>' +
@@ -749,6 +749,27 @@
           '<div class="stat-row"><span class="label">　互卡</span><span class="value warn">' + fsr(bf.bothStuck, bs.bothStuck) + '</span></div>' +
           '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label">合计卡手率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + cr + '%"></div></div><span class="value bad">' + fmt(hs.cantPlayRate) + '%</span></div></div>' +
           '<div style="font-size:10px;color:var(--text-dim);margin-top:3px;text-align:right">先后手明细 &nbsp;<span style="color:var(--accent)">■先</span> <span style="color:#ff9f0a">■后</span></div>';
+        // ── 各卡组卡手明细 ──
+        var bd = hs.byDeck;
+        if (bd && bd.length > 0) {
+          html += '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">' +
+            '<div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px">📊 各卡组卡手明细</div>' +
+            '<div style="font-size:10px;color:var(--text-dim);margin-bottom:4px;display:flex;justify-content:space-between;padding:0 2px">' +
+            '<span>卡组</span><span>对局</span><span>卡手率</span><span>卡手/废件/同名/后手/互卡</span></div>';
+          bd.forEach(function(d) {
+            var rate = parseFloat(d.cantPlayRate) || 0;
+            var color = rate > 30 ? '#ff3b30' : (rate > 15 ? '#ffd700' : '#4cd964');
+            html += '<div class="stat-row" style="font-size:11px">' +
+              '<span class="label" style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + d.deck + '</span>' +
+              '<span style="margin:0 4px;color:var(--text-dim)">' + d.total + '场</span>' +
+              '<div class="bar-wrap" style="flex:1;min-width:50px;max-width:80px"><div class="bar-track" style="height:8px"><div class="bar-fill" style="width:' + rate + '%;background:' + color + '"></div></div></div>' +
+              '<span class="value" style="font-size:10px;min-width:32px;color:' + color + '">' + d.cantPlayRate + '%</span>' +
+              '<span style="font-size:9px;color:var(--text-dim);white-space:nowrap">' + d.cantPlayCount + '/' + d.cantPlayGarnetCount + '/' + d.cantPlayDuplicateCount + '/' + d.cantPlayHTCount + '/' + d.bothStuckCount + '</span>' +
+              '</div>';
+          });
+          html += '</div>';
+        }
+        document.getElementById('handstate-content').innerHTML = html;
       }
 
       // ═══ 严重失误统计 ═══

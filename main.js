@@ -203,6 +203,25 @@ function computeStats() {
   const totalCantPlayFirst = matches.filter(m => (m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck) && m.goingFirst).length;
   const totalCantPlaySecond = matches.filter(m => (m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck) && !m.goingFirst).length;
 
+  // ── 卡手 × 自用卡组 ──
+  const cantPlayByDeck = {};
+  matches.forEach(m => {
+    const deck = (m.myDeck || '').trim();
+    if (!deck) return;
+    if (!cantPlayByDeck[deck]) cantPlayByDeck[deck] = { total: 0, wins: 0, losses: 0, cantPlayCount: 0, cantPlayAlone: 0, cantPlayGarnetCount: 0, cantPlayDuplicateCount: 0, cantPlayHTCount: 0, bothStuckCount: 0 };
+    cantPlayByDeck[deck].total++;
+    if (m.result === 'win') cantPlayByDeck[deck].wins++;
+    else if (m.result === 'loss') cantPlayByDeck[deck].losses++;
+    if (m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck) {
+      cantPlayByDeck[deck].cantPlayCount++;
+    }
+    if (m.cantPlay) cantPlayByDeck[deck].cantPlayAlone++;
+    if (m.cantPlayGarnet) cantPlayByDeck[deck].cantPlayGarnetCount++;
+    if (m.cantPlayDuplicate) cantPlayByDeck[deck].cantPlayDuplicateCount++;
+    if (m.cantPlayHT) cantPlayByDeck[deck].cantPlayHTCount++;
+    if (m.bothStuck) cantPlayByDeck[deck].bothStuckCount++;
+  });
+
   // ── 掉线 / 超时 ──
   const disconnect = matches.filter(m => m.disconnect).length;
   const disconnectSelf = matches.filter(m => m.disconnect && m.disconnectWho === 'self').length;
@@ -561,7 +580,15 @@ function computeStats() {
       // 先后手细分
       gfTotal, gsTotal,
       byFirst: { cantPlay: cantPlayFirst, cantPlayGarnet: cantPlayGarnetFirst, cantPlayDuplicate: cantPlayDuplicateFirst, cantPlayHT: cantPlayHTFirst, bothStuck: bothStuckFirst, totalCantPlay: totalCantPlayFirst },
-      bySecond: { cantPlay: cantPlaySecond, cantPlayGarnet: cantPlayGarnetSecond, cantPlayDuplicate: cantPlayDuplicateSecond, cantPlayHT: cantPlayHTSecond, bothStuck: bothStuckSecond, totalCantPlay: totalCantPlaySecond }
+      bySecond: { cantPlay: cantPlaySecond, cantPlayGarnet: cantPlayGarnetSecond, cantPlayDuplicate: cantPlayDuplicateSecond, cantPlayHT: cantPlayHTSecond, bothStuck: bothStuckSecond, totalCantPlay: totalCantPlaySecond },
+      // 各卡组明细
+      byDeck: Object.entries(cantPlayByDeck)
+        .sort((a, b) => b[1].total - a[1].total)
+        .map(([deck, s]) => ({
+          deck, ...s,
+          cantPlayRate: s.total > 0 ? ((s.cantPlayCount / s.total) * 100).toFixed(1) : '0.0',
+          winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0'
+        }))
     },
     connectivity: {
       disconnect, disconnectSelf, disconnectOpponent,

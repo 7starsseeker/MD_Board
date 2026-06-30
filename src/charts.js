@@ -948,7 +948,16 @@ function renderHandStatePie(canvas, stats, options) {
       infoSection('卡手率') +
       infoBar('全局', hs.cantPlayRate, 'red') +
       infoBar('先手', fmtRate(bf.totalCantPlay, gft), 'gold') +
-      infoBar('后手', fmtRate(bs.totalCantPlay, gst), 'gold');
+      infoBar('后手', fmtRate(bs.totalCantPlay, gst), 'gold') +
+      // ── 各卡组卡手明细 ──
+      (hs.byDeck && hs.byDeck.length > 0 ? (function() {
+        var h = infoSection('各卡组卡手率');
+        hs.byDeck.forEach(function(d) {
+          var rate = parseFloat(d.cantPlayRate) || 0;
+          h += infoBar(d.deck, rate, rate > 30 ? 'red' : (rate > 15 ? 'gold' : 'green'));
+        });
+        return h;
+      })() : '');
   }
   return canvas._chart;
 }
