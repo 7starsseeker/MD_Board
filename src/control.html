@@ -415,9 +415,12 @@
     </div>
     <div id="date-selector" style="display:none;margin-top:6px;max-height:240px;overflow-y:auto;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px">
       <div style="font-size:11px;color:var(--text-dim);padding:4px 6px">选择日期：</div>
+      <div style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px;padding:0 6px 2px">
+        <span id="time-range-hint">当前：全部历史数据</span>
+        <button id="btn-refresh-time" class="btn btn-sm" style="font-size:10px;padding:1px 5px;line-height:1.4" title="手动刷新日期范围（跨日后更新「今天」/本周/本月）">↻</button>
+      </div>
       <div id="date-list"></div>
     </div>
-    <div style="margin-top:6px;font-size:11px;color:var(--text-dim)" id="time-range-hint">当前：全部历史数据</div>
   </div>
 
   <!-- ═══ 循环显示面板控制 ═══ -->
@@ -1564,6 +1567,63 @@
       });
     }
 
+    // 手动刷新日期范围（跨日/跨周/跨月后更新「今天」/本周/本月）
+    function refreshTimeRangeUI() {
+      api.getTimeRange().then(function(range) {
+        if (range === 'today') {
+          var today = todayStr();
+          api.getSelectedDate().then(function(selDate) {
+            if (selDate && selDate !== today) {
+              api.setTimeRange('today', today).then(function() {
+                loadDateList();
+                document.getElementById('time-range-hint').textContent = '当前：一天 · ' + formatDateLabel(today);
+              });
+            } else {
+              loadDateList();
+              document.getElementById('time-range-hint').textContent = '当前：一天 · ' + formatDateLabel(today);
+            }
+          });
+        } else if (range === 'week') {
+          var today = new Date();
+          var todayWeekStart = getWeekRange();
+          api.getSelectedDate().then(function(selDate) {
+            var curWeekStart = getWeekRange(selDate || undefined);
+            if (curWeekStart.start !== todayWeekStart.start) {
+              // 选中日期已不在当前周 → 更新到今日所在周
+              api.setTimeRange('week', todayWeekStart.start).then(function() {
+                loadWeekList();
+                document.getElementById('time-range-hint').textContent = '当前：一整周 · ' + todayWeekStart.start + ' ~ ' + todayWeekStart.end;
+              });
+            } else {
+              loadWeekList();
+              document.getElementById('time-range-hint').textContent = '当前：一整周 · ' + curWeekStart.start + ' ~ ' + curWeekStart.end;
+            }
+          });
+        } else if (range === 'month') {
+          var today = new Date();
+          var todayMonthStart = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+          api.getSelectedDate().then(function(selDate) {
+            var ref = selDate ? new Date(selDate) : new Date();
+            var curMonthStart = ref.getFullYear() + '-' + String(ref.getMonth() + 1).padStart(2, '0');
+            if (curMonthStart !== todayMonthStart) {
+              // 选中日期已不在当前月 → 更新到今日所在月
+              var mr = getMonthRange();
+              api.setTimeRange('month', mr.start).then(function() {
+                loadMonthList();
+                document.getElementById('time-range-hint').textContent = '当前：一整月 · ' + mr.start + ' ~ ' + mr.end;
+              });
+            } else {
+              loadMonthList();
+              var mr = getMonthRange(ref);
+              document.getElementById('time-range-hint').textContent = '当前：一整月 · ' + mr.start + ' ~ ' + mr.end;
+            }
+          });
+        } else if (range === 'custom') {
+          loadCustomRange();
+        }
+      });
+    }
+
     function pad2(n) { return n < 10 ? '0' + n : '' + n; }
 
     function formatDateShort(d) {
@@ -1800,7 +1860,12 @@
     // ═══════════════════════════════════════════════════════════════════════
 
     api.getAll().then(renderAll);
-    api.onStatsUpdate(function() { api.getAll().then(renderAll); });
+    api.onStatsUpdate(function() {
+      api.getAll().then(renderAll);
+      refreshTimeRangeUI();
+    });
+
+    document.getElementById('btn-refresh-time').addEventListener('click', refreshTimeRangeUI);
 
     document.getElementById('btn-about').addEventListener('click', async function() {
       var ver = await api.getVersion();
