@@ -12,7 +12,7 @@ function getRuntimeDir() {
 const RUNTIME_DATA = () => path.join(getRuntimeDir(), 'stats.json');
 const RUNTIME_WSTATE = () => path.join(getRuntimeDir(), 'window-state.json');
 
-let data = { matches: [], version: 4, deckPresets: [], myDeckPresets: [], cycleConfig: null, timeRange: 'all', selectedDate: null, customStart: null, customEnd: null };
+let data = { matches: [], version: 4, deckPresets: [], myDeckPresets: [], handtrapPresets: [], handtrapConfig: { largeIds: [], compactIds: [] }, cycleConfig: null, timeRange: 'all', selectedDate: null, customStart: null, customEnd: null };
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -29,6 +29,24 @@ function loadData() {
       data = JSON.parse(fs.readFileSync(runtimeFile, 'utf-8'));
       if (!data.deckPresets) data.deckPresets = [];
       if (!data.myDeckPresets) data.myDeckPresets = [];
+      if (!data.handtrapPresets || !Array.isArray(data.handtrapPresets) || data.handtrapPresets.length === 0) {
+        data.handtrapPresets = [
+          { id: 'gotMaxxc', label: '增殖的G' },
+          { id: 'gotDroll', label: '鸟G' },
+          { id: 'gotJellyfish', label: '水母G' },
+          { id: 'gotLancea', label: '锁鸟' },
+          { id: 'gotNibiru', label: '陨石' },
+          { id: 'gotDimension', label: '大宇宙人/次元系' }
+        ];
+      }
+      if (!data.handtrapConfig || !data.handtrapConfig.largeIds) {
+        data.handtrapConfig = { largeIds: ['gotMaxxc', 'gotDroll', 'gotJellyfish', 'gotLancea'], compactIds: ['gotNibiru', 'gotDimension'] };
+      }
+      // 大字显示最多3个，超限时自动全部降级到简略
+      if (data.handtrapConfig.largeIds && data.handtrapConfig.largeIds.length > 3) {
+        const moved = data.handtrapConfig.largeIds.splice(0);
+        data.handtrapConfig.compactIds = [...new Set([...(data.handtrapConfig.compactIds || []), ...moved])];
+      }
       // 从 v2 迁移到 v3
       if (data.version === 2) {
         data.version = 3;
@@ -100,6 +118,24 @@ function filterMatchesByTimeRange(matches, range) {
   });
 }
 
+// ── 手坑兼容读取 ──────────────────────────────────────────────
+/** 从 match 中提取手坑 ID 数组（兼容新旧数据格式） */
+function getMatchHandtraps(match) {
+  if (match.handtraps && Array.isArray(match.handtraps) && match.handtraps.length > 0) {
+    return match.handtraps;
+  }
+  // 旧数据回退
+  const result = [];
+  if (match.gotMaxxc) result.push('gotMaxxc');
+  if (match.gotDroll) result.push('gotDroll');
+  if (match.gotJellyfish) result.push('gotJellyfish');
+  if (match.gotLancea) result.push('gotLancea');
+  if (match.gotNibiru) result.push('gotNibiru');
+  if (match.gotDimension) result.push('gotDimension');
+  if (match.gotSmallHT) result.push('_other');
+  return result;
+}
+
 // ── 统计计算（v2.0 增强版）─────────────────────────────────────────
 function computeStats() {
   const allMatches = data.matches || [];
@@ -147,34 +183,43 @@ function computeStats() {
     coinToss: m.coinToss
   }));
 
-  // ── 手坑统计 ──
-  const gotMaxxc = matches.filter(m => m.gotMaxxc).length;
-  const gotDroll = matches.filter(m => m.gotDroll).length;
-  const gotJellyfish = matches.filter(m => m.gotJellyfish).length;
-  const gotLancea = matches.filter(m => m.gotLancea).length;
-  const gotNibiru = matches.filter(m => m.gotNibiru).length;
-  // 合并吃G（增殖的G 或 鸟G/水母G，同一场只算一次）
-  const gotAnyG = matches.filter(m => m.gotMaxxc || m.gotDroll || m.gotJellyfish).length;
-  const gotDimension = matches.filter(m => m.gotDimension).length;
-  const gotSmallHT = matches.filter(m => m.gotSmallHT).length;
-  // 手坑先后手细分
-  const gotMaxxcFirst = matches.filter(m => m.gotMaxxc && m.goingFirst).length;
-  const gotMaxxcSecond = matches.filter(m => m.gotMaxxc && !m.goingFirst).length;
-  const gotDrollFirst = matches.filter(m => m.gotDroll && m.goingFirst).length;
-  const gotDrollSecond = matches.filter(m => m.gotDroll && !m.goingFirst).length;
-  const gotJellyfishFirst = matches.filter(m => m.gotJellyfish && m.goingFirst).length;
-  const gotJellyfishSecond = matches.filter(m => m.gotJellyfish && !m.goingFirst).length;
-  const gotLanceaFirst = matches.filter(m => m.gotLancea && m.goingFirst).length;
-  const gotLanceaSecond = matches.filter(m => m.gotLancea && !m.goingFirst).length;
-  const gotNibiruFirst = matches.filter(m => m.gotNibiru && m.goingFirst).length;
-  const gotNibiruSecond = matches.filter(m => m.gotNibiru && !m.goingFirst).length;
-  const gotDimensionFirst = matches.filter(m => m.gotDimension && m.goingFirst).length;
-  const gotDimensionSecond = matches.filter(m => m.gotDimension && !m.goingFirst).length;
-  const gotSmallHTFirst = matches.filter(m => m.gotSmallHT && m.goingFirst).length;
-  const gotSmallHTSecond = matches.filter(m => m.gotSmallHT && !m.goingFirst).length;
-  // 吃G率先后手细分
-  const gotAnyGFirst = matches.filter(m => (m.gotMaxxc || m.gotDroll || m.gotJellyfish) && m.goingFirst).length;
-  const gotAnyGSecond = matches.filter(m => (m.gotMaxxc || m.gotDroll || m.gotJellyfish) && !m.goingFirst).length;
+  // ── 手坑统计（动态） ──
+  const presets = data.handtrapPresets || [];
+  const htConfig = data.handtrapConfig || { largeIds: [], compactIds: [] };
+  const htCounts = {};
+  const htByFirst = {};
+  const htBySecond = {};
+  presets.forEach(p => {
+    htCounts[p.id] = matches.filter(m => getMatchHandtraps(m).includes(p.id)).length;
+    htByFirst[p.id] = matches.filter(m => getMatchHandtraps(m).includes(p.id) && m.goingFirst).length;
+    htBySecond[p.id] = matches.filter(m => getMatchHandtraps(m).includes(p.id) && !m.goingFirst).length;
+  });
+  // 额外统计"其他手坑"（_other），以及已删除预设的旧数据
+  const gotOther = matches.filter(m => getMatchHandtraps(m).includes('_other')).length;
+  const allPresetIds = new Set(presets.map(p => p.id));
+  const deletedPresetCount = matches.filter(m => {
+    return getMatchHandtraps(m).some(id => id !== '_other' && !allPresetIds.has(id));
+  }).length;
+  htCounts['_other'] = gotOther + deletedPresetCount;
+  htByFirst['_other'] = matches.filter(m => getMatchHandtraps(m).includes('_other') && m.goingFirst).length;
+  htBySecond['_other'] = matches.filter(m => getMatchHandtraps(m).includes('_other') && !m.goingFirst).length;
+  if (deletedPresetCount > 0) {
+    htByFirst['_other'] += matches.filter(m => {
+      return getMatchHandtraps(m).some(id => id !== '_other' && !allPresetIds.has(id)) && m.goingFirst;
+    }).length;
+    htBySecond['_other'] += matches.filter(m => {
+      return getMatchHandtraps(m).some(id => id !== '_other' && !allPresetIds.has(id)) && !m.goingFirst;
+    }).length;
+  }
+  // 旧字段兼容（保持后端引用不报错）
+  const gotMaxxc = htCounts['gotMaxxc'] || 0;
+  const gotDroll = htCounts['gotDroll'] || 0;
+  const gotJellyfish = htCounts['gotJellyfish'] || 0;
+  const gotLancea = htCounts['gotLancea'] || 0;
+  const gotNibiru = htCounts['gotNibiru'] || 0;
+  const gotDimension = htCounts['gotDimension'] || 0;
+  const gotSmallHT = gotOther;
+  const gotAnyG = matches.filter(m => getMatchHandtraps(m).some(id => ['gotMaxxc', 'gotDroll', 'gotJellyfish'].includes(id))).length;
 
   // ── 卡手统计 ──
   const cantPlay = matches.filter(m => m.cantPlay || m.bothStuck).length;
@@ -270,7 +315,8 @@ function computeStats() {
   const firstMatches = matches.filter(m => m.goingFirst);
   const endboardNormal = firstMatches.filter(m => m.endboardState === 'normal').length;
   const endboardCompromised = firstMatches.filter(m => m.endboardState === 'compromised').length;
-  const endboardStopped = firstMatches.filter(m => m.endboardState === 'stopped').length;
+  const endboardTrueStopped = firstMatches.filter(m => m.endboardState === 'stopped' && !m.opponentRan).length;
+  const opponentSurrendered = firstMatches.filter(m => m.endboardState === 'stopped' && m.opponentRan).length;
   const endboardSurrender = firstMatches.filter(m => m.endboardState === 'surrender').length;
 
   // ── 后手突破统计（仅后手对局） ──
@@ -568,8 +614,14 @@ function computeStats() {
       anyGRate: total > 0 ? ((gotAnyG / total) * 100).toFixed(1) : '0.0',
       nibiruRate: total > 0 ? ((gotNibiru / total) * 100).toFixed(1) : '0.0',
       // 先后手细分（向后兼容，原有字段不变）
-      byFirst: { gotMaxxc: gotMaxxcFirst, gotDroll: gotDrollFirst, gotJellyfish: gotJellyfishFirst, gotLancea: gotLanceaFirst, gotNibiru: gotNibiruFirst, gotDimension: gotDimensionFirst, gotSmallHT: gotSmallHTFirst, gotAnyG: gotAnyGFirst },
-      bySecond: { gotMaxxc: gotMaxxcSecond, gotDroll: gotDrollSecond, gotJellyfish: gotJellyfishSecond, gotLancea: gotLanceaSecond, gotNibiru: gotNibiruSecond, gotDimension: gotDimensionSecond, gotSmallHT: gotSmallHTSecond, gotAnyG: gotAnyGSecond }
+      byFirst: { gotMaxxc: htByFirst['gotMaxxc']||0, gotDroll: htByFirst['gotDroll']||0, gotJellyfish: htByFirst['gotJellyfish']||0, gotLancea: htByFirst['gotLancea']||0, gotNibiru: htByFirst['gotNibiru']||0, gotDimension: htByFirst['gotDimension']||0, gotSmallHT: htByFirst['_other']||0, gotAnyG: matches.filter(m => getMatchHandtraps(m).some(id => ['gotMaxxc','gotDroll','gotJellyfish'].includes(id)) && m.goingFirst).length },
+      bySecond: { gotMaxxc: htBySecond['gotMaxxc']||0, gotDroll: htBySecond['gotDroll']||0, gotJellyfish: htBySecond['gotJellyfish']||0, gotLancea: htBySecond['gotLancea']||0, gotNibiru: htBySecond['gotNibiru']||0, gotDimension: htBySecond['gotDimension']||0, gotSmallHT: htBySecond['_other']||0, gotAnyG: matches.filter(m => getMatchHandtraps(m).some(id => ['gotMaxxc','gotDroll','gotJellyfish'].includes(id)) && !m.goingFirst).length },
+      // 新字段：预设列表 + 配置 + 动态计数
+      presets: data.handtrapPresets || [],
+      config: data.handtrapConfig || { largeIds: [], compactIds: [] },
+      counts: htCounts,
+      byFirstAll: htByFirst,
+      bySecondAll: htBySecond
     },
     handState: {
       cantPlay, cantPlayGarnet, cantPlayDuplicate, cantPlayHT,
@@ -622,8 +674,9 @@ function computeStats() {
       total: firstMatches.length,
       normal: endboardNormal,
       compromised: endboardCompromised,
-      stopped: endboardStopped,
+      stopped: endboardTrueStopped,
       surrender: endboardSurrender,
+      opponentSurrendered: opponentSurrendered,
       normalRate: firstMatches.length > 0 ? ((endboardNormal / firstMatches.length) * 100).toFixed(1) : '0.0'
     },
     breakBoard: {
@@ -1090,6 +1143,71 @@ ipcMain.handle('mydeck:rename', (event, { oldName, newName }) => {
   return { success: true, presets: data.myDeckPresets };
 });
 
+// ── 手坑预设管理 ─────────────────────────────────────────────────
+ipcMain.handle('handtrap:get-all', () => {
+  return (data.handtrapPresets || []);
+});
+
+ipcMain.handle('handtrap:add', (event, { id, label }) => {
+  const l = (label || '').trim();
+  if (!l) return { success: false, error: '名称不能为空' };
+  if (!id) return { success: false, error: 'ID 不能为空' };
+  if (!data.handtrapPresets) data.handtrapPresets = [];
+  if (data.handtrapPresets.some(p => p.id === id)) return { success: false, error: '已存在' };
+  data.handtrapPresets.push({ id, label: l });
+  saveData();
+  notifyWindows();
+  return { success: true, presets: data.handtrapPresets };
+});
+
+ipcMain.handle('handtrap:delete', (event, id) => {
+  if (!data.handtrapPresets) return { success: false };
+  const idx = data.handtrapPresets.findIndex(p => p.id === id);
+  if (idx === -1) return { success: false, error: '未找到' };
+  data.handtrapPresets.splice(idx, 1);
+  // 也从 display 配置中移除
+  const cfg = data.handtrapConfig || { largeIds: [], compactIds: [] };
+  cfg.largeIds = (cfg.largeIds || []).filter(x => x !== id);
+  cfg.compactIds = (cfg.compactIds || []).filter(x => x !== id);
+  saveData();
+  notifyWindows();
+  return { success: true, presets: data.handtrapPresets, config: cfg };
+});
+
+ipcMain.handle('handtrap:rename', (event, { id, newLabel }) => {
+  if (!data.handtrapPresets) return { success: false };
+  const idx = data.handtrapPresets.findIndex(p => p.id === id);
+  if (idx === -1) return { success: false, error: '未找到' };
+  const l = (newLabel || '').trim();
+  if (!l) return { success: false, error: '名称不能为空' };
+  data.handtrapPresets[idx].label = l;
+  saveData();
+  notifyWindows();
+  return { success: true, presets: data.handtrapPresets };
+});
+
+ipcMain.handle('handtrap:set-display', (event, { id, display }) => {
+  // display: 'large' | 'compact' | null (null=归入other)
+  // 最多3个大字显示
+  const MAX_LARGE = 3;
+  if (!data.handtrapConfig) data.handtrapConfig = { largeIds: [], compactIds: [] };
+  const cfg = data.handtrapConfig;
+  // 如果要切成 large 且已达上限，拒绝
+  if (display === 'large') {
+    const currentLarge = (cfg.largeIds || []).filter(x => x !== id);
+    if (currentLarge.length >= MAX_LARGE) {
+      return { success: false, error: '大字显示最多' + MAX_LARGE + '个，请先将其他项降级' };
+    }
+  }
+  cfg.largeIds = (cfg.largeIds || []).filter(x => x !== id);
+  cfg.compactIds = (cfg.compactIds || []).filter(x => x !== id);
+  if (display === 'large') cfg.largeIds.push(id);
+  else if (display === 'compact') cfg.compactIds.push(id);
+  saveData();
+  notifyWindows();
+  return { success: true, config: cfg };
+});
+
 // ── 循环显示面板配置 ────────────────────────────────────────────────
 function getDefaultCycleConfig() {
   return {
@@ -1110,7 +1228,6 @@ function getDefaultCycleConfig() {
       { type: 'endboard', enabled: true, label: '先手终场' },
       { type: 'breakBoard', enabled: true, label: '后手突破' },
       { type: 'handState', enabled: true, label: '卡手率' },
-      { type: 'dealerScrewed', enabled: true, label: '被发牌员制裁' },
       { type: 'mistake', enabled: true, label: '严重失误' },
       { type: 'opponentT0', enabled: true, label: '对手T0动' },
       { type: 'disconnect', enabled: true, label: '掉线统计' },

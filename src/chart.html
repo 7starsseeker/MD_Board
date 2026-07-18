@@ -350,7 +350,6 @@
         { id: 'opp-deck-bar', label: '对战卡组胜率', sub: '对手卡组胜率排行', render: renderOppDeckBar },
         { id: 'streak', label: '连胜状态', sub: '当前连胜/连败', render: renderStreakGauge },
         { id: 'trend', label: '胜率趋势', sub: '累计胜率变化', render: renderWinTrendLine },
-        { id: 'dealer-screwed', label: '被发牌员制裁情况', sub: '完全动不了、互卡次数统计', render: renderDealerScrewed },
         { id: 'handstate', label: '卡手原因', sub: '卡废件/卡同名牌/卡后手牌次数', render: renderHandStatePie },
         { id: 'mistake', label: '严重失误', sub: '失误频率与胜率', render: renderMistakeDoughnut },
         { id: 'opponent-t0', label: '对手T0动', sub: '被对手T0干扰统计', render: renderOpponentT0Doughnut },
@@ -365,6 +364,8 @@
 
       var currentIndex = 0;
       var stats = null;
+      // 过滤掉渲染器不存在的定义（安全防护）
+      var VALID_DEFS = CHART_DEFS.filter(function(def) { return def && def.render; });
 
       // ═══ 构建图表 DOM ═══
       function buildSlides() {
@@ -372,7 +373,7 @@
         var empty = document.getElementById('empty-state');
         empty.style.display = 'none';
 
-        CHART_DEFS.forEach(function(def, i) {
+        VALID_DEFS.forEach(function(def, i) {
           var slide = document.createElement('div');
           slide.className = 'chart-slide' + (i === 0 ? ' active' : '');
           slide.id = 'slide-' + def.id;
@@ -442,7 +443,7 @@
         // 导航圆点
         var dotsEl = document.getElementById('nav-dots');
         dotsEl.innerHTML = '';
-        CHART_DEFS.forEach(function(def, i) {
+        VALID_DEFS.forEach(function(def, i) {
           var dot = document.createElement('span');
           dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
           dot.dataset.index = i;
@@ -453,16 +454,16 @@
 
       // ═══ 切换 ═══
       function goTo(index) {
-        if (index < 0) index = CHART_DEFS.length - 1;
-        if (index >= CHART_DEFS.length) index = 0;
+        if (index < 0) index = VALID_DEFS.length - 1;
+        if (index >= VALID_DEFS.length) index = 0;
         if (index === currentIndex) return;
 
         var direction = index > currentIndex ? 'right' : 'left';
         var oldIndex = currentIndex;
         currentIndex = index;
 
-        var oldSlide = document.getElementById('slide-' + CHART_DEFS[oldIndex].id);
-        var newSlide = document.getElementById('slide-' + CHART_DEFS[currentIndex].id);
+        var oldSlide = document.getElementById('slide-' + VALID_DEFS[oldIndex].id);
+        var newSlide = document.getElementById('slide-' + VALID_DEFS[currentIndex].id);
 
         // 设置新 slide 的进入方向
         newSlide.className = 'chart-slide slide-in-' + direction;
@@ -482,7 +483,7 @@
       function prev() { goTo(currentIndex - 1); }
 
       function updateNav() {
-        document.getElementById('nav-indicator').textContent = (currentIndex + 1) + ' / ' + CHART_DEFS.length;
+        document.getElementById('nav-indicator').textContent = (currentIndex + 1) + ' / ' + VALID_DEFS.length;
         document.querySelectorAll('.nav-dot').forEach(function(dot, i) {
           dot.classList.toggle('active', i === currentIndex);
         });
@@ -491,7 +492,7 @@
       // ═══ 渲染当前图表 ═══
       function renderCurrentChart() {
         if (!stats) return;
-        var def = CHART_DEFS[currentIndex];
+        var def = VALID_DEFS[currentIndex];
         var canvas = document.getElementById('chart-w-' + def.id);
         if (!canvas) return;
         var infoEl = document.getElementById('info-' + def.id);

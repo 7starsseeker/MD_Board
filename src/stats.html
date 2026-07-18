@@ -376,7 +376,6 @@
         <div class="card-icon" style="background:rgba(200,100,255,0.12)">🛡️</div>
         <div>
           <div class="card-title-text">吃手坑统计</div>
-          <div class="card-subtitle">增殖的G / 陨石 / 鸟G / 锁鸟 / 大宇宙人 / 其他 · 含先后手细分</div>
         </div>
       </div>
       <div id="handtrap-content"></div>
@@ -388,7 +387,6 @@
         <div class="card-icon" style="background:rgba(255,100,130,0.12)">🃏</div>
         <div>
           <div class="card-title-text">手牌与卡手统计</div>
-          <div class="card-subtitle">卡手原因：卡废件/卡同名牌/卡后手牌 · 制裁：完全动不了/互卡</div>
         </div>
       </div>
       <div id="handstate-content"></div>
@@ -436,7 +434,7 @@
         <div class="card-icon" style="background:rgba(76,217,100,0.12)">🏰</div>
         <div>
           <div class="card-title-text">先手终场质量</div>
-          <div class="card-subtitle">正常终场 · 妥协场 · 没做出来 · 投降</div>
+          <div class="card-subtitle">正常终场 · 妥协场 · 没做出来 · 对手先投降</div>
         </div>
       </div>
       <div id="endboard-content"></div>
@@ -695,34 +693,55 @@
       function renderHandtrap(stats) {
         var h = stats.handtrap;
         var t = stats.total;
-        var mxR = t > 0 ? ((h.gotMaxxc / t) * 100).toFixed(1) : '0.0';
-        var drR = t > 0 ? ((h.gotDroll / t) * 100).toFixed(1) : '0.0';
-        var jfR = t > 0 ? ((h.gotJellyfish / t) * 100).toFixed(1) : '0.0';
-        var laR = t > 0 ? ((h.gotLancea / t) * 100).toFixed(1) : '0.0';
-        var niR = t > 0 ? ((h.gotNibiru / t) * 100).toFixed(1) : '0.0';
-        var agR = t > 0 ? ((h.gotAnyG / t) * 100).toFixed(1) : '0.0';
-        var diR = t > 0 ? ((h.gotDimension / t) * 100).toFixed(1) : '0.0';
-        var smR = t > 0 ? ((h.gotSmallHT / t) * 100).toFixed(1) : '0.0';
-        var bf = h.byFirst || {}, bs = h.bySecond || {};
-        var html =
-          '<div class="stat-row"><span class="label">增殖的G</span><span class="value">' + h.gotMaxxc + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + mxR + '%</span></div>' +
-          '<div class="stat-row"><span class="label">鸟G</span><span class="value">' + h.gotDroll + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + drR + '%</span></div>' +
-          '<div class="stat-row"><span class="label">水母G</span><span class="value">' + h.gotJellyfish + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + jfR + '%</span></div>' +
-          '<div class="stat-row"><span class="label">锁鸟</span><span class="value">' + h.gotLancea + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + laR + '%</span></div>' +
-          '<div class="stat-row"><span class="label">陨石</span><span class="value">' + h.gotNibiru + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + niR + '%</span></div>' +
-          '<div class="stat-row"><span class="label">大宇宙人 / 次元系</span><span class="value">' + h.gotDimension + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + diR + '%</span></div>' +
-          '<div class="stat-row"><span class="label">其他手坑</span><span class="value">' + h.gotSmallHT + ' 次</span><span style="font-size:11px;color:var(--text-dim)">' + smR + '%</span></div>' +
-          '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label">吃G率（一场对局中吃到G+鸟G+水母G）</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill purple" style="width:' + parseFloat(agR) + '%"></div></div><span class="value info">' + fmt(agR) + '%</span><span style="font-size:11px;color:var(--text-dim)">（' + h.gotAnyG + ' 次）</span></div></div>' +
-          '<div style="margin-top:5px;border-top:1px solid var(--border);padding-top:5px"><span style="font-size:11px;color:var(--accent);font-weight:600">先后手细分</span></div>' +
-          '<div class="stat-row"><span class="label">增殖的G</span><span class="value">先 ' + (bf.gotMaxxc||0) + ' / 后 ' + (bs.gotMaxxc||0) + '</span></div>' +
-          '<div class="stat-row"><span class="label">鸟G</span><span class="value">先 ' + (bf.gotDroll||0) + ' / 后 ' + (bs.gotDroll||0) + '</span></div>' +
-          '<div class="stat-row"><span class="label">水母G</span><span class="value">先 ' + (bf.gotJellyfish||0) + ' / 后 ' + (bs.gotJellyfish||0) + '</span></div>' +
-          '<div class="stat-row"><span class="label">锁鸟</span><span class="value">先 ' + (bf.gotLancea||0) + ' / 后 ' + (bs.gotLancea||0) + '</span></div>' +
-          '<div class="stat-row"><span class="label">陨石</span><span class="value">先 ' + (bf.gotNibiru||0) + ' / 后 ' + (bs.gotNibiru||0) + '</span></div>' +
-          '<div class="stat-row"><span class="label">大宇宙人</span><span class="value">先 ' + (bf.gotDimension||0) + ' / 后 ' + (bs.gotDimension||0) + '</span></div>' +
-          '<div class="stat-row"><span class="label">其他手坑</span><span class="value">先 ' + (bf.gotSmallHT||0) + ' / 后 ' + (bs.gotSmallHT||0) + '</span></div>' +
-          '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:5px;margin-top:3px"><span class="label">先手吃G率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill purple" style="width:' + (t > 0 ? ((bf.gotAnyG||0) / t * 100) : 0) + '%"></div></div><span class="value info">' + (t > 0 ? ((bf.gotAnyG||0) / t * 100).toFixed(1) : '0.0') + '%</span><span style="font-size:11px;color:var(--text-dim)">（' + (bf.gotAnyG||0) + ' 次）</span></div></div>' +
-          '<div class="stat-row"><span class="label">后手吃G率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill purple" style="width:' + (t > 0 ? ((bs.gotAnyG||0) / t * 100) : 0) + '%"></div></div><span class="value info">' + (t > 0 ? ((bs.gotAnyG||0) / t * 100).toFixed(1) : '0.0') + '%</span><span style="font-size:11px;color:var(--text-dim)">（' + (bs.gotAnyG||0) + ' 次）</span></div></div>';
+        var presets = h.presets || [];
+        var cfg = h.config || { largeIds: [], compactIds: [] };
+        var counts = h.counts || {};
+        var bf = h.byFirstAll || {}, bs = h.bySecondAll || {};
+        var agR = h.anyGRate || (t > 0 ? ((h.gotAnyG / t) * 100).toFixed(1) : '0.0');
+        var gotOther = counts['_other'] || 0;
+
+        // large 区
+        var largeHtml = '';
+        var largeIds = (cfg.largeIds || []).filter(function(id) { return presets.some(function(p) { return p.id === id; }); });
+        var compactIds = (cfg.compactIds || []).filter(function(id) { return presets.some(function(p) { return p.id === id; }); });
+        var otherIds = presets.filter(function(p) { return largeIds.indexOf(p.id) < 0 && compactIds.indexOf(p.id) < 0; }).map(function(p) { return p.id; });
+
+        largeIds.forEach(function(id) {
+          var p = presets.find(function(x) { return x.id === id; });
+          if (!p) return;
+          var cnt = counts[id] || 0;
+          var rate = t > 0 ? (cnt / t * 100).toFixed(1) : '0.0';
+          var barW = parseFloat(rate);
+          largeHtml += '<div class="stat-row"><span class="label" style="font-size:14px;font-weight:700">' + p.label + '</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill purple" style="width:' + barW + '%"></div></div><span class="value" style="font-size:15px;font-weight:800">' + cnt + '<span style="font-size:11px;font-weight:400;color:var(--text-dim)"> (' + rate + '%)</span></span></div></div>';
+        });
+
+        // compact 区（一行小字）
+        var compactParts = [];
+        compactIds.forEach(function(id) {
+          var p = presets.find(function(x) { return x.id === id; });
+          if (!p) return;
+          var cnt = counts[id] || 0;
+          compactParts.push(p.label + ' ' + cnt);
+        });
+        var compactHtml = compactParts.length > 0 ? '<div style="margin-top:4px;padding:2px 0;font-size:12px;color:var(--text-dim);border-top:1px solid var(--border)">' + compactParts.join(' · ') + '</div>' : '';
+
+        // other 区
+        var otherTotal = gotOther;
+        otherIds.forEach(function(id) { otherTotal += (counts[id] || 0); });
+        var otherHtml = otherTotal > 0 ? '<div style="font-size:12px;color:var(--text-dim);padding:2px 0">其他手坑 ' + otherTotal + '</div>' : '';
+
+        var html = largeHtml + compactHtml + otherHtml;
+
+        // 先后手细分
+        html += '<div style="margin-top:5px;border-top:1px solid var(--border);padding-top:5px"><span style="font-size:11px;color:var(--accent);font-weight:600">先后手细分</span></div>';
+        presets.forEach(function(p) {
+          var cFirst = bf[p.id] || 0;
+          var cSecond = bs[p.id] || 0;
+          html += '<div class="stat-row"><span class="label">' + p.label + '</span><span class="value">先 ' + cFirst + ' / 后 ' + cSecond + '</span></div>';
+        });
+        // _other
+        html += '<div class="stat-row"><span class="label">其他手坑</span><span class="value">先 ' + (bf['_other']||0) + ' / 后 ' + (bs['_other']||0) + '</span></div>';
+
         document.getElementById('handtrap-content').innerHTML = html;
       }
 
@@ -744,9 +763,8 @@
           '<div class="stat-row"><span class="label">　卡废件</span><span class="value">' + fs(bf.cantPlayGarnet, bs.cantPlayGarnet) + '</span></div>' +
           '<div class="stat-row"><span class="label">　卡同名牌</span><span class="value">' + fs(bf.cantPlayDuplicate, bs.cantPlayDuplicate) + '</span></div>' +
           '<div class="stat-row"><span class="label">　卡后手牌</span><span class="value">' + fs(bf.cantPlayHT, bs.cantPlayHT) + '</span></div>' +
-          '<div style="padding:6px 0 2px 0;font-size:13px;font-weight:700;color:#ff6b62">🔨 被发牌员制裁</div>' +
-          '<div class="stat-row"><span class="label">　完全动不了</span><span class="value bad">' + fsr(bf.cantPlay, bs.cantPlay) + '</span></div>' +
           '<div class="stat-row"><span class="label">　互卡</span><span class="value warn">' + fsr(bf.bothStuck, bs.bothStuck) + '</span></div>' +
+          '<div class="stat-row"><span class="label">　完全动不了</span><span class="value bad">' + fsr(bf.cantPlay, bs.cantPlay) + '</span></div>' +
           '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label">合计卡手率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + cr + '%"></div></div><span class="value bad">' + fmt(hs.cantPlayRate) + '%</span></div></div>' +
           '<div style="font-size:10px;color:var(--text-dim);margin-top:3px;text-align:right">先后手明细 &nbsp;<span style="color:var(--accent)">■先</span> <span style="color:#ff9f0a">■后</span></div>';
         // ── 各卡组卡手明细 ──
@@ -755,7 +773,7 @@
           html += '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">' +
             '<div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px">📊 各卡组卡手明细</div>' +
             '<div style="font-size:10px;color:var(--text-dim);margin-bottom:4px;display:flex;justify-content:space-between;padding:0 2px">' +
-            '<span>卡组</span><span>对局</span><span>卡手率</span><span>卡手/废件/同名/后手/互卡</span></div>';
+            '<span>卡组</span><span>对局</span><span>卡手率</span><span>卡手/废件/同名/后手/互卡/动不了</span></div>';
           bd.forEach(function(d) {
             var rate = parseFloat(d.cantPlayRate) || 0;
             var color = rate > 30 ? '#ff3b30' : (rate > 15 ? '#ffd700' : '#4cd964');
@@ -764,7 +782,7 @@
               '<span style="margin:0 4px;color:var(--text-dim)">' + d.total + '场</span>' +
               '<div class="bar-wrap" style="flex:1;min-width:50px;max-width:80px"><div class="bar-track" style="height:8px"><div class="bar-fill" style="width:' + rate + '%;background:' + color + '"></div></div></div>' +
               '<span class="value" style="font-size:10px;min-width:32px;color:' + color + '">' + d.cantPlayRate + '%</span>' +
-              '<span style="font-size:9px;color:var(--text-dim);white-space:nowrap">' + d.cantPlayCount + '/' + d.cantPlayGarnetCount + '/' + d.cantPlayDuplicateCount + '/' + d.cantPlayHTCount + '/' + d.bothStuckCount + '</span>' +
+              '<span style="font-size:9px;color:var(--text-dim);white-space:nowrap">' + d.cantPlayCount + '/' + d.cantPlayGarnetCount + '/' + d.cantPlayDuplicateCount + '/' + d.cantPlayHTCount + '/' + d.bothStuckCount + '/' + (d.cantPlayAlone||0) + '</span>' +
               '</div>';
           });
           html += '</div>';
@@ -863,10 +881,13 @@
         var cP = (eb.compromised / t * 100).toFixed(1);
         var sP = (eb.stopped / t * 100).toFixed(1);
         var suP = (eb.surrender / t * 100).toFixed(1);
+        var os = eb.opponentSurrendered || 0;
+        var osP = t > 0 ? (os / t * 100).toFixed(1) : '0.0';
         document.getElementById('endboard-content').innerHTML =
           '<div class="stat-row"><span class="label">正常终场</span><span class="value good">' + eb.normal + ' (' + nP + '%)</span></div>' +
           '<div class="stat-row"><span class="label">妥协场</span><span class="value warn">' + eb.compromised + ' (' + cP + '%)</span></div>' +
           '<div class="stat-row"><span class="label">没做出来</span><span class="value bad">' + eb.stopped + ' (' + sP + '%)</span></div>' +
+          '<div class="stat-row"><span class="label">对手先投降</span><span class="value info">' + os + ' (' + osP + '%)</span></div>' +
           '<div class="stat-row"><span class="label">投降</span><span class="value bad">' + eb.surrender + ' (' + suP + '%)</span></div>' +
           '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px">' +
             '<span class="label">正常终场率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill green" style="width:' + parseFloat(nP) + '%"></div></div><span class="value good">' + fmt(nP) + '%</span></div></div>';
@@ -1404,16 +1425,17 @@
             '<div class="stat-row"><span class="label">后手胜率</span><span class="value ' + winCls(data.secondWinRate) + '">' + data.secondWinRate + '%</span></div>' +
             '<div class="stat-row"><span class="label">卡手率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(data.cantPlayRate) + '%"></div></div><span class="value bad">' + data.cantPlayRate + '%</span></div></div>' +
             '<div class="stat-row"><span class="label">对手大牌率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(data.bigHandRate) + '%"></div></div><span class="value bad">' + data.bigHandRate + '%</span></div></div>';
-          // 吃手坑情况
+          // 吃手坑情况（动态）
           var ht = data.handtrap;
-          h += '<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span style="font-size:11px;color:var(--accent);font-weight:600">吃手坑情况</span></div>' +
-            '<div class="stat-row"><span class="label">增殖的G</span><span class="value">' + ht.gotMaxxc + ' 次</span></div>' +
-            '<div class="stat-row"><span class="label">鸟G</span><span class="value">' + ht.gotDroll + ' 次</span></div>' +
-            '<div class="stat-row"><span class="label">水母G</span><span class="value">' + ht.gotJellyfish + ' 次</span></div>' +
-            '<div class="stat-row"><span class="label">锁鸟</span><span class="value">' + ht.gotLancea + ' 次</span></div>' +
-            '<div class="stat-row"><span class="label">陨石</span><span class="value">' + ht.gotNibiru + ' 次</span></div>' +
-            '<div class="stat-row"><span class="label">大宇宙人</span><span class="value">' + ht.gotDimension + ' 次</span></div>' +
-            '<div class="stat-row"><span class="label">其他手坑</span><span class="value">' + ht.gotSmallHT + ' 次</span></div>';
+          var htPresets = ht.presets || [];
+          var htCounts = ht.counts || {};
+          var htSection = '<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span style="font-size:11px;color:var(--accent);font-weight:600">吃手坑情况</span></div>';
+          htPresets.forEach(function(p) {
+            var cnt = htCounts[p.id] || 0;
+            htSection += '<div class="stat-row"><span class="label">' + p.label + '</span><span class="value">' + cnt + ' 次</span></div>';
+          });
+          htSection += '<div class="stat-row"><span class="label">其他手坑</span><span class="value">' + (htCounts['_other'] || 0) + ' 次</span></div>';
+          h += htSection;
           // 对手卡组分布（详细统计显示全部）
           if (data.oppDecks && data.oppDecks.length > 0) {
             h += '<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span style="font-size:11px;color:var(--accent);font-weight:600">对手卡组分布</span></div>';

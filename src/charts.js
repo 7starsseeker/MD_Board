@@ -198,11 +198,31 @@ function renderHandtrapPie(canvas, stats, options) {
   destroyChart(canvas._chart);
   var ctx = canvas.getContext('2d');
   var ht = stats.handtrap;
-  var labels = ['增殖的G','鸟G','水母G','锁鸟','陨石','大宇宙人','其他手坑'];
-  var values = [ht.gotMaxxc, ht.gotDroll, ht.gotJellyfish, ht.gotLancea, ht.gotNibiru, ht.gotDimension, ht.gotSmallHT];
+  var presets = ht.presets || [];
+  var cfg = ht.config || { largeIds: [], compactIds: [] };
+  var counts = ht.counts || {};
+  var bfAll = ht.byFirstAll || {}, bsAll = ht.bySecondAll || {};
+
+  // 排序：large → compact → other → _other
+  var largeIds = (cfg.largeIds || []).filter(function(id) { return presets.some(function(p) { return p.id === id; }); });
+  var compactIds = (cfg.compactIds || []).filter(function(id) { return presets.some(function(p) { return p.id === id; }); });
+  var otherIds = presets.filter(function(p) { return largeIds.indexOf(p.id) < 0 && compactIds.indexOf(p.id) < 0; }).map(function(p) { return p.id; });
+  var orderedIds = largeIds.concat(compactIds).concat(otherIds);
+
+  var labels = [];
+  var values = [];
+  orderedIds.forEach(function(id) {
+    var p = presets.find(function(x) { return x.id === id; });
+    labels.push(p ? p.label : id);
+    values.push(counts[id] || 0);
+  });
+  // _other 最后
+  labels.push('其他手坑');
+  values.push(counts['_other'] || 0);
+
   var total = values.reduce(function(a,b){return a+b;}, 0);
   if (total === 0) { canvas._chart = null; return null; }
-  // 改用柱状图：每种手坑独立展示发生次数，不暗示互斥
+
   canvas._chart = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -210,7 +230,7 @@ function renderHandtrapPie(canvas, stats, options) {
       datasets: [{
         label: '被吃次数',
         data: values,
-        backgroundColor: getColors(7),
+        backgroundColor: getColors(labels.length),
         borderRadius: 3
       }]
     },
@@ -234,37 +254,24 @@ function renderHandtrapPie(canvas, stats, options) {
       }
     }
   });
-  // info 面板：精确计数 + 吃G率/吃陨率
+  // info 面板
   var info = options && options.infoEl;
   if (info) {
     info.className = 'chart-info active';
-    var gTotal = ht.gotMaxxc + ht.gotDroll + ht.gotJellyfish;
-    var gRate = stats.total > 0 ? (gTotal / stats.total * 100) : 0;
-    var nRate = stats.total > 0 ? (ht.gotNibiru / stats.total * 100) : 0;
-    var bf = ht.byFirst || {}, bs = ht.bySecond || {};
-    var infoHtml =
-      infoSection('精确计数') +
-      infoRow('增殖的G', ht.gotMaxxc + ' 次') +
-      infoRow('鸟G', ht.gotDroll + ' 次') +
-      infoRow('水母G', ht.gotJellyfish + ' 次') +
-      infoRow('锁鸟', ht.gotLancea + ' 次') +
-      infoRow('陨石', ht.gotNibiru + ' 次') +
-      infoRow('大宇宙人', ht.gotDimension + ' 次') +
-      infoRow('其他手坑', ht.gotSmallHT + ' 次') +
-      infoSection('先后手细分') +
-      infoRow('增殖的G', '先 ' + (bf.gotMaxxc||0) + ' / 后 ' + (bs.gotMaxxc||0)) +
-      infoRow('鸟G', '先 ' + (bf.gotDroll||0) + ' / 后 ' + (bs.gotDroll||0)) +
-      infoRow('水母G', '先 ' + (bf.gotJellyfish||0) + ' / 后 ' + (bs.gotJellyfish||0)) +
-      infoRow('锁鸟', '先 ' + (bf.gotLancea||0) + ' / 后 ' + (bs.gotLancea||0)) +
-      infoRow('陨石', '先 ' + (bf.gotNibiru||0) + ' / 后 ' + (bs.gotNibiru||0)) +
-      infoRow('大宇宙人', '先 ' + (bf.gotDimension||0) + ' / 后 ' + (bs.gotDimension||0)) +
-      infoRow('其他手坑', '先 ' + (bf.gotSmallHT||0) + ' / 后 ' + (bs.gotSmallHT||0)) +
-      infoSection('汇总');
-    // G 系列合计
-    infoHtml += infoRow('先手吃G率', (stats.total > 0 ? ((bf.gotAnyG||0) / stats.total * 100).toFixed(1) : '0.0') + '%') +
-      infoRow('后手吃G率', (stats.total > 0 ? ((bs.gotAnyG||0) / stats.total * 100).toFixed(1) : '0.0') + '%') +
-      infoRow('G系列合计', gTotal + ' 次') +
-      infoBar('吃G率', gRate, 'gold');
+    var infoHtml = infoSection('精确计数');
+    orderedIds.forEach(function(id) {
+      var p = presets.find(function(x) { return x.id === id; });
+      if (!p) return;
+      infoHtml += infoRow(p.label, (counts[id]||0) + ' 次');
+    });
+    infoHtml += infoRow('其他手坑', (counts['_other']||0) + ' 次');
+    infoHtml += infoSection('先后手细分');
+    orderedIds.forEach(function(id) {
+      var p = presets.find(function(x) { return x.id === id; });
+      if (!p) return;
+      infoHtml += infoRow(p.label, '先 ' + (bfAll[id]||0) + ' / 后 ' + (bsAll[id]||0));
+    });
+    infoHtml += infoRow('其他手坑', '先 ' + (bfAll['_other']||0) + ' / 后 ' + (bsAll['_other']||0));
     info.innerHTML = infoHtml;
   }
   return canvas._chart;
@@ -279,13 +286,14 @@ function renderEndboardPie(canvas, stats, options) {
   var eb = stats.endboard;
   if (!eb || eb.total === 0) { canvas._chart = null; return null; }
   var nPct = eb.total > 0 ? (eb.normal / eb.total * 100) : 0;
+  var os = eb.opponentSurrendered || 0;
   canvas._chart = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: ['正常终场','妥协场','没做出来','投降'],
+      labels: ['正常终场','妥协场','没做出来','投降','对手先投降'],
       datasets: [{
-        data: [eb.normal, eb.compromised, eb.stopped, eb.surrender],
-        backgroundColor: ['#4cd964','#ffd700','#ff3b30','#8888a0'],
+        data: [eb.normal, eb.compromised, eb.stopped, eb.surrender, os],
+        backgroundColor: ['#4cd964','#ffd700','#ff3b30','#8888a0','#64c8ff'],
         borderWidth: 0
       }]
     },
@@ -329,6 +337,7 @@ function renderEndboardPie(canvas, stats, options) {
       infoRow('妥协场', eb.compromised + ' (' + fmt(eb.compromised/t*100) + '%)', 'warn') +
       infoRow('没做出来', eb.stopped + ' (' + fmt(eb.stopped/t*100) + '%)', 'bad') +
       infoRow('投降', eb.surrender + ' (' + fmt(eb.surrender/t*100) + '%)') +
+      infoRow('对手先投降', os + ' (' + fmt(os/t*100) + '%)', 'info') +
       infoSection('汇总') +
       infoBar('正常终场率', nPct, 'green');
   }
@@ -889,7 +898,7 @@ function renderCoinAnomaly(canvas, stats, options) {
 }
 
 /**
- * 10. 卡手原因分布（横向柱状图 — 仅卡手相关，不含完全动不了和互卡）
+ * 10. 卡手原因分布（横向柱状图 — 卡废件/卡同名牌/卡后手牌）
  */
 function renderHandStatePie(canvas, stats, options) {
   destroyChart(canvas._chart);
@@ -942,9 +951,9 @@ function renderHandStatePie(canvas, stats, options) {
       infoRow('卡废件', (hs.cantPlayGarnet||0) + '  先 ' + (bf.cantPlayGarnet||0) + '/' + gft + '  后 ' + (bs.cantPlayGarnet||0) + '/' + gst) +
       infoRow('卡同名牌', (hs.cantPlayDuplicate||0) + '  先 ' + (bf.cantPlayDuplicate||0) + '/' + gft + '  后 ' + (bs.cantPlayDuplicate||0) + '/' + gst) +
       infoRow('卡后手牌', (hs.cantPlayHT||0) + '  先 ' + (bf.cantPlayHT||0) + '/' + gft + '  后 ' + (bs.cantPlayHT||0) + '/' + gst) +
-      infoSection('被发牌员制裁') +
+      infoRow('互卡', (hs.bothStuck||0) + '  先 ' + (bf.bothStuck||0) + '/' + gft + '  后 ' + (bs.bothStuck||0) + '/' + gst) +
+      infoSection('完全动不了') +
       infoRow('完全动不了', (hs.cantPlay||0) + '  先 ' + (bf.cantPlay||0) + ' · 后 ' + (bs.cantPlay||0)) +
-      infoRow('互卡', (hs.bothStuck||0) + '  先 ' + (bf.bothStuck||0) + ' · 后 ' + (bs.bothStuck||0)) +
       infoSection('卡手率') +
       infoBar('全局', hs.cantPlayRate, 'red') +
       infoBar('先手', fmtRate(bf.totalCantPlay, gft), 'gold') +
@@ -963,14 +972,14 @@ function renderHandStatePie(canvas, stats, options) {
 }
 
 /**
- * 10b. 被发牌员制裁情况（横向柱状图 — 完全动不了 + 互卡）
+ * 10b. 完全动不了统计（横向柱状图）
  */
 function renderDealerScrewed(canvas, stats, options) {
   destroyChart(canvas._chart);
   var ctx = canvas.getContext('2d');
   var hs = stats.handState || {};
-  var labels = ['完全动不了','互卡'];
-  var values = [hs.cantPlay||0, hs.bothStuck||0];
+  var labels = ['完全动不了'];
+  var values = [hs.cantPlay||0];
   var total = values.reduce(function(a,b){return a+b;}, 0);
   if (total === 0) { canvas._chart = null; return null; }
   canvas._chart = new Chart(ctx, {
@@ -980,7 +989,7 @@ function renderDealerScrewed(canvas, stats, options) {
       datasets: [{
         label: '次数',
         data: values,
-        backgroundColor: getColors(2),
+        backgroundColor: getColors(1),
         borderRadius: 3
       }]
     },
@@ -1715,6 +1724,16 @@ function renderRankedStats(canvas, stats, options) {
   function buildBlock(data, icon, label, color) {
     if (!data) return '';
     var ht = data.handtrap;
+    // 手坑摘要（动态）
+    var htPresets = ht.presets || [];
+    var htCounts = ht.counts || {};
+    var htSummaryParts = [];
+    htPresets.forEach(function(p) {
+      var cnt = htCounts[p.id] || 0;
+      htSummaryParts.push(p.label + ' ' + cnt);
+    });
+    var otherCnt = htCounts['_other'] || 0;
+    if (otherCnt > 0) htSummaryParts.push('其他 ' + otherCnt);
     return '<div style="flex:1;min-width:0;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px;text-align:center">' +
       '<div style="font-size:14px;font-weight:700;color:' + color + ';margin-bottom:4px">' + icon + ' ' + label + '</div>' +
       '<div style="font-size:24px;font-weight:800;color:' + color + '">' + data.winRate + '%</div>' +
@@ -1725,9 +1744,8 @@ function renderRankedStats(canvas, stats, options) {
         '<span style="color:var(--text-dim)">后手</span><span style="color:var(--text-bright);font-weight:700;font-family:var(--font-mono);text-align:right">' + data.secondWinRate + '%</span>' +
         '<span style="color:var(--text-dim)">卡手率</span><span style="color:#ff3b30;font-weight:700;font-family:var(--font-mono);text-align:right">' + data.cantPlayRate + '%</span>' +
         '<span style="color:var(--text-dim)">遇到大牌哥</span><span style="color:#ff3b30;font-weight:700;font-family:var(--font-mono);text-align:right">' + data.bigHandRate + '%</span>' +
-        '<span style="color:var(--text-dim)">吃G率</span><span style="color:#ffd700;font-weight:700;font-family:var(--font-mono);text-align:right">' + fmt(ht.gotAnyG / (stats.total||1) * 100) + '%</span>' +
       '</div>' +
-      '<div style="font-size:10px;color:var(--text-dim);margin-top:4px;border-top:1px solid rgba(255,255,255,0.05);padding-top:3px">手坑: G' + ht.gotMaxxc + ' 鸟G' + ht.gotDroll + ' 水母G' + ht.gotJellyfish + ' 锁' + ht.gotLancea + ' 陨' + ht.gotNibiru + ' 宇宙人' + ht.gotDimension + '</div>' +
+      '<div style="font-size:10px;color:var(--text-dim);margin-top:4px;border-top:1px solid rgba(255,255,255,0.05);padding-top:3px">手坑: ' + htSummaryParts.join(' · ') + '</div>' +
     '</div>';
   }
 

@@ -190,6 +190,8 @@
     }
     .title-bar .title-actions button:hover { color: var(--text-dim); background: rgba(255,255,255,0.06); }
     .title-bar .title-actions .close-btn:hover { color: #ff4444; }
+    .title-bar .title-actions #btn-pause { background: rgba(100,200,255,0.15); color: #64c8ff; font-size:13px; }
+    .title-bar .title-actions #btn-pause:hover { background: rgba(100,200,255,0.3); }
 
     .empty-state {
       display: flex;
@@ -210,6 +212,8 @@
       <span class="title">🔄 循环显示</span>
       <span style="font-size:11px;color:#e8e8f0;flex:1;text-align:center" id="cycle-time-range-label"></span>
       <div class="title-actions">
+        <button id="btn-cycle-prev" style="display:none" title="上一个">◀</button>
+        <button id="btn-cycle-next" style="display:none" title="下一个">▶</button>
         <button id="btn-pause" title="暂停/继续">⏸</button>
         <button class="close-btn" id="btn-close" title="关闭">✕</button>
       </div>
@@ -322,21 +326,57 @@
       RENDERERS.handtrapRate = function(s) {
         var ht = s.handtrap;
         var t = s.total;
-        var laR = t > 0 ? (ht.gotLancea / t * 100).toFixed(1) : '0.0';
-        var niR = t > 0 ? (ht.gotNibiru / t * 100).toFixed(1) : '0.0';
-        var agR = ht.anyGRate || (t > 0 ? (ht.gotAnyG / t * 100).toFixed(1) : '0.0');
-        var bf = ht.byFirst || {}, bs = ht.bySecond || {};
-        var detailHtml = '<div style="font-size:12px;color:var(--text-dim);margin-top:2px">先手 G' + (bf.gotMaxxc||0) + ' 鸟' + (bf.gotDroll||0) + ' 水母' + (bf.gotJellyfish||0) + ' 锁' + (bf.gotLancea||0) + ' 陨' + (bf.gotNibiru||0) + ' 宇宙人' + (bf.gotDimension||0) + ' 其他' + (bf.gotSmallHT||0) + ' · 后手 G' + (bs.gotMaxxc||0) + ' 鸟' + (bs.gotDroll||0) + ' 水母' + (bs.gotJellyfish||0) + ' 锁' + (bs.gotLancea||0) + ' 陨' + (bs.gotNibiru||0) + ' 宇宙人' + (bs.gotDimension||0) + ' 其他' + (bs.gotSmallHT||0) + '</div>';
+        var presets = ht.presets || [];
+        var cfg = ht.config || { largeIds: [], compactIds: [] };
+        var counts = ht.counts || {};
+
+        var largeIds = (cfg.largeIds || []).filter(function(id) { return presets.some(function(p) { return p.id === id; }); });
+        var compactIds = (cfg.compactIds || []).filter(function(id) { return presets.some(function(p) { return p.id === id; }); });
+
+        // 最多取前3个 large 作为高亮
+        var top3 = largeIds.slice(0, 3);
+        var topHtml = '';
+        top3.forEach(function(id) {
+          var p = presets.find(function(x) { return x.id === id; });
+          if (!p) return;
+          var cnt = counts[id] || 0;
+          var r = t > 0 ? (cnt / t * 100).toFixed(1) : '0.0';
+          var colors = ['#ffd700', '#64c8ff', '#ff3b30'];
+          var ci = top3.indexOf(id) % colors.length;
+          topHtml += '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:' + colors[ci] + '">' + cnt + ' <span style="font-size:13px;font-weight:400">(' + fmt(r) + '%)</span></div><div style="font-size:12px;color:#ffffff">' + p.label + '</div></div>';
+        });
+        // 如果 large 不足3个补空位
+        var shown = top3.length;
+        while (shown < 3) {
+          topHtml += '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:var(--text-dim)">—</div><div style="font-size:12px;color:var(--text-dim)">—</div></div>';
+          shown++;
+        }
+
+        // 其他手坑一行：剩余large（第4个起）+ compact + 未归类
+        var otherParts = [];
+        largeIds.slice(3).concat(compactIds).forEach(function(id) {
+          var p = presets.find(function(x) { return x.id === id; });
+          if (!p) return;
+          var cnt = counts[id] || 0;
+          otherParts.push(p.label + ' ' + cnt);
+        });
+        var otherTotal = counts['_other'] || 0;
+        presets.forEach(function(p) {
+          if (largeIds.indexOf(p.id) < 0 && compactIds.indexOf(p.id) < 0) {
+            otherTotal += (counts[p.id] || 0);
+          }
+        });
+        if (otherTotal > 0) otherParts.push('其他 ' + otherTotal);
+
+        var detailHtml = otherParts.length > 0 ? '<div style="font-size:12px;color:var(--text-dim);text-align:center;margin-top:2px">' + otherParts.join(' · ') + '</div>' : '';
         return {
-          label: '吃G率 ' + agR + '%',
-          subLabel: '吃锁率 ' + laR + '%',
+          label: s.total + '',
+          subLabel: '总对局',
           html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:2px">' +
                   '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 10px;width:100%;max-width:300px">' +
-                    '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#ffd700">' + fmt(agR) + '%</div><div style="font-size:12px;color:#ffffff">吃G率</div></div>' +
-                    '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#64c8ff">' + fmt(laR) + '%</div><div style="font-size:12px;color:#ffffff">锁鸟</div></div>' +
-                    '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:#ff3b30">' + fmt(niR) + '%</div><div style="font-size:12px;color:#ffffff">陨石</div></div>' +
+                    topHtml +
                   '</div>' +
-                  '<div style="font-size:12px;color:#ffffff;text-align:center;margin-top:2px">增殖G ' + ht.gotMaxxc + ' · 鸟G ' + ht.gotDroll + ' · 水母G ' + ht.gotJellyfish + ' · 锁鸟 ' + ht.gotLancea + ' · 陨石 ' + ht.gotNibiru + ' · 大宇宙人 ' + ht.gotDimension + ' · 其他 ' + ht.gotSmallHT + '</div>' + detailHtml +
+                  detailHtml +
                 '</div>' +
                 '<div style="font-size:16px;color:var(--text-dim);margin-top:4px;text-align:center">手坑统计</div>'
         };
@@ -372,7 +412,7 @@
           return {
             label: '0',
             subLabel: '还没吓跑过对手',
-            html: '<div class="big-value" style="color:#e8e8f0;font-size:56px;line-height:1">0</div><div class="big-label" style="font-size:16px;margin-top:4px">还没吓跑过对手</div>'
+            html: '<div class="big-value" style="color:#e8e8f0;font-size:36px;line-height:1">0</div><div class="big-label" style="font-size:16px;margin-top:4px">还没吓跑过对手</div>'
           };
         }
         // 细分行
@@ -391,7 +431,7 @@
         return {
           label: or.total + '',
           subLabel: '吓跑对手 ' + or.total + ' 次',
-          html: '<div class="big-value" style="color:#ffd700;font-size:56px;line-height:1">' + or.total + ' <span style="font-size:26px">🏃</span></div>' +
+          html: '<div class="big-value" style="color:#ffd700;font-size:36px;line-height:1">' + or.total + ' <span style="font-size:20px">🏃</span></div>' +
                 '<div class="big-label" style="font-size:16px;margin-top:4px">吓跑对手</div>' +
                 '<div class="sub-line" style="font-size:14px">占总对局 ' + fmt(or.rate) + '%' +
                 (best ? ' · 最多: ' + best.deck + ' (' + best.count + ')' : '') + '</div>' + detailHtml
@@ -407,17 +447,21 @@
         var cP = (eb.compromised / eb.total * 100).toFixed(1);
         var sP = (eb.stopped / eb.total * 100).toFixed(1);
         var suP = (eb.surrender / eb.total * 100).toFixed(1);
+        var os = eb.opponentSurrendered || 0;
+        var osP = eb.total > 0 ? (os / eb.total * 100).toFixed(1) : '0.0';
         return {
-          label: nP + '%',
-          subLabel: '正常终场率',
+          label: eb.total + '',
+          subLabel: '先手总场次',
           html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:3px">' +
-                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;width:100%;max-width:280px">' +
-                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#4cd964">' + nP + '%</div><div style="font-size:12px;color:#ffffff">正常终场</div></div>' +
-                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#ffd700">' + cP + '%</div><div style="font-size:12px;color:#ffffff">妥协场</div></div>' +
-                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#ff3b30">' + sP + '%</div><div style="font-size:12px;color:#ffffff">没做出来</div></div>' +
-                  '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#e8e8f0">' + suP + '%</div><div style="font-size:12px;color:#ffffff">投降</div></div>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px 6px;width:100%;max-width:300px">' +
+                  '<div style="text-align:center"><div style="font-size:15px;font-weight:700;color:#4cd964">' + eb.normal + ' (' + nP + '%)</div><div style="font-size:10px;color:#ffffff">正常终场</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:15px;font-weight:700;color:#ffd700">' + eb.compromised + ' (' + cP + '%)</div><div style="font-size:10px;color:#ffffff">妥协场</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:15px;font-weight:700;color:#ff3b30">' + eb.stopped + ' (' + sP + '%)</div><div style="font-size:10px;color:#ffffff">没做出来</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:15px;font-weight:700;color:#e8e8f0">' + eb.surrender + ' (' + suP + '%)</div><div style="font-size:10px;color:#ffffff">投降</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:15px;font-weight:700;color:#64c8ff">' + os + ' (' + osP + '%)</div><div style="font-size:10px;color:#ffffff">对手先投降</div></div>' +
                 '</div>' +
-                '<div style="font-size:12px;color:#ffffff;text-align:center">共 ' + eb.total + ' 场先手 · 正常 ' + eb.normal + ' · 妥协 ' + eb.compromised + ' · 没做出来 ' + eb.stopped + ' · 投降 ' + eb.surrender + '</div>' +
+                '</div>' +
+                '</div>' +
                 '</div>' +
                 '<div style="font-size:16px;color:var(--text-dim);margin-top:4px;text-align:center">先手终场质量</div>'
         };
@@ -431,16 +475,18 @@
         var sr = parseFloat(bb.successRate) || 0;
         var swr = parseFloat(bb.successWinRate) || 0;
         return {
-          label: sr + '%',
-          subLabel: '突破成功率',
-          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%">' +
-                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;width:100%;max-width:300px;margin-bottom:4px">' +
-                  '<div style="text-align:center"><div style="font-size:32px;font-weight:800;color:#ff9632">' + fmt(bb.successRate) + '%</div><div style="font-size:13px;color:#ffffff">突破成功率</div></div>' +
-                  '<div style="text-align:center"><div style="font-size:32px;font-weight:800;color:#64c8ff">' + fmt(bb.successWinRate) + '%</div><div style="font-size:13px;color:#ffffff">突破后胜率</div></div>' +
+          label: bb.total + '',
+          subLabel: '后手总场次',
+          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:3px">' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px 6px;width:100%;max-width:300px">' +
+                  '<div style="text-align:center"><div style="font-size:15px;font-weight:700;color:#4cd964">' + bb.success + ' (' + fmt(bb.successRate) + '%)</div><div style="font-size:10px;color:#ffffff">成功突破</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:15px;font-weight:700;color:#ff3b30">' + bb.failed + ' (' + (bb.total > 0 ? (bb.failed/bb.total*100).toFixed(1) : '0.0') + '%)</div><div style="font-size:10px;color:#ffffff">失败</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:15px;font-weight:700;color:#e8e8f0">' + bb.surrender + ' (' + (bb.total > 0 ? (bb.surrender/bb.total*100).toFixed(1) : '0.0') + '%)</div><div style="font-size:10px;color:#ffffff">投降</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:15px;font-weight:700;color:#64c8ff">' + bb.notNeeded + ' (' + (bb.total > 0 ? (bb.notNeeded/bb.total*100).toFixed(1) : '0.0') + '%)</div><div style="font-size:10px;color:#ffffff">不需突破</div></div>' +
+                  '<div style="text-align:center"><div style="font-size:15px;font-weight:700;color:#ffd700">' + fmt(bb.successWinRate) + '%</div><div style="font-size:10px;color:#ffffff">突破后胜率</div></div>' +
                 '</div>' +
-                '<div style="font-size:12px;color:#ffffff;text-align:center">共 ' + bb.total + ' 场后手 · 成功 ' + bb.success + ' · 失败 ' + bb.failed + ' · 投降 ' + bb.surrender + ' · 不需要 ' + bb.notNeeded + ' · 突破后胜 ' + bb.successWins + '</div>' +
                 '</div>' +
-                '<div class="big-label">后手突破统计</div>'
+                '<div style="font-size:16px;color:var(--text-dim);margin-top:4px;text-align:center">后手突破</div>'
         };
       };
 
@@ -452,33 +498,10 @@
         return {
           label: cp + '%',
           subLabel: '卡手率',
-          html: '<div class="big-value" style="color:' + (cp > 20 ? '#ff3b30' : '#ffd700') + '">' + fmt(hs.cantPlayRate) + '<span class="pct">%</span></div>' +
+          html: '<div class="big-value" style="font-size:36px;color:' + (cp > 20 ? '#ff3b30' : '#ffd700') + '">' + fmt(hs.cantPlayRate) + '<span class="pct" style="font-size:18px">%</span></div>' +
                 '<div class="big-label">卡手率</div>' +
                 '<div class="sub-line">· 先手 ' + firstTotal + ' 次 · 后手 ' + secondTotal + ' 次 · 合计 ' + hs.totalCantPlay + ' 次</div>' +
-                '<div class="sub-line" style="font-size:11px;color:var(--text-dim)">卡废件 ' + hs.cantPlayGarnet + ' · 卡同名牌 ' + hs.cantPlayDuplicate + ' · 卡后手牌 ' + hs.cantPlayHT + '</div>'
-        };
-      };
-
-      RENDERERS.dealerScrewed = function(s) {
-        var hs = s.handState;
-        var total = (hs.cantPlay||0) + (hs.bothStuck||0);
-        if (total === 0) {
-          return { label: '0', subLabel: '暂无制裁记录', html: '<div class="big-value" style="color:#e8e8f0">0</div><div class="big-label">暂无制裁记录</div>' };
-        }
-        var bf = hs.byFirst || {}, bs = hs.bySecond || {};
-        var cpRate = s.total > 0 ? ((hs.cantPlay||0) / s.total * 100).toFixed(1) : '0.0';
-        var bsRate = s.total > 0 ? ((hs.bothStuck||0) / s.total * 100).toFixed(1) : '0.0';
-        return {
-          label: total + '',
-          subLabel: '被制裁 ' + total + ' 次',
-          html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%;gap:2px">' +
-                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;width:100%;max-width:300px">' +
-                  '<div style="text-align:center"><div style="font-size:36px;font-weight:800;color:#ff3b30">' + (hs.cantPlay||0) + '</div><div style="font-size:12px;color:#ffffff">完全动不了</div><div style="font-size:11px;color:var(--text-dim)">先 ' + (bf.cantPlay||0) + ' · 后 ' + (bs.cantPlay||0) + '</div></div>' +
-                  '<div style="text-align:center"><div style="font-size:36px;font-weight:800;color:#ff9f0a">' + (hs.bothStuck||0) + '</div><div style="font-size:12px;color:#ffffff">互卡</div><div style="font-size:11px;color:var(--text-dim)">先 ' + (bf.bothStuck||0) + ' · 后 ' + (bs.bothStuck||0) + '</div></div>' +
-                '</div>' +
-                '<div style="font-size:12px;color:#ffffff;text-align:center;margin-top:2px">完全动不了率 ' + cpRate + '% · 互卡率 ' + bsRate + '%</div>' +
-                '</div>' +
-                '<div class="big-label">被发牌员制裁</div>'
+                '<div class="sub-line" style="font-size:11px;color:var(--text-dim)">卡废件 ' + hs.cantPlayGarnet + ' · 卡同名牌 ' + hs.cantPlayDuplicate + ' · 卡后手牌 ' + hs.cantPlayHT + ' · 互卡 ' + (hs.bothStuck||0) + ' · 动不了 ' + (hs.cantPlay||0) + '</div>'
         };
       };
 
@@ -797,7 +820,7 @@
       // ═══ 构建幻灯片 ═══
       function getEnabledItems() {
         if (!config || !config.items) return [];
-        return config.items.filter(function(item) { return item.enabled; });
+        return config.items.filter(function(item) { return item.enabled && RENDERERS[item.type]; });
       }
 
       function buildSlides(items) {
@@ -832,7 +855,7 @@
 
         if (index < 0) index = items.length - 1;
         if (index >= items.length) index = 0;
-        if (index === currentIndex && items.length > 1) return;
+        if (index === currentIndex) return;
 
         var oldIndex = currentIndex;
         currentIndex = index;
@@ -888,6 +911,9 @@
       function togglePause() {
         paused = !paused;
         document.getElementById('btn-pause').textContent = paused ? '▶' : '⏸';
+        // 暂停时显示手动切换按钮，播放时隐藏
+        document.getElementById('btn-cycle-prev').style.display = paused ? '' : 'none';
+        document.getElementById('btn-cycle-next').style.display = paused ? '' : 'none';
         if (paused) { stopTimer(); }
         else { startTimer(); }
       }
@@ -977,6 +1003,14 @@
 
       // ═══ 绑定事件 ═══
       document.getElementById('btn-close').addEventListener('click', function() { window.close(); });
+      document.getElementById('btn-cycle-prev').addEventListener('click', function() {
+        if (paused) goTo(currentIndex - 1, 'prev');
+        else { stopTimer(); goTo(currentIndex - 1, 'prev'); startTimer(); }
+      });
+      document.getElementById('btn-cycle-next').addEventListener('click', function() {
+        if (paused) goTo(currentIndex + 1, 'next');
+        else { stopTimer(); goTo(currentIndex + 1, 'next'); startTimer(); }
+      });
       document.getElementById('btn-pause').addEventListener('click', togglePause);
 
       document.addEventListener('keydown', function(e) {

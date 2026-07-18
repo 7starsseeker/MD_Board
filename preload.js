@@ -57,6 +57,15 @@ contextBridge.exposeInMainWorld('mdStats', {
     rename: (oldName, newName) => ipcRenderer.invoke('mydeck:rename', { oldName, newName })
   },
 
+  // ── 手坑预设管理 ──
+  handtrapPresets: {
+    getAll: () => ipcRenderer.invoke('handtrap:get-all'),
+    add: (id, label) => ipcRenderer.invoke('handtrap:add', { id, label }),
+    delete: (id) => ipcRenderer.invoke('handtrap:delete', id),
+    rename: (id, newLabel) => ipcRenderer.invoke('handtrap:rename', { id, newLabel }),
+    setDisplay: (id, display) => ipcRenderer.invoke('handtrap:set-display', { id, display })
+  },
+
   // ── 关于对话框 ──
   openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
   getVersion: () => ipcRenderer.invoke('app:get-version'),
