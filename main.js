@@ -315,8 +315,16 @@ function computeStats() {
   const firstMatches = matches.filter(m => m.goingFirst);
   const endboardNormal = firstMatches.filter(m => m.endboardState === 'normal').length;
   const endboardCompromised = firstMatches.filter(m => m.endboardState === 'compromised').length;
-  const endboardTrueStopped = firstMatches.filter(m => m.endboardState === 'stopped' && !m.opponentRan).length;
-  const opponentSurrendered = firstMatches.filter(m => m.endboardState === 'stopped' && m.opponentRan).length;
+  // 先手终场没做出来、但对手以非正常方式"直接胜利"的情况（对方跑/掉线/超时/抽干）
+  const opponentDirectWin = m =>
+    m.endboardState === 'stopped' && (
+      m.opponentRan ||
+      (m.disconnect && m.disconnectWho === 'opponent') ||
+      (m.timeout && m.timeoutWho === 'opponent') ||
+      (m.deckOut && m.deckOutWho === 'opponent')
+    );
+  const endboardTrueStopped = firstMatches.filter(m => m.endboardState === 'stopped' && !opponentDirectWin(m)).length;
+  const opponentSurrendered = firstMatches.filter(m => opponentDirectWin(m)).length;
   const endboardSurrender = firstMatches.filter(m => m.endboardState === 'surrender').length;
 
   // ── 后手突破统计（仅后手对局） ──

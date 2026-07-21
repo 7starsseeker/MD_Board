@@ -117,6 +117,7 @@
     /* 终场/突破 条件区域 - 隐藏直到显示 */
     .conditional-section { display:none; }
     .conditional-section.visible { display:block; }
+    #section-firstmover { margin-left:22px; grid-column:1 / -1; }
   </style>
 </head>
 <body>
@@ -272,6 +273,27 @@
           <input type="checkbox" id="chk-both-stuck">
           <label for="chk-both-stuck">双方都动不了</label>
         </div>
+        <!-- 谁先能动（双方都动不了时显示） -->
+        <div class="conditional-section" id="section-firstmover">
+          <label style="font-size:12px;color:var(--text-dim);margin-bottom:6px;display:block">最终情况</label>
+          <div class="btn-group" style="margin-bottom:6px">
+            <button class="btn btn-endboard" id="firstmover-move" data-val="move">有人先动</button>
+            <button class="btn btn-endboard" id="firstmover-surrender" data-val="surrender">有人投降</button>
+            <button class="btn btn-endboard" id="firstmover-other" data-val="other">其他</button>
+          </div>
+          <div class="sub-checkboxes" id="sub-mover-who" style="display:none">
+            <div class="btn-group">
+              <button class="btn btn-sm mover-btn" data-val="self">自己</button>
+              <button class="btn btn-sm mover-btn" data-val="opponent">对方</button>
+            </div>
+          </div>
+          <div class="sub-checkboxes" id="sub-surrender-who" style="display:none">
+            <div class="btn-group">
+              <button class="btn btn-sm surrender-btn" data-val="self">自己投降</button>
+              <button class="btn btn-sm surrender-btn" data-val="opponent">对方投降</button>
+            </div>
+          </div>
+        </div>
 
         <!-- 严重失误 -->
         <div class="checkbox-row">
@@ -303,45 +325,25 @@
           </div>
         </div>
 
+        <!-- 对手跑了（互斥组） -->
+        <div class="checkbox-row">
+          <input type="checkbox" id="chk-opponent-ran">
+          <label for="chk-opponent-ran">🏃 对手跑了</label>
+        </div>
+
       </div>
 
-      <!-- 对手T0动、对手跑了（条件显示） -->
+      <!-- 对手T0动（条件显示） -->
       <div class="conditional-section" id="section-t0">
         <div class="checkbox-row">
           <input type="checkbox" id="chk-t0">
           <label for="chk-t0">对手 T0 动</label>
         </div>
       </div>
-      <div class="conditional-section" id="section-opponent-ran">
-        <div class="checkbox-row">
-          <input type="checkbox" id="chk-opponent-ran">
-          <label for="chk-opponent-ran">🏃 对手跑了</label>
-        </div>
-      </div>
     </div>
 
-    <!-- 终场/突破/谁先能动 （条件显示） -->
+    <!-- 终场/突破 （条件显示） -->
     <div style="border-top:1px solid var(--border);padding-top:10px">
-      <!-- 谁先能动（双方都动不了时显示） -->
-      <div class="conditional-section" id="section-firstmover">
-        <label style="font-size:12px;color:var(--text-dim);margin-bottom:6px;display:block">最终情况</label>
-        <div class="btn-group" style="margin-bottom:6px">
-          <button class="btn btn-endboard" id="firstmover-move" data-val="move">有人先动</button>
-          <button class="btn btn-endboard" id="firstmover-surrender" data-val="surrender">有人投降</button>
-        </div>
-        <div class="sub-checkboxes" id="sub-mover-who" style="display:none">
-          <div class="btn-group">
-            <button class="btn btn-sm mover-btn" data-val="self">自己</button>
-            <button class="btn btn-sm mover-btn" data-val="opponent">对方</button>
-          </div>
-        </div>
-        <div class="sub-checkboxes" id="sub-surrender-who" style="display:none">
-          <div class="btn-group">
-            <button class="btn btn-sm surrender-btn" data-val="self">自己投降</button>
-            <button class="btn btn-sm surrender-btn" data-val="opponent">对方投降</button>
-          </div>
-        </div>
-      </div>
 
       <!-- 先手 - 终场情况 -->
       <div class="conditional-section" id="section-first">
@@ -649,6 +651,7 @@
         // 重新点亮刚选的结果按钮
         b.classList.add('active');
         updateConditionalSections();
+        updateSpecialLock();
       });
     });
 
@@ -682,7 +685,6 @@
         document.getElementById('section-otk').classList.remove('visible');
         document.getElementById('section-endboard').classList.remove('visible');
         document.getElementById('section-t0').classList.remove('visible');
-        document.getElementById('section-opponent-ran').classList.remove('visible');
         return;
       }
       // 如果双方都动不了已勾选，固定显示谁先能动，隐藏其他
@@ -693,7 +695,6 @@
         document.getElementById('section-otk').classList.remove('visible');
         document.getElementById('section-endboard').classList.remove('visible');
         document.getElementById('section-t0').classList.remove('visible');
-        document.getElementById('section-opponent-ran').classList.remove('visible');
         state.opponentT0 = false; state.opponentRan = false;
         document.getElementById('chk-t0').checked = false;
         document.getElementById('chk-opponent-ran').checked = false;
@@ -703,7 +704,6 @@
       // 对手跑了时仍显示终场情况（记录对手跑时的场面状态）
       document.getElementById('section-first').classList.toggle('visible', state.goingFirst === true);
       document.getElementById('section-t0').classList.toggle('visible', state.goingFirst === true);
-      document.getElementById('section-opponent-ran').classList.toggle('visible', state.result === 'win');
       document.getElementById('section-second').classList.toggle('visible', state.goingFirst === false);
       // 切换先后手时重置条件区域的选中状态
       if (state.goingFirst === true) {
@@ -752,10 +752,13 @@
         state.result = 'loss';
         document.querySelectorAll('#input-win, #input-loss, #input-draw, #input-abnormal').forEach(function(b) { b.classList.remove('active'); });
         document.getElementById('input-loss').classList.add('active');
-        // 禁用胜按钮（视觉 + 点击隔离）
+        // 禁用胜和平局按钮
         document.getElementById('input-win').style.opacity = '0.3';
         document.getElementById('input-win').style.pointerEvents = 'none';
         document.getElementById('input-win').title = '已投降，不可设为胜';
+        document.getElementById('input-draw').style.opacity = '0.3';
+        document.getElementById('input-draw').style.pointerEvents = 'none';
+        document.getElementById('input-draw').title = '已投降，不可设为平局';
         // 投降与对手跑互斥
         if (state.opponentRan) {
           state.opponentRan = false;
@@ -769,13 +772,123 @@
           document.getElementById('sub-mover-who').style.display = 'none';
           document.getElementById('sub-surrender-who').style.display = 'none';
         }
+        // 投降与掉线/超时/抽干互斥
+        clearSpecialConditions();
       } else {
-        // 恢复胜按钮
+        // 非投降时由特殊情况锁定接管
+        updateSpecialLock();
+      }
+      updateConditionalSections();
+    }
+
+    // ── 清除掉线/超时/抽干的选中状态（含子选单）──
+    function clearSpecialConditions() {
+      if (state.disconnect) {
+        state.disconnect = false;
+        document.getElementById('chk-disconnect').checked = false;
+        state.disconnectWho = null;
+        document.getElementById('sub-disconnect').style.display = 'none';
+        document.querySelectorAll('.disconnect-btn').forEach(function(b) { b.classList.remove('active'); });
+      }
+      if (state.timeout) {
+        state.timeout = false;
+        document.getElementById('chk-timeout').checked = false;
+        state.timeoutWho = null;
+        document.getElementById('sub-timeout').style.display = 'none';
+        document.querySelectorAll('.timeout-btn').forEach(function(b) { b.classList.remove('active'); });
+      }
+      if (state.deckOut) {
+        state.deckOut = false;
+        document.getElementById('chk-deck-out').checked = false;
+        state.deckOutWho = null;
+        document.getElementById('sub-deck-out').style.display = 'none';
+        document.querySelectorAll('.deckout-btn').forEach(function(b) { b.classList.remove('active'); });
+      }
+      // 解除锁定
+      document.getElementById('input-win').style.opacity = '';
+      document.getElementById('input-win').style.pointerEvents = '';
+      document.getElementById('input-win').title = '';
+      document.getElementById('input-loss').style.opacity = '';
+      document.getElementById('input-loss').style.pointerEvents = '';
+      document.getElementById('input-loss').title = '';
+      document.getElementById('input-draw').style.opacity = '';
+      document.getElementById('input-draw').style.pointerEvents = '';
+      document.getElementById('input-draw').title = '';
+    }
+    // ── 掉线/超时/抽干 → 根据选择方自动锁定胜负 + 平局 ──
+    function updateSpecialLock() {
+      // 异常结果不触发锁定
+      if (state.result === 'abnormal') {
         document.getElementById('input-win').style.opacity = '';
         document.getElementById('input-win').style.pointerEvents = '';
         document.getElementById('input-win').title = '';
+        document.getElementById('input-loss').style.opacity = '';
+        document.getElementById('input-loss').style.pointerEvents = '';
+        document.getElementById('input-loss').title = '';
+        document.getElementById('input-draw').style.opacity = '';
+        document.getElementById('input-draw').style.pointerEvents = '';
+        document.getElementById('input-draw').title = '';
+        return;
       }
+      // 优先解除之前的锁定
+      document.getElementById('input-win').style.opacity = '';
+      document.getElementById('input-win').style.pointerEvents = '';
+      document.getElementById('input-win').title = '';
+      document.getElementById('input-loss').style.opacity = '';
+      document.getElementById('input-loss').style.pointerEvents = '';
+      document.getElementById('input-loss').title = '';
+      document.getElementById('input-draw').style.opacity = '';
+      document.getElementById('input-draw').style.pointerEvents = '';
+      document.getElementById('input-draw').title = '';
+
+      var specialWho = null;
+      var specialLabel = '';
+      if (state.disconnect && state.disconnectWho) {
+        specialWho = state.disconnectWho;
+        specialLabel = '掉线';
+      } else if (state.timeout && state.timeoutWho) {
+        specialWho = state.timeoutWho;
+        specialLabel = '超时';
+      } else if (state.deckOut && state.deckOutWho) {
+        specialWho = state.deckOutWho;
+        specialLabel = '抽干牌库';
+      } else if (state.opponentRan) {
+        // 对手跑了 → 自动胜（无 who 选择，固定为对方）
+        specialWho = 'opponent';
+        specialLabel = '跑了';
+      }
+      if (!specialWho) {
+        updateBothStuckOther();
+        return;
+      }
+
+      if (specialWho === 'self') {
+        // 自己掉线/超时/抽干 → 自动负、屏蔽胜和平局
+        state.result = 'loss';
+        document.querySelectorAll('#input-win, #input-loss, #input-draw, #input-abnormal').forEach(function(b) { b.classList.remove('active'); });
+        document.getElementById('input-loss').classList.add('active');
+        document.getElementById('input-win').style.opacity = '0.3';
+        document.getElementById('input-win').style.pointerEvents = 'none';
+        document.getElementById('input-win').title = '自己' + specialLabel + '，不可设为胜';
+        document.getElementById('input-draw').style.opacity = '0.3';
+        document.getElementById('input-draw').style.pointerEvents = 'none';
+        document.getElementById('input-draw').title = '自己' + specialLabel + '，不可设为平局';
+      } else {
+        // 对手掉线/超时/抽干 → 自动胜、屏蔽负和平局
+        state.result = 'win';
+        document.querySelectorAll('#input-win, #input-loss, #input-draw, #input-abnormal').forEach(function(b) { b.classList.remove('active'); });
+        document.getElementById('input-win').classList.add('active');
+        document.getElementById('input-loss').style.opacity = '0.3';
+        document.getElementById('input-loss').style.pointerEvents = 'none';
+        document.getElementById('input-loss').title = '对方' + specialLabel + '，不可设为负';
+        document.getElementById('input-draw').style.opacity = '0.3';
+        document.getElementById('input-draw').style.pointerEvents = 'none';
+        document.getElementById('input-draw').title = '对方' + specialLabel + '，不可设为平局';
+      }
+      // 结果变更后刷新条件区域
       updateConditionalSections();
+      // 双方都动不了子选项联动：特殊情况时自动选中「其他」
+      updateBothStuckOther();
     }
     // 终场投降点击
     document.getElementById('endboard-surrender').addEventListener('click', updateSurrenderLock);
@@ -835,18 +948,20 @@
           if (id === 'chk-opponent-ran') { state.opponentRan = false; }
         }
       });
+      // 互斥清除后刷新特殊情况锁定（防止上一个条件的锁定残留）
+      updateSpecialLock();
     }
     // 对手跑了（互斥）
     (function() {
       var el = document.getElementById('chk-opponent-ran');
       el.addEventListener('change', function() {
         state.opponentRan = el.checked;
-        if (el.checked) uncheckMutex('chk-opponent-ran');
-        // 对手跑时清除投降状态
+        // 对手跑时先清除投降状态和双方都动不了（必须在 uncheckMutex 之前，
+        // 否则 uncheckMutex 末尾的 updateSpecialLock → updateConditionalSections
+        // 会因双方都动不了未清除而把对手跑了重置）
         if (el.checked) {
           if (state.endboardState === 'surrender') { state.endboardState = null; document.getElementById('endboard-surrender').classList.remove('active'); }
           if (state.brokeBoard === 'surrender') { state.brokeBoard = null; document.getElementById('broke-surrender').classList.remove('active'); }
-          // 对手跑时清除双方都动不了
           if (document.getElementById('chk-both-stuck').checked) {
             document.getElementById('chk-both-stuck').checked = false;
             state.bothStuck = false;
@@ -855,15 +970,16 @@
             document.getElementById('sub-surrender-who').style.display = 'none';
           }
         }
+        if (el.checked) uncheckMutex('chk-opponent-ran');
         updateConditionalSections();
+        updateSpecialLock();
       });
     })();
     bindCheckbox('chk-big-hand', 'opponentBigHand');
     bindCheckbox('chk-mistake', 'mistake');
     bindCheckbox('chk-t0', 'opponentT0');
     bindCheckbox('chk-t0', 'opponentT0');
-    bindCheckbox('chk-disconnect', 'disconnect');
-    // 一方掉线 - 自定义级联（与超时互斥）
+    // 一方掉线 - 自定义级联（互斥组）
     (function() {
       var el = document.getElementById('chk-disconnect');
       el.addEventListener('change', function() {
@@ -872,10 +988,12 @@
         if (!el.checked) {
           state.disconnectWho = null;
           document.querySelectorAll('.disconnect-btn').forEach(function(b) { b.classList.remove('active'); });
+          updateSpecialLock();
         }
-        // 互斥：选中掉线时取消超时/对手跑了/抽干
         if (el.checked) {
           uncheckMutex('chk-disconnect');
+          if (state.endboardState === 'surrender') { state.endboardState = null; document.getElementById('endboard-surrender').classList.remove('active'); }
+          if (state.brokeBoard === 'surrender') { state.brokeBoard = null; document.getElementById('broke-surrender').classList.remove('active'); }
         }
       });
       document.querySelectorAll('.disconnect-btn').forEach(function(btn) {
@@ -883,11 +1001,13 @@
           document.querySelectorAll('.disconnect-btn').forEach(function(b) { b.classList.remove('active'); });
           btn.classList.add('active');
           state.disconnectWho = btn.dataset.val;
+          updateSpecialLock();
+          if (state.endboardState === 'surrender') { state.endboardState = null; document.getElementById('endboard-surrender').classList.remove('active'); }
+          if (state.brokeBoard === 'surrender') { state.brokeBoard = null; document.getElementById('broke-surrender').classList.remove('active'); }
         });
       });
     })();
-    bindCheckbox('chk-timeout', 'timeout');
-    // 一方超时 - 自定义级联（与掉线互斥）
+    // 一方超时 - 自定义级联（互斥组）
     (function() {
       var el = document.getElementById('chk-timeout');
       el.addEventListener('change', function() {
@@ -896,10 +1016,12 @@
         if (!el.checked) {
           state.timeoutWho = null;
           document.querySelectorAll('.timeout-btn').forEach(function(b) { b.classList.remove('active'); });
+          updateSpecialLock();
         }
-        // 互斥：选中超时时取消掉线/对手跑了/抽干
         if (el.checked) {
           uncheckMutex('chk-timeout');
+          if (state.endboardState === 'surrender') { state.endboardState = null; document.getElementById('endboard-surrender').classList.remove('active'); }
+          if (state.brokeBoard === 'surrender') { state.brokeBoard = null; document.getElementById('broke-surrender').classList.remove('active'); }
         }
       });
       document.querySelectorAll('.timeout-btn').forEach(function(btn) {
@@ -907,6 +1029,9 @@
           document.querySelectorAll('.timeout-btn').forEach(function(b) { b.classList.remove('active'); });
           btn.classList.add('active');
           state.timeoutWho = btn.dataset.val;
+          updateSpecialLock();
+          if (state.endboardState === 'surrender') { state.endboardState = null; document.getElementById('endboard-surrender').classList.remove('active'); }
+          if (state.brokeBoard === 'surrender') { state.brokeBoard = null; document.getElementById('broke-surrender').classList.remove('active'); }
         });
       });
     })();
@@ -928,11 +1053,13 @@
         if (el.checked) {
           state.endboardState = null; state.brokeBoard = null; state.otk = null; state.endboardInteraction = null;
           state.opponentT0 = false; state.opponentRan = false;
-          document.querySelectorAll('#section-first .btn, #section-second .btn').forEach(function(b) { b.classList.remove('active'); });
+          document.querySelectorAll('#section-first .btn, #section-second .btn, #section-firstmover .btn').forEach(function(b) { b.classList.remove('active'); });
           document.getElementById('section-otk').classList.remove('visible');
           document.getElementById('section-endboard').classList.remove('visible');
           document.getElementById('chk-t0').checked = false;
           document.getElementById('chk-opponent-ran').checked = false;
+          // 清除 opponentRan 等特殊条件的胜负锁定
+          updateSpecialLock();
         } else {
           state.firstMover = null; state.moverWho = null; state.surrenderWho = null;
           document.querySelectorAll('#section-firstmover .btn').forEach(function(b) { b.classList.remove('active'); });
@@ -940,12 +1067,8 @@
           document.querySelectorAll('.mover-btn').forEach(function(b) { b.classList.remove('active'); });
           document.getElementById('sub-surrender-who').style.display = 'none';
           document.querySelectorAll('.surrender-btn').forEach(function(b) { b.classList.remove('active'); });
-          document.getElementById('input-win').style.opacity = '';
-          document.getElementById('input-win').style.pointerEvents = '';
-          document.getElementById('input-win').title = '';
-          document.getElementById('input-loss').style.opacity = '';
-          document.getElementById('input-loss').style.pointerEvents = '';
-          document.getElementById('input-loss').title = '';
+          // 释放双方都动不了的锁定后，由特殊情况锁定接管
+          updateSpecialLock();
         }
       });
     })();
@@ -969,23 +1092,34 @@
     });
 
     // 抽干牌组
-    bindCheckbox('chk-deck-out', 'deckOut');
-    document.getElementById('sub-deck-out').style.display = 'none';
-    document.getElementById('chk-deck-out').addEventListener('change', function() {
-      if (this.checked) uncheckMutex('chk-deck-out');
-      document.getElementById('sub-deck-out').style.display = this.checked ? 'block' : 'none';
-      if (!this.checked) {
-        state.deckOutWho = null;
-        document.querySelectorAll('.deckout-btn').forEach(function(b) { b.classList.remove('active'); });
-      }
-    });
-    document.querySelectorAll('.deckout-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        document.querySelectorAll('.deckout-btn').forEach(function(b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        state.deckOutWho = btn.dataset.val;
+    // 抽干牌组 — 自定义级联
+    (function() {
+      var el = document.getElementById('chk-deck-out');
+      el.addEventListener('change', function() {
+        state.deckOut = el.checked;
+        document.getElementById('sub-deck-out').style.display = el.checked ? 'block' : 'none';
+        if (!el.checked) {
+          state.deckOutWho = null;
+          document.querySelectorAll('.deckout-btn').forEach(function(b) { b.classList.remove('active'); });
+          updateSpecialLock();
+        }
+        if (el.checked) {
+          uncheckMutex('chk-deck-out');
+          if (state.endboardState === 'surrender') { state.endboardState = null; document.getElementById('endboard-surrender').classList.remove('active'); }
+          if (state.brokeBoard === 'surrender') { state.brokeBoard = null; document.getElementById('broke-surrender').classList.remove('active'); }
+        }
       });
-    });
+      document.querySelectorAll('.deckout-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('.deckout-btn').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          state.deckOutWho = btn.dataset.val;
+          updateSpecialLock();
+          if (state.endboardState === 'surrender') { state.endboardState = null; document.getElementById('endboard-surrender').classList.remove('active'); }
+          if (state.brokeBoard === 'surrender') { state.brokeBoard = null; document.getElementById('broke-surrender').classList.remove('active'); }
+        });
+      });
+    })();
 
     // 吃到手坑 - 折叠
     (function() {
@@ -1018,6 +1152,9 @@
       document.getElementById('firstmover-move'),
       document.getElementById('firstmover-surrender')
     ], 'firstMover');
+    // 「其他」按钮不由用户点击，由程序自动控制
+    document.getElementById('firstmover-other').style.pointerEvents = 'none';
+    document.getElementById('firstmover-other').style.opacity = '0.3';
     (function() {
       // 有人先动 - 子选单
       var moverBtns = document.querySelectorAll('.mover-btn');
@@ -1042,6 +1179,9 @@
             document.getElementById('input-win').style.opacity = '0.3';
             document.getElementById('input-win').style.pointerEvents = 'none';
             document.getElementById('input-win').title = '已投降，不可设为胜';
+            document.getElementById('input-draw').style.opacity = '0.3';
+            document.getElementById('input-draw').style.pointerEvents = 'none';
+            document.getElementById('input-draw').title = '已投降，不可设为平局';
             document.getElementById('input-loss').style.opacity = '';
             document.getElementById('input-loss').style.pointerEvents = '';
             document.getElementById('input-loss').title = '';
@@ -1052,6 +1192,9 @@
             document.getElementById('input-loss').style.opacity = '0.3';
             document.getElementById('input-loss').style.pointerEvents = 'none';
             document.getElementById('input-loss').title = '对方投降，不可设为负';
+            document.getElementById('input-draw').style.opacity = '0.3';
+            document.getElementById('input-draw').style.pointerEvents = 'none';
+            document.getElementById('input-draw').title = '对方投降，不可设为平局';
             document.getElementById('input-win').style.opacity = '';
             document.getElementById('input-win').style.pointerEvents = '';
             document.getElementById('input-win').title = '';
@@ -1071,7 +1214,56 @@
         state.moverWho = null;
         moverBtns.forEach(function(b) { b.classList.remove('active'); });
       });
+      // 其他 → 隐藏所有子选单
+      document.getElementById('firstmover-other').addEventListener('click', function() {
+        document.getElementById('sub-mover-who').style.display = 'none';
+        document.getElementById('sub-surrender-who').style.display = 'none';
+        state.moverWho = null; state.surrenderWho = null;
+        moverBtns.forEach(function(b) { b.classList.remove('active'); });
+        surrenderBtns.forEach(function(b) { b.classList.remove('active'); });
+      });
     })();
+
+    // ── 双方都动不了子选项「其他」自动联动 ──
+    // 当勾选掉线/超时/抽干/对手跑时自动选中「其他」并锁定另外两个按钮
+    function updateBothStuckOther() {
+      var hasSpecial = state.disconnect || state.timeout || state.deckOut || state.opponentRan;
+      var moveBtn = document.getElementById('firstmover-move');
+      var surrenderBtn = document.getElementById('firstmover-surrender');
+      var otherBtn = document.getElementById('firstmover-other');
+
+      if (state.bothStuck && hasSpecial) {
+        // 自动选中「其他」
+        state.firstMover = 'other';
+        moveBtn.classList.remove('active');
+        surrenderBtn.classList.remove('active');
+        otherBtn.classList.add('active');
+        // 隐藏子选单、清除子状态
+        document.getElementById('sub-mover-who').style.display = 'none';
+        document.getElementById('sub-surrender-who').style.display = 'none';
+        state.moverWho = null; state.surrenderWho = null;
+        document.querySelectorAll('.mover-btn').forEach(function(b) { b.classList.remove('active'); });
+        document.querySelectorAll('.surrender-btn').forEach(function(b) { b.classList.remove('active'); });
+        // 锁定「有人先动」和「有人投降」
+        moveBtn.style.pointerEvents = 'none';
+        moveBtn.style.opacity = '0.3';
+        surrenderBtn.style.pointerEvents = 'none';
+        surrenderBtn.style.opacity = '0.3';
+        otherBtn.style.opacity = '0.7';
+      } else {
+        // 解锁「有人先动」和「有人投降」
+        moveBtn.style.pointerEvents = '';
+        moveBtn.style.opacity = '';
+        surrenderBtn.style.pointerEvents = '';
+        surrenderBtn.style.opacity = '';
+        otherBtn.style.opacity = '0.3';
+        // 如果之前是「其他」且已无特殊情况，清除
+        if (state.firstMover === 'other') {
+          state.firstMover = null;
+          otherBtn.classList.remove('active');
+        }
+      }
+    }
 
     document.getElementById('input-deck').addEventListener('input', function(e) { state.opponentDeck = e.target.value; });
 
@@ -1242,6 +1434,9 @@
       document.getElementById('input-loss').style.opacity = '';
       document.getElementById('input-loss').style.pointerEvents = '';
       document.getElementById('input-loss').title = '';
+      document.getElementById('input-draw').style.opacity = '';
+      document.getElementById('input-draw').style.pointerEvents = '';
+      document.getElementById('input-draw').title = '';
       updateConditionalSections();
       document.getElementById('match-normal').classList.add('active');
     }

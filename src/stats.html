@@ -434,7 +434,7 @@
         <div class="card-icon" style="background:rgba(76,217,100,0.12)">🏰</div>
         <div>
           <div class="card-title-text">先手终场质量</div>
-          <div class="card-subtitle">正常终场 · 妥协场 · 没做出来 · 对手先投降</div>
+          <div class="card-subtitle">正常终场 · 妥协场 · 没做出来 · 直接胜利</div>
         </div>
       </div>
       <div id="endboard-content"></div>
@@ -887,7 +887,7 @@
           '<div class="stat-row"><span class="label">正常终场</span><span class="value good">' + eb.normal + ' (' + nP + '%)</span></div>' +
           '<div class="stat-row"><span class="label">妥协场</span><span class="value warn">' + eb.compromised + ' (' + cP + '%)</span></div>' +
           '<div class="stat-row"><span class="label">没做出来</span><span class="value bad">' + eb.stopped + ' (' + sP + '%)</span></div>' +
-          '<div class="stat-row"><span class="label">对手先投降</span><span class="value info">' + os + ' (' + osP + '%)</span></div>' +
+          '<div class="stat-row"><span class="label">直接胜利</span><span class="value info">' + os + ' (' + osP + '%)</span></div>' +
           '<div class="stat-row"><span class="label">投降</span><span class="value bad">' + eb.surrender + ' (' + suP + '%)</span></div>' +
           '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px">' +
             '<span class="label">正常终场率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill green" style="width:' + parseFloat(nP) + '%"></div></div><span class="value good">' + fmt(nP) + '%</span></div></div>';

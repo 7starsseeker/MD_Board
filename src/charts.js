@@ -290,7 +290,7 @@ function renderEndboardPie(canvas, stats, options) {
   canvas._chart = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: ['正常终场','妥协场','没做出来','投降','对手先投降'],
+      labels: ['正常终场','妥协场','没做出来','投降','直接胜利'],
       datasets: [{
         data: [eb.normal, eb.compromised, eb.stopped, eb.surrender, os],
         backgroundColor: ['#4cd964','#ffd700','#ff3b30','#8888a0','#64c8ff'],
@@ -337,7 +337,7 @@ function renderEndboardPie(canvas, stats, options) {
       infoRow('妥协场', eb.compromised + ' (' + fmt(eb.compromised/t*100) + '%)', 'warn') +
       infoRow('没做出来', eb.stopped + ' (' + fmt(eb.stopped/t*100) + '%)', 'bad') +
       infoRow('投降', eb.surrender + ' (' + fmt(eb.surrender/t*100) + '%)') +
-      infoRow('对手先投降', os + ' (' + fmt(os/t*100) + '%)', 'info') +
+      infoRow('直接胜利', os + ' (' + fmt(os/t*100) + '%)', 'info') +
       infoSection('汇总') +
       infoBar('正常终场率', nPct, 'green');
   }
