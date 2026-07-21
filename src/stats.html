@@ -68,10 +68,14 @@
 
     /* 内容区域 — 滚动，给固定标题栏留空间 */
     .content-wrap {
-      padding: 56px 20px 20px;
+      padding: 56px 28px 20px 20px;
       height: 100vh;
       overflow-y: auto;
     }
+    .content-wrap::-webkit-scrollbar { width: 8px; }
+    .content-wrap::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 4px; margin-top: 56px; }
+    .content-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+    .content-wrap::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.35); }
 
     /* 标题栏 */
       font-size: 12px;
@@ -390,6 +394,18 @@
         </div>
       </div>
       <div id="handstate-content"></div>
+    </div>
+
+    <!-- 互卡子选项详情 -->
+    <div class="stat-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(255,149,0,0.15)">🔄</div>
+        <div>
+          <div class="card-title-text">互卡子选项详情</div>
+          <div class="card-subtitle">有人先动 · 有人投降 · 其他</div>
+        </div>
+      </div>
+      <div id="bothstuck-detail-content"></div>
     </div>
 
     <!-- 严重失误统计 -->
@@ -788,6 +804,26 @@
           html += '</div>';
         }
         document.getElementById('handstate-content').innerHTML = html;
+      }
+
+      // ═══ 互卡子选项详情 ═══
+      function renderBothStuckDetail(stats) {
+        var hs = stats.handState || {};
+        var bd = hs.bothStuckDetail;
+        var el = document.getElementById('bothstuck-detail-content');
+        if (!bd || bd.total === 0) {
+          el.innerHTML = '<div style="padding:10px;text-align:center;color:var(--text-dim);font-size:12px">还没有互卡记录</div>'; return;
+        }
+        var html =
+          '<div class="stat-row"><span class="label">互卡总次数</span><span class="value warn">' + bd.total + ' 次</span></div>' +
+          '<div class="stat-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span class="label">有人先动</span><span class="value">' + bd.firstMove + ' 次</span></div>' +
+          '<div class="stat-row" style="margin-left:22px;font-size:12px"><span class="label">　自己先动</span><span class="value">' + bd.firstMoveSelf + '</span></div>' +
+          '<div class="stat-row" style="margin-left:22px;font-size:12px"><span class="label">　对方先动</span><span class="value">' + bd.firstMoveOpp + '</span></div>' +
+          '<div class="stat-row"><span class="label">有人投降</span><span class="value">' + bd.surrender + ' 次</span></div>' +
+          '<div class="stat-row" style="margin-left:22px;font-size:12px"><span class="label">　自己投降</span><span class="value">' + bd.surrenderSelf + '</span></div>' +
+          '<div class="stat-row" style="margin-left:22px;font-size:12px"><span class="label">　对方投降</span><span class="value">' + bd.surrenderOpp + '</span></div>' +
+          '<div class="stat-row"><span class="label">其他</span><span class="value">' + bd.other + ' 次</span></div>';
+        el.innerHTML = html;
       }
 
       // ═══ 严重失误统计 ═══
@@ -1503,6 +1539,7 @@
         renderCoin(stats);
         renderHandtrap(stats);
         renderHandState(stats);
+        renderBothStuckDetail(stats);
         renderMistake(stats);
         renderOpponentRan(stats);
         renderT0(stats);

@@ -1517,6 +1517,34 @@ function renderHero(canvas, stats, options) {
 }
 
 /**
+ * 21. 互卡子选项详情（纯信息展示）
+ */
+function renderBothStuckDetail(canvas, stats, options) {
+  destroyChart(canvas._chart);
+  var hs = stats.handState || {};
+  var bd = hs.bothStuckDetail;
+  var ctx = canvas.getContext('2d');
+  if (!bd || bd.total === 0) { canvas._chart = null; return null; }
+  var parent = canvas.parentNode;
+  canvas.style.display = 'none';
+  parent.innerHTML =
+    '<div style="padding:10px;text-align:center">' +
+      '<div style="font-size:28px;font-weight:700;color:#ffd700">' + bd.total + '</div>' +
+      '<div style="font-size:12px;color:var(--text-dim);margin-bottom:10px">互卡总次数</div>' +
+      '<div style="border-top:1px solid var(--border);padding-top:8px">' +
+        '<div style="font-size:13px;color:#4cd964;margin-bottom:4px">有人先动 ' + bd.firstMove + ' 次</div>' +
+        '<div style="font-size:11px;color:var(--text-dim)">　自己 ' + bd.firstMoveSelf + ' · 对方 ' + bd.firstMoveOpp + '</div>' +
+      '</div>' +
+      '<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px">' +
+        '<div style="font-size:13px;color:#ff6b62;margin-bottom:4px">有人投降 ' + bd.surrender + ' 次</div>' +
+        '<div style="font-size:11px;color:var(--text-dim)">　自己投降 ' + bd.surrenderSelf + ' · 对方投降 ' + bd.surrenderOpp + '</div>' +
+      '</div>' +
+      (bd.other > 0 ? '<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><div style="font-size:13px;color:#64c8ff">其他 ' + bd.other + ' 次</div></div>' : '') +
+    '</div>';
+  return null;
+}
+
+/**
  * 20. 抽干牌组统计（仪表盘 + info面板）
  */
 function renderDeckOutChart(canvas, stats, options) {

@@ -34,6 +34,7 @@
     .form-row .form-group.shrink { flex:0 0 auto; }
     .btn-group { display:flex; gap:4px; }
     .btn-group .btn { flex:1; }
+    .btn-abnormal.active { background:rgba(255,59,48,0.55); border-color:#ff3b30; color:#fff; box-shadow:0 0 8px rgba(255,59,48,0.4); }
     .btn-group-3 { display:flex; gap:3px; }
     .btn-group-3 .btn { flex:1; font-size:12px; padding:5px 4px; }
     .submit-row { display:flex; gap:8px; margin-top:10px; }
@@ -158,13 +159,15 @@
           <button class="btn btn-second" id="input-second" data-val="false">后手</button>
         </div>
       </div>
-      <div class="form-group shrink" style="min-width:180px">
+      <div class="form-group shrink">
         <label>结果</label>
-        <div class="btn-group" style="min-width:280px">
+        <div class="btn-group">
           <button class="btn btn-win" id="input-win" data-val="win">胜</button>
           <button class="btn btn-loss" id="input-loss" data-val="loss">负</button>
           <button class="btn" id="input-draw" data-val="draw">平局</button>
-          <button class="btn btn-abnormal" id="input-abnormal" data-val="abnormal">异常</button>
+          <span style="width:2px;background:rgba(255,59,48,0.3);margin:5px 4px;border-radius:1px;flex-shrink:0"></span>
+          <button class="btn btn-abnormal" id="btn-abnormal-toggle" data-val="abnormal"
+            style="min-width:60px">⚡ 异常</button>
         </div>
       </div>
     </div>
@@ -206,7 +209,7 @@
     </div>
 
     <!-- 对局情况 - 复选框（折叠式） -->
-    <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:8px">
+    <div id="section-match-conditions" style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:8px">
       <label style="font-size:12px;color:var(--text-dim);margin-bottom:6px">对局情况</label>
       <div class="checkbox-group">
 
@@ -633,20 +636,15 @@
     // ═══════════════════════════════════════════════════════════════════════
 
     // 结果
-    var resultBtns = [document.getElementById('input-win'), document.getElementById('input-loss'), document.getElementById('input-draw'), document.getElementById('input-abnormal')];
+    // 结果（异常已独立为 toggle）
+    var resultBtns = [document.getElementById('input-win'), document.getElementById('input-loss'), document.getElementById('input-draw')];
     bindGroup(resultBtns, 'result', function(b) { return b.dataset.val; });
     resultBtns.forEach(function(b) {
       b.addEventListener('click', function() {
-        if (state.result === 'abnormal') {
-          state.opponentDeck = '未知';
-          document.getElementById('input-deck').value = '未知';
-          document.getElementById('input-deck').disabled = true;
-        } else {
-          document.getElementById('input-deck').disabled = false;
-        }
-        document.querySelectorAll('#input-win, #input-loss, #input-draw, #input-abnormal').forEach(function(btn) { btn.classList.remove('active'); });
-        if (state.result === 'abnormal') {
-          state.endboardState = null; state.brokeBoard = null; state.otk = null; state.endboardInteraction = null; state.firstMover = null; state.moverWho = null; state.surrenderWho = null;
+        document.querySelectorAll('#input-win, #input-loss, #input-draw').forEach(function(btn) { btn.classList.remove('active'); });
+        // 如果异常 toggle 开启，关闭它
+        if (document.getElementById('btn-abnormal-toggle').classList.contains('active')) {
+          toggleAbnormalOff();
         }
         // 重新点亮刚选的结果按钮
         b.classList.add('active');
@@ -654,6 +652,62 @@
         updateSpecialLock();
       });
     });
+
+    // ── 异常独立 toggle ──
+    function toggleAbnormalOff() {
+      document.getElementById('btn-abnormal-toggle').classList.remove('active');
+      state.result = null;
+      // 恢复胜负按钮
+      document.getElementById('input-win').style.opacity = '';
+      document.getElementById('input-win').style.pointerEvents = '';
+      document.getElementById('input-win').title = '';
+      document.getElementById('input-loss').style.opacity = '';
+      document.getElementById('input-loss').style.pointerEvents = '';
+      document.getElementById('input-loss').title = '';
+      document.getElementById('input-draw').style.opacity = '';
+      document.getElementById('input-draw').style.pointerEvents = '';
+      document.getElementById('input-draw').title = '';
+      document.getElementById('input-deck').disabled = false;
+      // 显示对局情况区域
+      document.getElementById('section-match-conditions').style.display = '';
+      // 恢复卡组输入
+      if (document.getElementById('input-deck').value === '未知') {
+        document.getElementById('input-deck').value = '';
+      }
+      updateConditionalSections();
+    }
+    (function() {
+      var el = document.getElementById('btn-abnormal-toggle');
+      el.addEventListener('click', function() {
+        if (el.classList.contains('active')) {
+          // 关闭异常
+          toggleAbnormalOff();
+        } else {
+          // 开启异常
+          el.classList.add('active');
+          state.result = 'abnormal';
+          // 清除胜负按钮的选中状态
+          document.querySelectorAll('#input-win, #input-loss, #input-draw').forEach(function(b) { b.classList.remove('active'); });
+          // 锁定胜负按钮
+          document.getElementById('input-win').style.opacity = '0.3';
+          document.getElementById('input-win').style.pointerEvents = 'none';
+          document.getElementById('input-win').title = '异常状态，不可设为胜';
+          document.getElementById('input-loss').style.opacity = '0.3';
+          document.getElementById('input-loss').style.pointerEvents = 'none';
+          document.getElementById('input-loss').title = '异常状态，不可设为负';
+          document.getElementById('input-draw').style.opacity = '0.3';
+          document.getElementById('input-draw').style.pointerEvents = 'none';
+          document.getElementById('input-draw').title = '异常状态，不可设为平局';
+          document.getElementById('input-deck').disabled = true;
+          // 对手卡组锁定到未知
+          document.getElementById('input-deck').value = '未知';
+          // 隐藏对局情况区域（复选框全部隐藏，无需逐个清理）
+          document.getElementById('section-match-conditions').style.display = 'none';
+          updateConditionalSections();
+          updateSpecialLock();
+        }
+      });
+    })();
 
     // 先后手
     var firstBtn = document.getElementById('input-first');
@@ -750,7 +804,7 @@
       if (isSurrender) {
         // 自动设结果为负
         state.result = 'loss';
-        document.querySelectorAll('#input-win, #input-loss, #input-draw, #input-abnormal').forEach(function(b) { b.classList.remove('active'); });
+        document.querySelectorAll('#input-win, #input-loss, #input-draw').forEach(function(b) { b.classList.remove('active'); });
         document.getElementById('input-loss').classList.add('active');
         // 禁用胜和平局按钮
         document.getElementById('input-win').style.opacity = '0.3';
@@ -865,7 +919,7 @@
       if (specialWho === 'self') {
         // 自己掉线/超时/抽干 → 自动负、屏蔽胜和平局
         state.result = 'loss';
-        document.querySelectorAll('#input-win, #input-loss, #input-draw, #input-abnormal').forEach(function(b) { b.classList.remove('active'); });
+        document.querySelectorAll('#input-win, #input-loss, #input-draw').forEach(function(b) { b.classList.remove('active'); });
         document.getElementById('input-loss').classList.add('active');
         document.getElementById('input-win').style.opacity = '0.3';
         document.getElementById('input-win').style.pointerEvents = 'none';
@@ -876,7 +930,7 @@
       } else {
         // 对手掉线/超时/抽干 → 自动胜、屏蔽负和平局
         state.result = 'win';
-        document.querySelectorAll('#input-win, #input-loss, #input-draw, #input-abnormal').forEach(function(b) { b.classList.remove('active'); });
+        document.querySelectorAll('#input-win, #input-loss, #input-draw').forEach(function(b) { b.classList.remove('active'); });
         document.getElementById('input-win').classList.add('active');
         document.getElementById('input-loss').style.opacity = '0.3';
         document.getElementById('input-loss').style.pointerEvents = 'none';
@@ -1174,7 +1228,7 @@
           state.surrenderWho = btn.dataset.val;
           if (btn.dataset.val === 'self') {
             state.result = 'loss';
-            document.querySelectorAll('#input-win, #input-loss, #input-draw, #input-abnormal').forEach(function(b) { b.classList.remove('active'); });
+            document.querySelectorAll('#input-win, #input-loss, #input-draw').forEach(function(b) { b.classList.remove('active'); });
             document.getElementById('input-loss').classList.add('active');
             document.getElementById('input-win').style.opacity = '0.3';
             document.getElementById('input-win').style.pointerEvents = 'none';
@@ -1187,7 +1241,7 @@
             document.getElementById('input-loss').title = '';
           } else {
             state.result = 'win';
-            document.querySelectorAll('#input-win, #input-loss, #input-draw, #input-abnormal').forEach(function(b) { b.classList.remove('active'); });
+            document.querySelectorAll('#input-win, #input-loss, #input-draw').forEach(function(b) { b.classList.remove('active'); });
             document.getElementById('input-win').classList.add('active');
             document.getElementById('input-loss').style.opacity = '0.3';
             document.getElementById('input-loss').style.pointerEvents = 'none';

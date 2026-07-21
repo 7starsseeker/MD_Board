@@ -245,6 +245,15 @@ function computeStats() {
   const cantPlayHTSecond = matches.filter(m => m.cantPlayHT && !m.goingFirst).length;
   const bothStuckFirst = matches.filter(m => m.bothStuck && m.goingFirst).length;
   const bothStuckSecond = matches.filter(m => m.bothStuck && !m.goingFirst).length;
+  // ── 互卡子选项统计 ──
+  const bsMatches = matches.filter(m => m.bothStuck);
+  const bsFirstMove = bsMatches.filter(m => m.firstMover === 'move').length;
+  const bsFirstMoveSelf = bsMatches.filter(m => m.firstMover === 'move' && m.moverWho === 'self').length;
+  const bsFirstMoveOpp = bsMatches.filter(m => m.firstMover === 'move' && m.moverWho === 'opponent').length;
+  const bsSurrender = bsMatches.filter(m => m.firstMover === 'surrender').length;
+  const bsSurrenderSelf = bsMatches.filter(m => m.firstMover === 'surrender' && m.surrenderWho === 'self').length;
+  const bsSurrenderOpp = bsMatches.filter(m => m.firstMover === 'surrender' && m.surrenderWho === 'opponent').length;
+  const bsOther = bsMatches.filter(m => m.firstMover === 'other' || !m.firstMover).length;
   const totalCantPlayFirst = matches.filter(m => (m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck) && m.goingFirst).length;
   const totalCantPlaySecond = matches.filter(m => (m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck) && !m.goingFirst).length;
 
@@ -452,15 +461,16 @@ function computeStats() {
     const tFirstWins = tFirst.filter(m => m.result === 'win').length;
     const tSecond = typeMatches.filter(m => !m.goingFirst);
     const tSecondWins = tSecond.filter(m => m.result === 'win').length;
-    // 手坑
-    const tMaxxc = typeMatches.filter(m => m.gotMaxxc).length;
-    const tDroll = typeMatches.filter(m => m.gotDroll).length;
-    const tJellyfish = typeMatches.filter(m => m.gotJellyfish).length;
-    const tLancea = typeMatches.filter(m => m.gotLancea).length;
-    const tNibiru = typeMatches.filter(m => m.gotNibiru).length;
-    const tDimension = typeMatches.filter(m => m.gotDimension).length;
-    const tSmallHT = typeMatches.filter(m => m.gotSmallHT).length;
-    const tAnyG = typeMatches.filter(m => m.gotMaxxc || m.gotDroll || m.gotJellyfish).length;
+    // 手坑（兼容新旧格式）
+    const tHTMatches = typeMatches.map(function(m) { return getMatchHandtraps(m); });
+    const tMaxxc = tHTMatches.filter(function(h) { return h.includes('gotMaxxc'); }).length;
+    const tDroll = tHTMatches.filter(function(h) { return h.includes('gotDroll'); }).length;
+    const tJellyfish = tHTMatches.filter(function(h) { return h.includes('gotJellyfish'); }).length;
+    const tLancea = tHTMatches.filter(function(h) { return h.includes('gotLancea'); }).length;
+    const tNibiru = tHTMatches.filter(function(h) { return h.includes('gotNibiru'); }).length;
+    const tDimension = tHTMatches.filter(function(h) { return h.includes('gotDimension'); }).length;
+    const tSmallHT = tHTMatches.filter(function(h) { return h.includes('_other'); }).length;
+    const tAnyG = tHTMatches.filter(function(h) { return h.includes('gotMaxxc') || h.includes('gotDroll') || h.includes('gotJellyfish'); }).length;
     // 卡手
     const tCantPlay = typeMatches.filter(m => m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck).length;
     // 对手大牌
@@ -482,7 +492,21 @@ function computeStats() {
       coinWinRate: tCoin.length > 0 ? ((tCoinWins / tCoin.length) * 100).toFixed(1) : '0.0',
       firstWinRate: tFirst.length > 0 ? ((tFirstWins / tFirst.length) * 100).toFixed(1) : '0.0',
       secondWinRate: tSecond.length > 0 ? ((tSecondWins / tSecond.length) * 100).toFixed(1) : '0.0',
-      handtrap: { gotMaxxc: tMaxxc, gotDroll: tDroll, gotJellyfish: tJellyfish, gotLancea: tLancea, gotNibiru: tNibiru, gotDimension: tDimension, gotSmallHT: tSmallHT, gotAnyG: tAnyG },
+      handtrap: {
+        gotMaxxc: tMaxxc, gotDroll: tDroll, gotJellyfish: tJellyfish,
+        gotLancea: tLancea, gotNibiru: tNibiru, gotDimension: tDimension,
+        gotSmallHT: tSmallHT, gotAnyG: tAnyG,
+        // 动态手坑列表（供渲染端展示预设手坑）
+        presets: data.handtrapPresets || [],
+        counts: (function() {
+          var c = {};
+          (data.handtrapPresets || []).forEach(function(p) {
+            c[p.id] = tHTMatches.filter(function(h) { return h.includes(p.id); }).length;
+          });
+          c['_other'] = tSmallHT;
+          return c;
+        })()
+      },
       cantPlayRate: tTotal > 0 ? ((tCantPlay / tTotal) * 100).toFixed(1) : '0.0',
       bigHandRate: tTotal > 0 ? ((tBigHand / tTotal) * 100).toFixed(1) : '0.0',
       oppDecks: Object.entries(tOppDecks)
@@ -641,6 +665,13 @@ function computeStats() {
       gfTotal, gsTotal,
       byFirst: { cantPlay: cantPlayFirst, cantPlayGarnet: cantPlayGarnetFirst, cantPlayDuplicate: cantPlayDuplicateFirst, cantPlayHT: cantPlayHTFirst, bothStuck: bothStuckFirst, totalCantPlay: totalCantPlayFirst },
       bySecond: { cantPlay: cantPlaySecond, cantPlayGarnet: cantPlayGarnetSecond, cantPlayDuplicate: cantPlayDuplicateSecond, cantPlayHT: cantPlayHTSecond, bothStuck: bothStuckSecond, totalCantPlay: totalCantPlaySecond },
+      // 互卡子选项详情
+      bothStuckDetail: {
+        total: bothStuck,
+        firstMove: bsFirstMove, firstMoveSelf: bsFirstMoveSelf, firstMoveOpp: bsFirstMoveOpp,
+        surrender: bsSurrender, surrenderSelf: bsSurrenderSelf, surrenderOpp: bsSurrenderOpp,
+        other: bsOther
+      },
       // 各卡组明细
       byDeck: Object.entries(cantPlayByDeck)
         .sort((a, b) => b[1].total - a[1].total)
