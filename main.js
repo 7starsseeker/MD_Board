@@ -247,9 +247,10 @@ function computeStats() {
   const bothStuckSecond = matches.filter(m => m.bothStuck && !m.goingFirst).length;
   // ── 互卡子选项统计 ──
   const bsMatches = matches.filter(m => m.bothStuck);
-  const bsFirstMove = bsMatches.filter(m => m.firstMover === 'move').length;
-  const bsFirstMoveSelf = bsMatches.filter(m => m.firstMover === 'move' && m.moverWho === 'self').length;
-  const bsFirstMoveOpp = bsMatches.filter(m => m.firstMover === 'move' && m.moverWho === 'opponent').length;
+  // 兼容旧版：旧版 firstMover 直接存 "self"/"opponent"（相当于"有人先动" + 谁先动）
+  const bsFirstMove = bsMatches.filter(m => m.firstMover === 'move' || m.firstMover === 'self' || m.firstMover === 'opponent').length;
+  const bsFirstMoveSelf = bsMatches.filter(m => (m.firstMover === 'move' && m.moverWho === 'self') || m.firstMover === 'self').length;
+  const bsFirstMoveOpp = bsMatches.filter(m => (m.firstMover === 'move' && m.moverWho === 'opponent') || m.firstMover === 'opponent').length;
   const bsSurrender = bsMatches.filter(m => m.firstMover === 'surrender').length;
   const bsSurrenderSelf = bsMatches.filter(m => m.firstMover === 'surrender' && m.surrenderWho === 'self').length;
   const bsSurrenderOpp = bsMatches.filter(m => m.firstMover === 'surrender' && m.surrenderWho === 'opponent').length;

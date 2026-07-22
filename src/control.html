@@ -1836,7 +1836,10 @@
         if (m.timeout) extras.push('超时' + (m.timeoutWho === 'self' ? '(我)' : m.timeoutWho === 'opponent' ? '(对)' : ''));
         if (m.cantPlay) extras.push('卡手');
         if (m.bothStuck) extras.push('互卡');
-        if (m.bothStuck && m.firstMover === 'move') extras.push('先动' + (m.moverWho === 'self' ? '(我)' : '(对)'));
+        if (m.bothStuck && (m.firstMover === 'move' || m.firstMover === 'self' || m.firstMover === 'opponent')) {
+          var who = m.firstMover === 'move' ? m.moverWho : m.firstMover;
+          extras.push('先动' + (who === 'self' ? '(我)' : '(对)'));
+        }
         if (m.bothStuck && m.firstMover === 'surrender') extras.push('投降' + (m.surrenderWho === 'self' ? '(我)' : '(对)'));
         if (m.typhonAppeared) extras.push('提丰' + (m.typhonWho === 'self' ? '(我)' : '(对)'));
         if (m.deckOut) extras.push('抽干' + (m.deckOutWho === 'self' ? '(我)' : '(对)'));
