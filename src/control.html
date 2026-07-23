@@ -1330,6 +1330,7 @@
       if (state.result === null) missing.push('结果');
       if (state.goingFirst === null) missing.push('先后手');
       if (state.coinToss === null) missing.push('硬币');
+      if (!state.myDeck || !state.myDeck.trim()) missing.push('自己卡组');
       // 异常跳过后面的条件校验
       if (state.result !== 'abnormal') {
         if (state.bothStuck) {
@@ -1472,6 +1473,7 @@
       document.getElementById('sub-deck-out').style.display = 'none';
       document.getElementById('sub-handtraps').style.display = 'none';
       document.getElementById('sub-cantplay').style.display = 'none';
+      document.getElementById('section-match-conditions').style.display = '';
       document.getElementById('section-firstmover').classList.remove('visible');
       document.getElementById('sub-mover-who').style.display = 'none';
       document.getElementById('sub-surrender-who').style.display = 'none';
