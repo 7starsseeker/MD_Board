@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('mdStats', {
   // ── 导入/导出 ──
   exportJSON: () => ipcRenderer.invoke('stats:export-json'),
   importJSON: (jsonStr) => ipcRenderer.invoke('stats:import-json', jsonStr),
+  exportMD: (params) => ipcRenderer.invoke('stats:export-md', params),
 
   // ── 实时通知 ──
   onStatsUpdate: (callback) => {

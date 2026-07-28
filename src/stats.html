@@ -339,6 +339,7 @@
     <div class="title-actions">
       <span style="font-size:11px;color:var(--text-dim);margin-right:6px" id="stats-tr-label"></span>
       <span class="last-update" id="last-update">—</span>
+      <button id="btn-export-md" title="导出 .md 统计报告" style="background:none;border:none;color:#8e8ea0;cursor:pointer;font-size:12px;padding:2px 8px;border-radius:4px;transition:all 0.15s" onmouseover="this.style.background='rgba(255,255,255,0.1)';this.style.color='#fff'" onmouseout="this.style.background='none';this.style.color='#8e8ea0'">📝 .md</button>
       <button class="close-btn" id="btn-close" title="关闭">✕</button>
     </div>
   </div>
@@ -1573,6 +1574,41 @@
       api.onStatsUpdate(function() { api.getStats().then(renderAll); });
 
       document.getElementById('btn-close').addEventListener('click', function() { window.close(); });
+
+      // ═══ 导出 .md 统计报告 ═══
+      document.getElementById('btn-export-md').addEventListener('click', async function() {
+        var btn = document.getElementById('btn-export-md');
+        var origText = btn.textContent;
+        btn.textContent = '⏳ 导出中...';
+        btn.disabled = true;
+        try {
+          var range = await api.getTimeRange();
+          var selDate = await api.getSelectedDate();
+          var cr = await api.getCustomRange();
+          var labels = { all: '全部', today: '当天', week: '本周', month: '本月', custom: '自定义' };
+          var timeLabel = labels[range] || '全部';
+          if (range === 'today' && selDate) timeLabel = selDate;
+          else if (range === 'week' && selDate) timeLabel = selDate + ' 所在周';
+          else if (range === 'month' && selDate) timeLabel = selDate.substring(0, 7) + ' 月';
+          else if (range === 'custom' && cr.start && cr.end) timeLabel = cr.start + ' ~ ' + cr.end;
+          var result = await api.exportMD({ timeRange: range, selectedDate: selDate, customStart: cr.start, customEnd: cr.end, timeLabel: timeLabel });
+          if (result && result.success) {
+            btn.textContent = '✅ 已导出';
+            setTimeout(function() { btn.textContent = origText; btn.disabled = false; }, 2000);
+          } else if (result && result.reason === 'canceled') {
+            btn.textContent = '已取消';
+            setTimeout(function() { btn.textContent = origText; btn.disabled = false; }, 1500);
+          } else {
+            btn.textContent = '❌ 导出失败';
+            console.error('导出失败:', result);
+            setTimeout(function() { btn.textContent = origText; btn.disabled = false; }, 2000);
+          }
+        } catch (e) {
+          btn.textContent = '❌ 出错';
+          console.error('导出异常:', e);
+          setTimeout(function() { btn.textContent = origText; btn.disabled = false; }, 2000);
+        }
+      });
     })();
   </script>
 </body>

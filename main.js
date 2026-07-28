@@ -979,6 +979,402 @@ ipcMain.handle('stats:export-json', () => {
   return JSON.stringify(data, null, 2);
 });
 
+// ── 导出 Markdown 统计报告 ──────────────────────────────────────
+ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, customStart, customEnd, timeLabel }) => {
+  const stats = computeStats();
+  const matches = filterMatchesByTimeRange(data.matches || [], data.timeRange || 'all');
+
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const genTime = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+  let md = '';
+  md += '# MD Stats 统计报告\n\n';
+  md += `**生成时间**: ${genTime}\n`;
+  md += `**数据范围**: ${timeLabel || '全部'}\n\n`;
+
+  // ── 时间范围说明 ──
+  if (timeRange === 'custom' && customStart && customEnd) {
+    md += `自定义时间范围: ${customStart} ~ ${customEnd}\n\n`;
+  } else if (timeRange === 'today' && selectedDate) {
+    md += `日期: ${selectedDate}\n\n`;
+  }
+
+  // ── 概览 ──
+  const b = stats;
+  md += '---\n\n';
+  md += '## 📊 概览\n\n';
+  md += `| 指标 | 数值 |\n| --- | --- |\n`;
+  md += `| 总对局 | ${b.total} |\n`;
+  md += `| 胜 | ${b.wins} |\n`;
+  md += `| 负 | ${b.losses} |\n`;
+  md += `| 平 | ${b.draws} |\n`;
+  md += `| 异常 | ${b.abnormals} |\n`;
+  md += `| **胜率** | **${b.winRate}%** |\n`;
+  md += '\n';
+
+  // ── 连胜/连败 ──
+  const streak = stats.currentStreak;
+  if (streak.count > 1) {
+    const streakEmoji = streak.type === 'win' ? '🔥' : '💧';
+    const streakLabel = streak.type === 'win' ? '连胜' : '连败';
+    md += `**当前状态**: ${streakEmoji} ${streakLabel} ${streak.count}\n\n`;
+  }
+  md += '> **算法**: 总对局 = 胜+负+平+异常; 胜率 = 胜/(胜+负)*100%; 连胜/连败 = 从最新对局向前扫描, 跳过平局/异常, 连续同结果次数\n\n';
+
+  // ── 先后手 ──
+  md += '---\n\n';
+  md += '## ⚔️ 先后手对比\n\n';
+  md += `| 项目 | 场次 | 胜率 |\n| --- | --- | --- |\n`;
+  md += `| 先手 | ${stats.goingFirst.total} | ${stats.goingFirst.winRate}% |\n`;
+  md += `| 后手 | ${stats.goingSecond.total} | ${stats.goingSecond.winRate}% |\n`;
+  md += '\n';
+  md += '> **算法**: 先手/后手 = 筛选 goingFirst 为 true/false 的正常对局; 先手胜率 = 先手胜/(先手胜+先手负)*100%; 后手同理\n\n';
+
+  // ── 硬币统计 ──
+  if (stats.coin) {
+    md += '---\n\n';
+    md += '## 🪙 硬币统计\n\n';
+    const c = stats.coin;
+    md += `| 项目 | 数值 |\n| --- | --- |\n`;
+    md += `| 总投币 | ${c.total} |\n`;
+    md += `| 正（先手） | ${c.wins} (${c.winRate}%) |\n`;
+    md += `| 反（后手） | ${c.losses} |\n`;
+    if (c.streak && c.streak.current) {
+      const cur = c.streak.current;
+      const ctLabel = cur.type === true ? '连正' : '连反';
+      md += `| 当前${ctLabel} | ${cur.length} |\n`;
+    }
+    if (c.bias && c.bias.severity !== '—') {
+      md += `| 偏斜检测 | ${c.bias.severity} (分数: ${c.bias.severityScore}) |\n`;
+    }
+    md += '\n';
+  }
+  md += '> **算法**: 正=投币赢且先手; 反=投币输且后手。连正/连反分析从最近对局倒序扫描; 偏斜用 Z 检验 (|观察-预期|/标准误), 严重度：分数≤20正常/≤50⚠️/≤75🔴/>75🔥。期望最大连正=log₂(n)+0.333\n\n';
+
+  // ── 手坑统计 ──
+  md += '---\n\n';
+  md += '## 🛡️ 吃手坑统计\n\n';
+  const ht = stats.handtrap;
+  md += `| 手坑 | 次数 | 占比 |\n| --- | --- | --- |\n`;
+  md += `| G | ${ht.gotMaxxc} | ${ht.maxxcRate}% |\n`;
+  md += `| 任一 G | ${ht.gotAnyG} | ${ht.anyGRate}% |\n`;
+  md += `| 锁鸟 | ${ht.gotDroll} | -\n`;
+  md += `| 水母 | ${ht.gotJellyfish} | -\n`;
+  md += `| 渊兽 | ${ht.gotLancea} | -\n`;
+  md += `| 陨石 | ${ht.gotNibiru} | ${ht.nibiruRate}% |\n`;
+  md += `| 次元 | ${ht.gotDimension} | -\n`;
+  md += `| 小手坑 | ${ht.gotSmallHT} | -\n`;
+  if (ht.presets && ht.presets.length > 0) {
+    ht.presets.forEach(function(p) {
+      const cnt = (ht.counts && ht.counts[p.id]) || 0;
+      if (cnt > 0) {
+        md += `| ${p.label} | ${cnt} | -\n`;
+      }
+    });
+  }
+  md += '\n';
+  md += '> **算法**: 逐场提取 handtraps 数组, 按 ID 统计出现次数除以总对局数得占比。gotAnyG = 含 G/锁鸟/水母任一的场次\n\n';
+
+  // ── 手牌与卡手统计 ──
+  md += '---\n\n';
+  md += '## 🃏 手牌与卡手统计\n\n';
+  const hs = stats.handState;
+  md += `| 类型 | 次数 | 占比 |\n| --- | --- | --- |\n`;
+  md += `| 卡手合计 | ${hs.totalCantPlay} | ${hs.cantPlayRate}% |\n`;
+  md += `| 动不了 | ${hs.cantPlay} | -\n`;
+  md += `| 卡组件 | ${hs.cantPlayGarnet} | -\n`;
+  md += `| 卡复数 | ${hs.cantPlayDuplicate} | -\n`;
+  md += `| 卡手坑 | ${hs.cantPlayHT} | -\n`;
+  md += `| 互卡 | ${hs.bothStuck} | ${hs.bothStuckRate}% |\n`;
+
+  // 先后手卡手
+  md += '\n**先后手卡手**:\n\n';
+  md += `| 项目 | 先手 | 后手 |\n| --- | --- | --- |\n`;
+  md += `| 动不了 | ${hs.byFirst.cantPlay} | ${hs.bySecond.cantPlay} |\n`;
+  md += `| 卡组件 | ${hs.byFirst.cantPlayGarnet} | ${hs.bySecond.cantPlayGarnet} |\n`;
+  md += `| 卡复数 | ${hs.byFirst.cantPlayDuplicate} | ${hs.bySecond.cantPlayDuplicate} |\n`;
+  md += `| 卡手坑 | ${hs.byFirst.cantPlayHT} | ${hs.bySecond.cantPlayHT} |\n`;
+  md += `| 互卡 | ${hs.byFirst.bothStuck} | ${hs.bySecond.bothStuck} |\n`;
+
+  md += '> **算法**: 各类型卡手标记位统计; 卡手率 = 任一类卡手对局数/总对局*100%。byDeck 按自用卡组分组\n\n';
+
+  // 互卡子选项详情
+  if (hs.bothStuck > 0) {
+    const bsd = hs.bothStuckDetail;
+    md += '\n**互卡子选项详情**:\n\n';
+    md += `| 类型 | 次数 |\n| --- | --- |\n`;
+    md += `| 有人先动 | ${bsd.firstMove} |\n`;
+    if (bsd.firstMove > 0) {
+      md += `|　ー 自己先动 | ${bsd.firstMoveSelf} |\n`;
+      md += `|　ー 对手先动 | ${bsd.firstMoveOpp} |\n`;
+    }
+    md += `| 有人投降 | ${bsd.surrender} |\n`;
+    if (bsd.surrender > 0) {
+      md += `|　ー 自己投降 | ${bsd.surrenderSelf} |\n`;
+      md += `|　ー 对手投降 | ${bsd.surrenderOpp} |\n`;
+    }
+    md += `| 其他 | ${bsd.other} |\n`;
+  }
+  md += '\n';
+
+  // ── 严重失误 ──
+  if (stats.mistake && stats.mistake.total > 0) {
+    md += '---\n\n';
+    md += '## 💢 严重失误统计\n\n';
+    const m = stats.mistake;
+    md += `| 项目 | 数值 |\n| --- | --- |\n`;
+    md += `| 失误总次数 | ${m.total} (${m.rate}%) |\n`;
+    md += `| 失误时胜率 | ${m.winRate}% (${m.wins}W ${m.losses}L) |\n`;
+    if (m.byDeck && m.byDeck.length > 0) {
+      md += '\n**各卡组失误分布**:\n\n';
+      md += `| 卡组 | 失误 | 胜率 |\n| --- | --- | --- |\n`;
+      m.byDeck.forEach(function(d) {
+        md += `| ${d.deck} | ${d.total} | ${d.winRate}% |\n`;
+      });
+    }
+    md += '\n';
+  }
+  md += '> **算法**: 失误率 = mistake 标记对局数/总对局*100%; 失误时胜率 = 有失误对局中胜/(胜+负)*100%; 按 myDeck 分组计数\n\n';
+
+  // ── 吓跑对手 ──
+  if (stats.opponentRan && stats.opponentRan.total > 0) {
+    md += '---\n\n';
+    md += '## 🏃 吓跑对手情况\n\n';
+    const r = stats.opponentRan;
+    md += `| 项目 | 次数 |\n| --- | --- |\n`;
+    md += `| 合计 | ${r.total} (${r.rate}%) |\n`;
+    md += `| 先手吓跑 | ${r.firstTotal} |\n`;
+    md += `| 后手吓跑 | ${r.secondTotal} |\n`;
+    if (r.byDeck && r.byDeck.length > 0) {
+      md += '\n**吓跑分布**:\n';
+      r.byDeck.forEach(function(d) { md += `- ${d.deck}: ${d.count}\n`; });
+    }
+    md += '\n';
+  }
+  md += '> **算法**: 吓跑率 = opponentRan 标记对局数/总对局*100%; 区分先手终场阶段(正常/妥协/被停/其他)和后手突破阶段(无需/成功/失败/其他)\n\n';
+
+  // ── 对手 T0 ──
+  if (stats.opponentT0 && stats.opponentT0.total > 0) {
+    md += '---\n\n';
+    md += '## ⚡ 对手 T0 动统计\n\n';
+    const t0 = stats.opponentT0;
+    md += `| 项目 | 数值 |\n| --- | --- |\n`;
+    md += `| 总次数 | ${t0.total} |\n`;
+    md += `| 胜率 | ${t0.winRate}% (${t0.wins}W ${t0.losses}L) |\n`;
+    if (t0.byDeck && t0.byDeck.length > 0) {
+      t0.byDeck.forEach(function(d) {
+        md += `| 对手 ${d.deck} | ${d.total} | ${d.winRate}% |\n`;
+      });
+    }
+    md += '\n';
+  }
+  md += '> **算法**: 对手 T0 = opponentT0 标记对局; 按对手卡组分组的胜率\n\n';
+
+  // ── 先手终场 ──
+  if (stats.endboard && stats.endboard.total > 0) {
+    md += '---\n\n';
+    md += '## 🏗️ 先手终场统计\n\n';
+    const eb = stats.endboard;
+    md += `| 终场质量 | 次数 | 占比 |\n| --- | --- | --- |\n`;
+    md += `| 正常展开 | ${eb.normal} | ${eb.normalRate}% |\n`;
+    md += `| 妥协场 | ${eb.compromised} | -\n`;
+    md += `| 被停 | ${eb.stopped} | -\n`;
+    md += `| 直接投降 | ${eb.surrender} | -\n`;
+    md += `| 对手投 | ${eb.opponentSurrendered} | -\n`;
+    md += '\n';
+  }
+  md += '> **算法**: 正常展开率 = endboardState="normal"/先手总场*100%; 妥协/被停/投降/对手投各计数\n\n';
+
+  // ── 后手突破 ──
+  if (stats.breakBoard && stats.breakBoard.total > 0) {
+    md += '---\n\n';
+    md += '## 🔨 后手突破统计\n\n';
+    const bb = stats.breakBoard;
+    md += `| 项目 | 次数 | 占比 |\n| --- | --- | --- |\n`;
+    md += `| 成功突破 | ${bb.success} | ${bb.successRate}% |\n`;
+    md += `| 突破失败 | ${bb.failed} | -\n`;
+    md += `| 投降 | ${bb.surrender} | -\n`;
+    md += `| 无需突破 | ${bb.notNeeded} | -\n`;
+    md += `| 突破后胜率 | ${bb.successWinRate}% | -\n`;
+    md += '\n';
+  }
+  md += '> **算法**: 突破成功率 = brokeBoard=true/后手总场*100%; 突破后胜率 = 突破成功且获胜/突破成功总场*100%\n\n';
+
+  // ── 连接状态 ──
+  md += '---\n\n';
+  md += '## 📡 连接状态统计\n\n';
+  const conn = stats.connectivity;
+  md += `| 项目 | 次数 | 占比 |\n| --- | --- | --- |\n`;
+  md += `| 掉线 | ${conn.disconnect} | ${conn.disconnectRate}% |\n`;
+  md += `|　ー 自己掉线 | ${conn.disconnectSelf} | -\n`;
+  md += `|　ー 对手掉线 | ${conn.disconnectOpponent} | -\n`;
+  md += `| 超时 | ${conn.timeout} | ${conn.timeoutRate}% |\n`;
+  md += `|　ー 己方超时 | ${conn.timeoutSelf} | -\n`;
+  md += `|　ー 对手超时 | ${conn.timeoutOpponent} | -\n`;
+  md += '\n';
+  md += '> **算法**: 掉线/超时分别统计 disconnect/timeout 标记; 区分己方(disconnectWho/timeoutWho="self")和对方("opponent")\n\n';
+
+  // ── 大牌/提丰/抽干 ──
+  md += '---\n\n';
+  md += '## 🃏 其他统计\n\n';
+
+  md += `**对手大牌**: ${stats.bigHand.total} 次（先手 ${stats.bigHand.first} / 后手 ${stats.bigHand.second}）\n\n`;
+
+  if (stats.typhon && stats.typhon.total > 0) {
+    const t = stats.typhon;
+    md += `**提丰登场**: ${t.total} 次\n`;
+    md += `- 对手出提丰输了: ${t.enemyBlack} 次\n`;
+    md += `- 对手出提丰赢了: ${t.enemyWhite} 次\n`;
+    md += `- 自己出提丰输了: ${t.selfBlack} 次\n`;
+    md += `- 自己出提丰赢了: ${t.selfWhite} 次\n\n`;
+  }
+
+  if (stats.deckOut && stats.deckOut.total > 0) {
+    const d = stats.deckOut;
+    md += `**抽干牌组**: ${d.total} 次（自己 ${d.self} / 对手 ${d.opponent}）\n\n`;
+  }
+  md += '> **算法**: 大牌=opponentBigHand; 提丰=typhonAppeared; 抽干=deckOut。分别统计次数, 提丰+抽干区分己方/对方\n\n';
+
+  // ── 自用卡组统计 ──
+  if (stats.myDeckStats && stats.myDeckStats.length > 0) {
+    md += '---\n\n';
+    md += '## 🃏 自用卡组统计\n\n';
+    md += `| 卡组 | 总场 | 胜 | 负 | 胜率 |\n| --- | --- | --- | --- | --- |\n`;
+    stats.myDeckStats.forEach(function(d) {
+      md += `| ${d.deck} | ${d.total} | ${d.wins} | ${d.losses} | ${d.winRate}% |\n`;
+    });
+    md += '\n';
+  }
+  md += '> **算法**: 按 myDeck 字段分组, 每组统计胜/负/平/异常, 胜率=胜/(胜+负)*100%; 按总场数降序排列\n\n';
+
+  // ── 对手卡组统计 ──
+  if (stats.deckStats && stats.deckStats.length > 0) {
+    md += '---\n\n';
+    md += '## 🎴 对手卡组统计\n\n';
+    md += `| 卡组 | 总场 | 胜 | 负 | 胜率 |\n| --- | --- | --- | --- | --- |\n`;
+    stats.deckStats.forEach(function(d) {
+      md += `| ${d.deck} | ${d.total} | ${d.wins} | ${d.losses} | ${d.winRate}% |\n`;
+    });
+    md += '\n';
+  }
+  md += '> **算法**: 按 opponentDeck 字段分组, 与自用卡组同理\n\n';
+
+  // ── 二维交叉统计 ──
+  if (stats.matchupStats && stats.matchupStats.length > 0) {
+    md += '---\n\n';
+    md += '## ⚔️ 对位交叉统计\n\n';
+    // 按 myDeck 分组
+    var groups = {};
+    stats.matchupStats.forEach(function(m) {
+      if (!groups[m.myDeck]) groups[m.myDeck] = [];
+      groups[m.myDeck].push(m);
+    });
+    Object.keys(groups).sort(function(a, b) {
+      var ta = groups[a].reduce(function(s, m) { return s + m.total; }, 0);
+      var tb = groups[b].reduce(function(s, m) { return s + m.total; }, 0);
+      return tb - ta;
+    }).forEach(function(myDeck) {
+      var items = groups[myDeck];
+      var subTotal = items.reduce(function(s, m) { return s + m.total; }, 0);
+      var subWins = items.reduce(function(s, m) { return s + m.wins; }, 0);
+      var subLosses = items.reduce(function(s, m) { return s + m.losses; }, 0);
+      var subRate = (subWins + subLosses) > 0 ? ((subWins / (subWins + subLosses)) * 100).toFixed(1) : '0.0';
+      md += `**${myDeck}** — 共 ${subTotal} 场, 胜率 ${subRate}%\n\n`;
+      md += `| 对手卡组 | 总 | W | L | 胜率 |\n| --- | --- | --- | --- | --- |\n`;
+      items.forEach(function(m) {
+        var wr = (m.wins + m.losses) > 0 ? ((m.wins / (m.wins + m.losses)) * 100).toFixed(1) : '0.0';
+        md += `| ${m.opponentDeck} | ${m.total} | ${m.wins} | ${m.losses} | ${wr}% |\n`;
+      });
+      md += '\n';
+    });
+  }
+  md += '> **算法**: 按 myDeck+opponentDeck 二维分组, 统计各组胜率; 先按 myDeck 聚合, 每个 myDeck 下再按 opponentDeck 显示明细\n\n';
+
+  // ── 晋级/保级赛 ──
+  var rs = stats.rankedStats;
+  if (rs && (rs.promotion || rs.relegation)) {
+    md += '---\n\n';
+    md += '## 🏆 晋级 / 保级赛\n\n';
+    [['晋级赛', '🔥', rs.promotion], ['保级赛', '💧', rs.relegation]].forEach(function(item) {
+      var label = item[0], icon = item[1], data = item[2];
+      if (!data) return;
+      md += `### ${icon} ${label}\n\n`;
+      md += `| 项目 | 数值 |\n| --- | --- |\n`;
+      md += `| 场次 | ${data.total} |\n`;
+      md += `| 胜率 | ${data.winRate}% |\n`;
+      md += `| 硬币胜率 | ${data.coinWinRate}% |\n`;
+      md += `| 先手胜率 | ${data.firstWinRate}% |\n`;
+      md += `| 后手胜率 | ${data.secondWinRate}% |\n`;
+      md += `| 卡手率 | ${data.cantPlayRate}% |\n`;
+      md += `| 对手大牌率 | ${data.bigHandRate}% |\n`;
+
+      var ht2 = data.handtrap;
+      if (ht2 && ht2.presets && ht2.presets.length > 0) {
+        md += '\n**吃手坑**:\n';
+        ht2.presets.forEach(function(p) {
+          var cnt = (ht2.counts && ht2.counts[p.id]) || 0;
+          if (cnt > 0) md += `- ${p.label}: ${cnt}\n`;
+        });
+      }
+
+      if (data.oppDecks && data.oppDecks.length > 0) {
+        md += '\n**对手卡组分布**:\n\n';
+        md += `| 卡组 | W | L | 胜率 |\n| --- | --- | --- | --- |\n`;
+        data.oppDecks.forEach(function(d) {
+          md += `| ${d.deck} | ${d.wins} | ${d.losses} | ${d.winRate}% |\n`;
+        });
+      }
+      md += '\n';
+    });
+  }
+  md += '> **算法**: 晋级/保级赛 = matchType 为 "promotion"/"relegation" 的对局; 统计胜率、硬币胜率、先后手胜率、卡手率、对手大牌率、吃手坑分布、对手卡组分布\n\n';
+
+  // ── 对局原始数据表格 ──
+  md += '---\n\n';
+  md += '## 📋 对局明细\n\n';
+  if (matches.length > 0) {
+    md += `共 ${matches.length} 场对局\n\n`;
+    md += `| # | 时间 | 结果 | 先后手 | 硬币 | 自用卡组 | 对手卡组 | 手坑 | 卡手 | 失误 | 终场/突破 | 备注 |\n`;
+    md += `| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n`;
+    var maxRows = matches.length;
+    for (var i = matches.length - maxRows; i < matches.length; i++) {
+      var m = matches[i];
+      var ts = m.timestamp ? m.timestamp.substring(0, 16).replace('T', ' ') : '—';
+      var res = m.result || '—';
+      var gf = m.goingFirst === true ? '先手' : (m.goingFirst === false ? '后手' : '—');
+      var coin = m.coinToss === true ? '正' : (m.coinToss === false ? '反' : '—');
+      var myD = m.myDeck || '—';
+      var opD = m.opponentDeck || '—';
+      var htStr = (m.handtraps && m.handtraps.length > 0) ? m.handtraps.map(function(h) { return h.replace('got', ''); }).join(',') : '—';
+      var cantPlay = (m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck) ? 'Y' : '—';
+      var mistake = m.mistake ? 'Y' : '—';
+      var endBrk = m.goingFirst ? (m.endboardState || '—') : (m.brokeBoard || '—');
+      var notes = (m.notes || '').substring(0, 30).replace(/\|/g, '\\|');
+      md += `| ${i + 1} | ${ts} | ${res} | ${gf} | ${coin} | ${myD} | ${opD} | ${htStr} | ${cantPlay} | ${mistake} | ${endBrk} | ${notes} |\n`;
+    }
+    md += '\n';
+  } else {
+    md += '（无对局数据）\n\n';
+  }
+
+  md += '---\n\n';
+  md += `*由 MD Stats v${require('./package.json').version} 自动生成*\n`;
+
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    title: '导出统计报告',
+    defaultPath: `md-stats-report-${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}.md`,
+    filters: [{ name: 'Markdown', extensions: ['md'] }]
+  });
+  if (canceled || !filePath) return { success: false, reason: 'canceled' };
+  try {
+    fs.writeFileSync(filePath, md, 'utf-8');
+    return { success: true, path: filePath };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
 ipcMain.handle('stats:import-json', (event, jsonStr) => {
   try {
     const parsed = JSON.parse(jsonStr);
