@@ -1,5 +1,49 @@
 # 更新日志
 
+## v1.2.3 — 安全审计 + AES 加密 + 代码重构
+
+### 🔒 安全修复
+
+- **XSS 跨站脚本注入** — 所有前端页面中对用户可控文本字段（卡组名、备注、预设标签）的 innerHTML 拼接添加 HTML 转义（`escapeHtml`）。核心工具函数 `infoRow()` / `infoBar()` 新增 `escapeHtml`，一次性覆盖全部图表 info 面板
+- **`shell.openExternal` URL 白名单** — 限制可打开的外部链接仅为 `github.com` 和 `raw.githubusercontent.com`，且仅允许 `https:` 协议
+- **CSP 内容安全策略** — 所有 5 个 HTML 文件添加 `Content-Security-Policy` meta 标签，限制资源仅同源加载，阻断外部脚本注入
+- **导入数据校验增强** — `import-json` 不再覆盖整个 `data` 对象，改为仅覆盖 `matches`，并限制最大 10 万条
+- **输入长度限制** — 卡组预设名称、手坑预设名称添加 100 字符上限
+
+### 🔐 数据加密
+
+- **自包含 AES-256-GCM 加密** — 数据文件自动加密存储。加密密钥嵌入文件自身（固定派生包装密钥保护随机数据密钥），复制 `stats.json` 到任何机器都能直接解密，无需额外密钥文件
+- **三级解密回退** — 加载时依次尝试：自包含解密 → 旧版密钥文件解密（兼容迁移） → 明文读取，确保历史数据无感升级
+- **旧密钥文件移除** — 不再依赖 `%APPDATA%/.md-stats-key`，密钥自包含于数据文件
+
+### 🔧 重构与改进
+
+- **`computeStats` 函数拆分** — 从单一 ~700 行函数拆分为 15 个独立子函数（`computeBasicStats` / `computeStreak` / `computeCoinStats` / `computeHandtrapStats` / `computeHandStateStats` / `computeConnectivityStats` / `computeEndboardStats` / `computeBreakBoardStats` / `computeOpponentRanStats` / `computeMistakeStats` / `computeOpponentT0Stats` / `computeDeckGroupStats` / `computeMatchupStats` / `computeTypeStats`），编排层仅 ~60 行
+- **`crypto.randomUUID()` 替代 `Math.random()`** — 对局 ID 生成使用真正的唯一 ID
+- **版本号统一** — `start.bat` 改为从 `package.json` 动态读取版本号，数据源统一
+- **单元测试导入** — 新增 `test/stats-core.test.js`，覆盖核心纯函数和加密模块（26 个用例），运行 `npm test`
+- **`build-log.txt` 移出版本控制** — 加入 `.gitignore`，构建日志不再提交
+
+---
+
+## v1.2.0 — 安全审计修复：XSS 防御 + CSP + 数据校验
+
+### 🔒 安全修复
+
+- **XSS 跨站脚本注入** — 所有前端页面中对用户可控文本字段（卡组名、备注、预设标签）的 innerHTML 拼接添加 HTML 转义（`escapeHtml`）。核心工具函数 `infoRow()` / `infoBar()` 新增 `escapeHtml`，一次性覆盖全部图表 info 面板
+- **`shell.openExternal` URL 白名单** — 限制可打开的外部链接仅为 `github.com` 和 `raw.githubusercontent.com`，且仅允许 `https:` 协议
+- **CSP 内容安全策略** — 所有 5 个 HTML 文件添加 `Content-Security-Policy` meta 标签，限制资源仅同源加载，阻断外部脚本注入
+- **导入数据校验增强** — `import-json` 不再覆盖整个 `data` 对象，改为仅覆盖 `matches`，并限制最大 10 万条
+- **输入长度限制** — 卡组预设名称、手坑预设名称添加 100 字符上限
+
+### 🔧 改进
+
+- **ID 生成改为 `crypto.randomUUID()`** — 替代 `Math.random()` 实现真正的唯一 ID
+- **版本号统一** — `start.bat` 改为从 `package.json` 动态读取版本号，数据源统一
+- **`build-log.txt` 移出版本控制** — 加入 `.gitignore`，构建日志不再提交
+
+---
+
 ## v1.2.0 — 自定义手坑预设 + 录入面板重构 + 双方都动不了投降
 
 ### ✨ 新增功能
@@ -328,3 +372,4 @@
 
 - 图表面板 Chart.js 因路径错误不加载，图表不显示的问题
 - 打包后的 exe 中 Chart.js 同样因路径问题不工作
+

@@ -58,28 +58,6 @@
 
 ---
 
-## 快速开始
-
-### 环境要求
-
-- [Node.js](https://nodejs.org/) v18 或更高
-- Windows / macOS / Linux
-
-### 从源码运行
-
-```bash
-git clone https://github.com/7starsseeker/MD_Board.git
-cd MD_Board
-npm install
-npm start
-```
-
-### 使用便携版 exe
-
-从 [Releases](https://github.com/7starsseeker/MD_Board/releases) 页面下载 `MD_Board_x.x.x_portable.exe`，双击运行即可。
-
----
-
 ## 使用说明
 
 ### 录入对局
@@ -123,11 +101,42 @@ npm start
 
 ## 数据存储
 
-所有对局数据自动保存在系统临时目录（`%TEMP%/md-stats-data/stats.json`），每次修改自动保存，重启自动加载。
+所有对局数据自动保存在系统临时目录（`%TEMP%/md-stats-data/stats.json`），使用 **AES-256-GCM** 自动加密存储。加密密钥嵌入文件自身，复制到任何机器都能直接解密，无需额外配置。
 
-如需备份数据，请在控制面板使用「导出」功能导出 JSON；恢复时使用「导入」功能。
+如需备份数据，请在控制面板使用「导出」功能导出明文 JSON；恢复时使用「导入」功能。
 
 所有数据仅存储在本地，不上传任何服务器。
+
+---
+
+## 开发
+
+### 从源码运行
+
+```bash
+git clone https://github.com/7starsseeker/MD_Board.git
+cd MD_Board
+npm install
+npm start
+```
+
+> 便携版 exe 从 [Releases](https://github.com/7starsseeker/MD_Board/releases) 下载 `MD_Board_x.x.x_portable.exe`，双击运行即可。
+
+### 测试
+
+```bash
+npm test
+```
+
+使用 Node.js 内置 `node:test` 运行，零外部依赖。覆盖核心统计函数（胜率计算、连胜/连败、硬币统计、手坑统计等）和 AES-256-GCM 加密模块。
+
+### 打包
+
+```bash
+npm run pack
+```
+
+输出便携版 exe 到 `release/` 目录。
 
 ---
 

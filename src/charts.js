@@ -21,15 +21,22 @@ function fmt(v) {
 // 胜率颜色 >50%绿 <50%红 =50%白
 function winBarCls(r) { var v = parseFloat(r); return v > 50 ? 'green' : v < 50 ? 'red' : ''; }
 
+/** HTML 转义 */
+function escapeHtml(str) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 /** 填充 info 面板：单行 */
 function infoRow(label, value, cls) {
-  return '<div class="info-row"><span class="info-label">' + label + '</span><span class="info-val' + (cls ? ' ' + cls : '') + '">' + value + '</span></div>';
+  return '<div class="info-row"><span class="info-label">' + escapeHtml(label) + '</span><span class="info-val' + (cls ? ' ' + cls : '') + '">' + value + '</span></div>';
 }
 
 /** 填充 info 面板：带进度条 */
 function infoBar(label, pct, cls) {
   var v = parseFloat(pct);
-  return '<div class="info-bar"><span style="flex:1;color:var(--text-dim)">' + label + '</span><div class="info-bar-track"><div class="info-bar-fill ' + cls + '" style="width:' + Math.min(v, 100) + '%"></div></div><span class="info-val" style="font-size:10px">' + fmt(v) + '%</span></div>';
+  return '<div class="info-bar"><span style="flex:1;color:var(--text-dim)">' + escapeHtml(label) + '</span><div class="info-bar-track"><div class="info-bar-fill ' + cls + '" style="width:' + Math.min(v, 100) + '%"></div></div><span class="info-val" style="font-size:10px">' + fmt(v) + '%</span></div>';
 }
 
 /** 填充 info 面板：分段标题 */

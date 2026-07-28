@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MD Stats - 循环显示</title>
   <link rel="stylesheet" href="style.css">
@@ -239,6 +240,12 @@
       var currentTimeRange = 'all';
       var TIME_RANGE_LABELS = { all: '全部', today: '一天', week: '一整周', month: '一整月', custom: '自定义' };
 
+      function escapeHtml(str) {
+        if (typeof str !== 'string') return str;
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+
       // ═══ 渲染函数 ▸ 返回 { label, subLabel, html } ═══
 
       var RENDERERS = {};
@@ -343,7 +350,7 @@
           var r = t > 0 ? (cnt / t * 100).toFixed(1) : '0.0';
           var colors = ['#ffd700', '#64c8ff', '#ff3b30'];
           var ci = top3.indexOf(id) % colors.length;
-          topHtml += '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:' + colors[ci] + '">' + cnt + ' <span style="font-size:13px;font-weight:400">(' + fmt(r) + '%)</span></div><div style="font-size:12px;color:#ffffff">' + p.label + '</div></div>';
+          topHtml += '<div style="text-align:center"><div style="font-size:20px;font-weight:800;color:' + colors[ci] + '">' + cnt + ' <span style="font-size:13px;font-weight:400">(' + fmt(r) + '%)</span></div><div style="font-size:12px;color:#ffffff">' + escapeHtml(p.label) + '</div></div>';
         });
         // 如果 large 不足3个补空位
         var shown = top3.length;
@@ -434,7 +441,7 @@
           html: '<div class="big-value" style="color:#ffd700;font-size:36px;line-height:1">' + or.total + ' <span style="font-size:20px">🏃</span></div>' +
                 '<div class="big-label" style="font-size:16px;margin-top:4px">吓跑对手</div>' +
                 '<div class="sub-line" style="font-size:14px">占总对局 ' + fmt(or.rate) + '%' +
-                (best ? ' · 最多: ' + best.deck + ' (' + best.count + ')' : '') + '</div>' + detailHtml
+                (best ? ' · 最多: ' + escapeHtml(best.deck) + ' (' + best.count + ')' : '') + '</div>' + detailHtml
         };
       };
 
@@ -615,7 +622,7 @@
         var top = decks.filter(function(d) { return d.deck !== '未知'; }).slice(0, 3);
         var list = top.map(function(d) {
           return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:290px;padding:3px 0;font-size:16px">' +
-            '<span style="color:var(--text-bright);font-size:14px">' + d.deck + '</span>' +
+            '<span style="color:var(--text-bright);font-size:14px">' + escapeHtml(d.deck) + '</span>' +
             '<span><span style="color:#4cd964;font-weight:700;font-family:var(--font-mono);font-size:15px">' + d.wins + '</span>' +
             '<span style="color:var(--text-dim);font-size:13px">/</span>' +
             '<span style="color:#ff3b30;font-weight:700;font-family:var(--font-mono);font-size:15px">' + d.losses + '</span>' +
@@ -637,7 +644,7 @@
         var top = decks.filter(function(d) { return d.deck !== '未知'; }).slice(0, 3);
         var list = top.map(function(d) {
           return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:290px;padding:3px 0;font-size:16px">' +
-            '<span style="color:var(--text-bright);font-size:14px">' + d.deck + '</span>' +
+            '<span style="color:var(--text-bright);font-size:14px">' + escapeHtml(d.deck) + '</span>' +
             '<span><span style="color:#4cd964;font-weight:700;font-family:var(--font-mono);font-size:15px">' + d.wins + '</span>' +
             '<span style="color:var(--text-dim);font-size:13px">/</span>' +
             '<span style="color:#ff3b30;font-weight:700;font-family:var(--font-mono);font-size:15px">' + d.losses + '</span>' +
@@ -659,9 +666,9 @@
         var top = matchups.filter(function(m) { return m.myDeck !== '未知' && m.opponentDeck !== '未知'; }).slice(0, 3);
         var list = top.map(function(m) {
           return '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:290px;padding:2px 0;font-size:13px">' +
-            '<span style="color:var(--text-bright);font-size:12px">' + m.myDeck + '</span>' +
+            '<span style="color:var(--text-bright);font-size:12px">' + escapeHtml(m.myDeck) + '</span>' +
             '<span style="color:var(--text-dim);font-size:11px">vs</span>' +
-            '<span style="color:var(--text);font-size:12px">' + m.opponentDeck + '</span>' +
+            '<span style="color:var(--text);font-size:12px">' + escapeHtml(m.opponentDeck) + '</span>' +
             ' <span style="font-weight:700;font-family:var(--font-mono);color:' + winClr(m.winRate) + ';font-size:13px">' + m.winRate + '%</span></span></div>';
         }).join('');
         return {

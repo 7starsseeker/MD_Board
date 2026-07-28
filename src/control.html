@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MD Stats - 控制面板</title>
   <link rel="stylesheet" href="style.css">
@@ -1808,6 +1809,16 @@
     loadHandtrapPresets();
 
     // ═══════════════════════════════════════════════════════════════════════
+    //  工具函数
+    // ═══════════════════════════════════════════════════════════════════════
+
+    function escapeHtml(str) {
+      if (typeof str !== 'string') return str;
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     //  渲染统计 & 对局记录
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -1821,7 +1832,7 @@
         var idx = matches.length - i;
         var label = m.result === 'win' ? '胜' : m.result === 'draw' ? '平' : m.result === 'abnormal' ? '异' : '负';
         var going = m.goingFirst ? '先手' : '后手';
-        var deck = m.opponentDeck || '—';
+        var deck = escapeHtml(m.opponentDeck || '—');
         var extras = [];
         if (m.coinToss === true) extras.push('硬币胜');
         else if (m.coinToss === false) extras.push('硬币负');
@@ -1850,7 +1861,7 @@
         else if (m.brokeBoard === false) extras.push('未突破');
         else if (m.brokeBoard === 'not_applicable') extras.push('不需要突破');
         if (m.otk === true) extras.push('斩杀');
-        var notes = m.notes ? ' · ' + m.notes.slice(0, 20) + (m.notes.length > 20 ? '…' : '') : '';
+        var notes = m.notes ? ' · ' + escapeHtml(m.notes.slice(0, 20) + (m.notes.length > 20 ? '…' : '')) : '';
         var date = new Date(m.timestamp);
         var timeStr = (date.getMonth()+1) + '/' + date.getDate() + ' ' + String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0');
         var extraStr = extras.length ? ' · ' + extras.join(' ') : '';

@@ -4,5 +4,7 @@ data/*
 release/
 .DS_Store
 Thumbs.db
-build-log.txt
 .reasonix/
+
+# Build logs
+build-log.txt

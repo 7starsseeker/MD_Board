@@ -1,6 +1,28 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+
+/** HTML 转义 — 防止 XSS */
+function escapeHtml(str) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/** 清洗单条对局数据中的字符串字段 */
+function sanitizeMatchData(m) {
+  const MAX_DECK_LEN = 100;
+  const MAX_NOTES_LEN = 500;
+  const allowedResults = ['win', 'loss', 'draw', 'abnormal'];
+  const safe = { ...m };
+  if (typeof safe.opponentDeck === 'string') safe.opponentDeck = safe.opponentDeck.slice(0, MAX_DECK_LEN);
+  if (typeof safe.myDeck === 'string') safe.myDeck = safe.myDeck.slice(0, MAX_DECK_LEN);
+  if (typeof safe.notes === 'string') safe.notes = safe.notes.slice(0, MAX_NOTES_LEN);
+  if (safe.result && !allowedResults.includes(safe.result)) safe.result = 'abnormal';
+  if (safe.handtraps && !Array.isArray(safe.handtraps)) safe.handtraps = [];
+  return safe;
+}
 
 // ── 数据管理 ──────────────────────────────────────────────────────────────
 
@@ -12,13 +34,82 @@ function getRuntimeDir() {
 const RUNTIME_DATA = () => path.join(getRuntimeDir(), 'stats.json');
 const RUNTIME_WSTATE = () => path.join(getRuntimeDir(), 'window-state.json');
 
+// ── 自包含 AES-256-GCM 加密 ──────────────────────────────────────────
+// 数据密钥嵌入文件自身，复制到任何机器都能解密，无需额外密钥文件。
+
+/** 固定包装密钥（所有机器通用，仅用于保护数据密钥） */
+function getWrapKey() {
+  return crypto.pbkdf2Sync('md-board-enc-v1', 'md-stats-salt', 10000, 32, 'sha256');
+}
+
+/** 自包含加密：数据密钥随机生成 → 用包装密钥加密 → 与数据一同存储 */
+function selfEncrypt(plaintext) {
+  const wrapKey = getWrapKey();
+  const dataKey = crypto.randomBytes(32);
+
+  // 用包装密钥加密数据密钥
+  const wrapIv = crypto.randomBytes(16);
+  const wrapCipher = crypto.createCipheriv('aes-256-gcm', wrapKey, wrapIv);
+  const encKey = Buffer.concat([wrapCipher.update(dataKey), wrapCipher.final()]);
+  const wrapTag = wrapCipher.getAuthTag();
+
+  // 用数据密钥加密数据体
+  const dataIv = crypto.randomBytes(16);
+  const dataCipher = crypto.createCipheriv('aes-256-gcm', dataKey, dataIv);
+  const encData = Buffer.concat([dataCipher.update(plaintext, 'utf-8'), dataCipher.final()]);
+  const dataTag = dataCipher.getAuthTag();
+
+  // 文件布局: [wrapIv(16) + wrapTag(16) + encKey(32) + dataIv(16) + dataTag(16) + encData(N)]
+  return Buffer.concat([wrapIv, wrapTag, encKey, dataIv, dataTag, encData]);
+}
+
+/** 自包含解密 */
+function selfDecrypt(buffer) {
+  const wrapKey = getWrapKey();
+
+  const wrapIv = buffer.slice(0, 16);
+  const wrapTag = buffer.slice(16, 32);
+  const encKey = buffer.slice(32, 64);
+  const dataIv = buffer.slice(64, 80);
+  const dataTag = buffer.slice(80, 96);
+  const encData = buffer.slice(96);
+
+  const d1 = crypto.createDecipheriv('aes-256-gcm', wrapKey, wrapIv);
+  d1.setAuthTag(wrapTag);
+  const dataKey = Buffer.concat([d1.update(encKey), d1.final()]);
+
+  const d2 = crypto.createDecipheriv('aes-256-gcm', dataKey, dataIv);
+  d2.setAuthTag(dataTag);
+  return d2.update(encData) + d2.final('utf-8');
+}
+
+/** 兼容旧版：从密钥文件读取（迁移用） */
+function readLegacyKey() {
+  try {
+    const keyFile = path.join(app.getPath('userData'), '.md-stats-key');
+    if (fs.existsSync(keyFile)) return fs.readFileSync(keyFile);
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
+/** AES-256-GCM 解密（旧版密钥文件格式） */
+function legacyDecrypt(encrypted, key) {
+  if (!key) return encrypted.toString('utf-8');
+  const iv = encrypted.slice(0, 16);
+  const tag = encrypted.slice(16, 32);
+  const ciphertext = encrypted.slice(32);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(tag);
+  return decipher.update(ciphertext) + decipher.final('utf-8');
+}
+
 let data = { matches: [], version: 4, deckPresets: [], myDeckPresets: [], handtrapPresets: [], handtrapConfig: { largeIds: [], compactIds: [] }, cycleConfig: null, timeRange: 'all', selectedDate: null, customStart: null, customEnd: null };
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
-/** 加载数据：从系统临时目录读取 */
+/** 加载数据：三级回退链 — 自包含解密 → 旧密钥文件 → 明文 */
 function loadData() {
   const runtimeDir = getRuntimeDir();
   ensureDir(runtimeDir);
@@ -26,7 +117,32 @@ function loadData() {
   const runtimeFile = RUNTIME_DATA();
   try {
     if (fs.existsSync(runtimeFile)) {
-      data = JSON.parse(fs.readFileSync(runtimeFile, 'utf-8'));
+      const buffer = fs.readFileSync(runtimeFile);
+      let parsed;
+      // 1) 自包含解密（新格式）
+      try {
+        const plaintext = selfDecrypt(buffer);
+        parsed = JSON.parse(plaintext);
+      } catch (e1) {
+        // 2) 旧密钥文件解密（兼容迁移）
+        try {
+          const legacyKey = readLegacyKey();
+          if (legacyKey) {
+            const plaintext = legacyDecrypt(buffer, legacyKey);
+            parsed = JSON.parse(plaintext);
+          } else {
+            throw new Error('no legacy key');
+          }
+        } catch (e2) {
+          // 3) 明文读取（最旧的未加密格式）
+          try {
+            parsed = JSON.parse(buffer.toString('utf-8'));
+          } catch (e3) {
+            throw new Error('数据文件损坏，无法解析');
+          }
+        }
+      }
+      data = parsed || data;
       if (!data.deckPresets) data.deckPresets = [];
       if (!data.myDeckPresets) data.myDeckPresets = [];
       if (!data.handtrapPresets || !Array.isArray(data.handtrapPresets) || data.handtrapPresets.length === 0) {
@@ -67,8 +183,10 @@ function loadData() {
 
 function saveData() {
   try {
+    const plaintext = JSON.stringify(data, null, 2);
+    const encrypted = selfEncrypt(plaintext);
     ensureDir(getRuntimeDir());
-    fs.writeFileSync(RUNTIME_DATA(), JSON.stringify(data, null, 2), 'utf-8');
+    fs.writeFileSync(RUNTIME_DATA(), encrypted);
   } catch (e) {
     console.error('保存数据文件失败:', e.message);
   }
@@ -137,31 +255,38 @@ function getMatchHandtraps(match) {
 }
 
 // ── 统计计算（v2.0 增强版）─────────────────────────────────────────
-function computeStats() {
-  const allMatches = data.matches || [];
-  const timeRange = data.timeRange || 'all';
-  const matches = filterMatchesByTimeRange(allMatches, timeRange);
+
+/** 计算百分比 */
+function pct(n, total) {
+  return total > 0 ? ((n / total) * 100).toFixed(1) : '0.0';
+}
+
+/** 按 total 降序排序 entries */
+function sortEntries(entries) {
+  return Object.entries(entries).sort((a, b) => b[1].total > a[1].total ? 1 : -1);
+}
+
+// ── 基础统计 ──
+function computeBasicStats(matches) {
   const wins = matches.filter(m => m.result === 'win').length;
   const losses = matches.filter(m => m.result === 'loss').length;
   const draws = matches.filter(m => m.result === 'draw').length;
   const abnormals = matches.filter(m => m.result === 'abnormal').length;
   const total = wins + losses + draws + abnormals;
-
+  const playable = wins + losses;
   const normalMatches = matches.filter(m => m.result === 'win' || m.result === 'loss');
   const goingFirst = normalMatches.filter(m => m.goingFirst);
   const goingSecond = normalMatches.filter(m => !m.goingFirst);
   const gfWins = goingFirst.filter(m => m.result === 'win').length;
   const gsWins = goingSecond.filter(m => m.result === 'win').length;
-
-  // 先后手包含平局和异常
   const gfAll = matches.filter(m => m.goingFirst);
   const gsAll = matches.filter(m => !m.goingFirst);
-  const gdDraws = gfAll.filter(m => m.result === 'draw').length;
-  const gdAbnormals = gfAll.filter(m => m.result === 'abnormal').length;
-  const gsDraws = gsAll.filter(m => m.result === 'draw').length;
-  const gsAbnormals = gsAll.filter(m => m.result === 'abnormal').length;
+  return { wins, losses, draws, abnormals, total, playable, winRate: pct(wins, playable),
+    normalMatches, goingFirst, goingSecond, gfWins, gsWins, gfAll, gsAll };
+}
 
-  // 当前连胜/连败（跳过异常和平局）
+// ── 连胜/连败 ──
+function computeStreak(matches) {
   let streakType = null, streakCount = 0;
   for (let i = matches.length - 1; i >= 0; i--) {
     const r = matches[i].result;
@@ -171,83 +296,118 @@ function computeStats() {
     else if (r === streakType) streakCount++;
     else break;
   }
+  return { type: streakType, count: streakCount };
+}
 
-  // 硬币统计
-  const coinMatches = matches.filter(m => m.coinToss === true || m.coinToss === false);
-  const coinWins = coinMatches.filter(m => m.coinToss === true).length;
-  const coinLosses = coinMatches.filter(m => m.coinToss === false).length;
+// ── 硬币统计 ──
+function computeCoinStats(matches) {
+  const arr = matches.filter(m => m.coinToss === true || m.coinToss === false);
+  const wins = arr.filter(m => m.coinToss === true).length;
+  const losses = arr.filter(m => m.coinToss === false).length;
+  const n = arr.length;
+  const coinHistory = arr.map(m => ({ coinToss: m.coinToss, result: m.result, goingFirst: m.goingFirst }));
+  // 连正/连反分析
+  const streak = (function() {
+    if (n === 0) return { current: null, longest: 0, longestType: null, severity: '—', severityScore: 0, pValue: 1 };
+    var curType = arr[0].coinToss, curLen = 1, maxLen = 1, maxType = curType;
+    for (var si = 1; si < n; si++) {
+      if (arr[si].coinToss === curType) { curLen++; }
+      else { curType = arr[si].coinToss; curLen = 1; }
+      if (curLen > maxLen) { maxLen = curLen; maxType = curType; }
+    }
+    var curCoin = arr[n - 1].coinToss, curStreak = 1;
+    for (var si2 = n - 2; si2 >= 0; si2--) {
+      if (arr[si2].coinToss === curCoin) curStreak++;
+      else break;
+    }
+    var L = maxLen, pVal = 1;
+    if (n > 0 && L > 0) { pVal = 1 - Math.exp(-n / Math.pow(2, L + 1)); if (pVal < 0) pVal = 0; }
+    var expectedMax = Math.log2(n) + 0.333;
+    var diff = L - expectedMax, score = Math.min(100, Math.max(0, Math.round((diff / (expectedMax > 3 ? 3 : 2)) * 100)));
+    var severity = score <= 20 ? '正常' : score <= 50 ? '⚠️ 偏高' : score <= 75 ? '🔴 显著' : '🔥 异常';
+    if (L <= 2) { severity = '正常'; score = 0; }
+    return { current: { type: curCoin, length: curStreak }, longest: { type: maxType, length: maxLen },
+      severity, severityScore: score, pValue: pVal, expectedMax: expectedMax.toFixed(1) };
+  })();
+  // 偏斜检测
+  const bias = (function() {
+    if (n < 10) return { heads: wins, tails: losses, pct: '—', zScore: 0, severity: '—', severityScore: 0 };
+    var expected = n / 2, se = Math.sqrt(n) / 2, z = Math.abs(wins - expected) / se;
+    var pctStr = ((wins / n) * 100).toFixed(1), score = Math.min(100, Math.round((z / 4) * 100));
+    var s = score <= 20 ? '正常' : score <= 50 ? '⚠️ 偏高' : score <= 75 ? '🔴 显著' : '🔥 异常';
+    return { heads: wins, tails: losses, pct: pctStr, zScore: z, severity: s, severityScore: score };
+  })();
+  return { total: n, wins, losses, coinHistory, winRate: pct(wins, n), streak, bias };
+}
 
-  // 最近10场
-  const last10 = matches.slice(-10).map(m => ({
-    result: m.result, goingFirst: m.goingFirst, opponentDeck: m.opponentDeck || '',
-    coinToss: m.coinToss
-  }));
-
-  // ── 手坑统计（动态） ──
-  const presets = data.handtrapPresets || [];
-  const htConfig = data.handtrapConfig || { largeIds: [], compactIds: [] };
-  const htCounts = {};
-  const htByFirst = {};
-  const htBySecond = {};
+// ── 手坑统计 ──
+function computeHandtrapStats(matches, total, presets, htConfig) {
+  const htCounts = {}, htByFirst = {}, htBySecond = {};
   presets.forEach(p => {
     htCounts[p.id] = matches.filter(m => getMatchHandtraps(m).includes(p.id)).length;
     htByFirst[p.id] = matches.filter(m => getMatchHandtraps(m).includes(p.id) && m.goingFirst).length;
     htBySecond[p.id] = matches.filter(m => getMatchHandtraps(m).includes(p.id) && !m.goingFirst).length;
   });
-  // 额外统计"其他手坑"（_other），以及已删除预设的旧数据
   const gotOther = matches.filter(m => getMatchHandtraps(m).includes('_other')).length;
   const allPresetIds = new Set(presets.map(p => p.id));
-  const deletedPresetCount = matches.filter(m => {
-    return getMatchHandtraps(m).some(id => id !== '_other' && !allPresetIds.has(id));
-  }).length;
+  const deletedPresetCount = matches.filter(m =>
+    getMatchHandtraps(m).some(id => id !== '_other' && !allPresetIds.has(id))
+  ).length;
   htCounts['_other'] = gotOther + deletedPresetCount;
   htByFirst['_other'] = matches.filter(m => getMatchHandtraps(m).includes('_other') && m.goingFirst).length;
   htBySecond['_other'] = matches.filter(m => getMatchHandtraps(m).includes('_other') && !m.goingFirst).length;
   if (deletedPresetCount > 0) {
-    htByFirst['_other'] += matches.filter(m => {
-      return getMatchHandtraps(m).some(id => id !== '_other' && !allPresetIds.has(id)) && m.goingFirst;
-    }).length;
-    htBySecond['_other'] += matches.filter(m => {
-      return getMatchHandtraps(m).some(id => id !== '_other' && !allPresetIds.has(id)) && !m.goingFirst;
-    }).length;
+    htByFirst['_other'] += matches.filter(m =>
+      getMatchHandtraps(m).some(id => id !== '_other' && !allPresetIds.has(id)) && m.goingFirst
+    ).length;
+    htBySecond['_other'] += matches.filter(m =>
+      getMatchHandtraps(m).some(id => id !== '_other' && !allPresetIds.has(id)) && !m.goingFirst
+    ).length;
   }
-  // 旧字段兼容（保持后端引用不报错）
-  const gotMaxxc = htCounts['gotMaxxc'] || 0;
-  const gotDroll = htCounts['gotDroll'] || 0;
-  const gotJellyfish = htCounts['gotJellyfish'] || 0;
-  const gotLancea = htCounts['gotLancea'] || 0;
-  const gotNibiru = htCounts['gotNibiru'] || 0;
-  const gotDimension = htCounts['gotDimension'] || 0;
+  const gotMaxxc = htCounts['gotMaxxc'] || 0, gotDroll = htCounts['gotDroll'] || 0;
+  const gotJellyfish = htCounts['gotJellyfish'] || 0, gotLancea = htCounts['gotLancea'] || 0;
+  const gotNibiru = htCounts['gotNibiru'] || 0, gotDimension = htCounts['gotDimension'] || 0;
   const gotSmallHT = gotOther;
-  const gotAnyG = matches.filter(m => getMatchHandtraps(m).some(id => ['gotMaxxc', 'gotDroll', 'gotJellyfish'].includes(id))).length;
+  const gotAnyG = matches.filter(m => getMatchHandtraps(m).some(id => ['gotMaxxc','gotDroll','gotJellyfish'].includes(id))).length;
+  const anyGFirst = matches.filter(m => getMatchHandtraps(m).some(id => ['gotMaxxc','gotDroll','gotJellyfish'].includes(id)) && m.goingFirst).length;
+  const anyGSecond = matches.filter(m => getMatchHandtraps(m).some(id => ['gotMaxxc','gotDroll','gotJellyfish'].includes(id)) && !m.goingFirst).length;
+  return {
+    total: gotMaxxc + gotDroll + gotJellyfish + gotLancea + gotNibiru + gotDimension + gotSmallHT,
+    gotMaxxc, gotDroll, gotJellyfish, gotLancea, gotNibiru, gotDimension, gotSmallHT, gotAnyG,
+    maxxcRate: pct(gotMaxxc, total), anyGRate: pct(gotAnyG, total), nibiruRate: pct(gotNibiru, total),
+    byFirst: { gotMaxxc: htByFirst['gotMaxxc']||0, gotDroll: htByFirst['gotDroll']||0, gotJellyfish: htByFirst['gotJellyfish']||0, gotLancea: htByFirst['gotLancea']||0, gotNibiru: htByFirst['gotNibiru']||0, gotDimension: htByFirst['gotDimension']||0, gotSmallHT: htByFirst['_other']||0, gotAnyG: anyGFirst },
+    bySecond: { gotMaxxc: htBySecond['gotMaxxc']||0, gotDroll: htBySecond['gotDroll']||0, gotJellyfish: htBySecond['gotJellyfish']||0, gotLancea: htBySecond['gotLancea']||0, gotNibiru: htBySecond['gotNibiru']||0, gotDimension: htBySecond['gotDimension']||0, gotSmallHT: htBySecond['_other']||0, gotAnyG: anyGSecond },
+    presets, config: htConfig, counts: htCounts, byFirstAll: htByFirst, bySecondAll: htBySecond
+  };
+}
 
-  // ── 卡手统计 ──
-  const cantPlay = matches.filter(m => m.cantPlay || m.bothStuck).length;
+// ── 卡手统计 ──
+function computeHandStateStats(matches, total, gfTotal, gsTotal) {
+  const cantPlayAlone = matches.filter(m => m.cantPlay).length;
   const cantPlayGarnet = matches.filter(m => m.cantPlayGarnet).length;
   const cantPlayDuplicate = matches.filter(m => m.cantPlayDuplicate).length;
   const cantPlayHT = matches.filter(m => m.cantPlayHT).length;
-
-  // ── 互卡统计 ──
   const bothStuck = matches.filter(m => m.bothStuck).length;
-  // 有效卡手 = 任一卡手情况被选中即计为一场（同一场多项也只计一次）
   const totalCantPlay = matches.filter(m => m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck).length;
-
-  // ── 卡手统计 · 先后手细分 ──
-  const gfTotal = gfAll.length;
-  const gsTotal = gsAll.length;
-  const cantPlayFirst = matches.filter(m => (m.cantPlay || m.bothStuck) && m.goingFirst).length;
-  const cantPlaySecond = matches.filter(m => (m.cantPlay || m.bothStuck) && !m.goingFirst).length;
-  const cantPlayGarnetFirst = matches.filter(m => m.cantPlayGarnet && m.goingFirst).length;
-  const cantPlayGarnetSecond = matches.filter(m => m.cantPlayGarnet && !m.goingFirst).length;
-  const cantPlayDuplicateFirst = matches.filter(m => m.cantPlayDuplicate && m.goingFirst).length;
-  const cantPlayDuplicateSecond = matches.filter(m => m.cantPlayDuplicate && !m.goingFirst).length;
-  const cantPlayHTFirst = matches.filter(m => m.cantPlayHT && m.goingFirst).length;
-  const cantPlayHTSecond = matches.filter(m => m.cantPlayHT && !m.goingFirst).length;
-  const bothStuckFirst = matches.filter(m => m.bothStuck && m.goingFirst).length;
-  const bothStuckSecond = matches.filter(m => m.bothStuck && !m.goingFirst).length;
-  // ── 互卡子选项统计 ──
+  // 先后手
+  const byFirst = {
+    cantPlay: matches.filter(m => (m.cantPlay || m.bothStuck) && m.goingFirst).length,
+    cantPlayGarnet: matches.filter(m => m.cantPlayGarnet && m.goingFirst).length,
+    cantPlayDuplicate: matches.filter(m => m.cantPlayDuplicate && m.goingFirst).length,
+    cantPlayHT: matches.filter(m => m.cantPlayHT && m.goingFirst).length,
+    bothStuck: matches.filter(m => m.bothStuck && m.goingFirst).length,
+    totalCantPlay: matches.filter(m => (m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck) && m.goingFirst).length
+  };
+  const bySecond = {
+    cantPlay: matches.filter(m => (m.cantPlay || m.bothStuck) && !m.goingFirst).length,
+    cantPlayGarnet: matches.filter(m => m.cantPlayGarnet && !m.goingFirst).length,
+    cantPlayDuplicate: matches.filter(m => m.cantPlayDuplicate && !m.goingFirst).length,
+    cantPlayHT: matches.filter(m => m.cantPlayHT && !m.goingFirst).length,
+    bothStuck: matches.filter(m => m.bothStuck && !m.goingFirst).length,
+    totalCantPlay: matches.filter(m => (m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck) && !m.goingFirst).length
+  };
+  // 互卡子选项
   const bsMatches = matches.filter(m => m.bothStuck);
-  // 兼容旧版：旧版 firstMover 直接存 "self"/"opponent"（相当于"有人先动" + 谁先动）
   const bsFirstMove = bsMatches.filter(m => m.firstMover === 'move' || m.firstMover === 'self' || m.firstMover === 'opponent').length;
   const bsFirstMoveSelf = bsMatches.filter(m => (m.firstMover === 'move' && m.moverWho === 'self') || m.firstMover === 'self').length;
   const bsFirstMoveOpp = bsMatches.filter(m => (m.firstMover === 'move' && m.moverWho === 'opponent') || m.firstMover === 'opponent').length;
@@ -255,540 +415,319 @@ function computeStats() {
   const bsSurrenderSelf = bsMatches.filter(m => m.firstMover === 'surrender' && m.surrenderWho === 'self').length;
   const bsSurrenderOpp = bsMatches.filter(m => m.firstMover === 'surrender' && m.surrenderWho === 'opponent').length;
   const bsOther = bsMatches.filter(m => m.firstMover === 'other' || !m.firstMover).length;
-  const totalCantPlayFirst = matches.filter(m => (m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck) && m.goingFirst).length;
-  const totalCantPlaySecond = matches.filter(m => (m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck) && !m.goingFirst).length;
-
-  // ── 卡手 × 自用卡组 ──
-  const cantPlayByDeck = {};
+  // 各卡组
+  const byDeck = {};
   matches.forEach(m => {
     const deck = (m.myDeck || '').trim();
     if (!deck) return;
-    if (!cantPlayByDeck[deck]) cantPlayByDeck[deck] = { total: 0, wins: 0, losses: 0, cantPlayCount: 0, cantPlayAlone: 0, cantPlayGarnetCount: 0, cantPlayDuplicateCount: 0, cantPlayHTCount: 0, bothStuckCount: 0 };
-    cantPlayByDeck[deck].total++;
-    if (m.result === 'win') cantPlayByDeck[deck].wins++;
-    else if (m.result === 'loss') cantPlayByDeck[deck].losses++;
-    if (m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck) {
-      cantPlayByDeck[deck].cantPlayCount++;
-    }
-    if (m.cantPlay) cantPlayByDeck[deck].cantPlayAlone++;
-    if (m.cantPlayGarnet) cantPlayByDeck[deck].cantPlayGarnetCount++;
-    if (m.cantPlayDuplicate) cantPlayByDeck[deck].cantPlayDuplicateCount++;
-    if (m.cantPlayHT) cantPlayByDeck[deck].cantPlayHTCount++;
-    if (m.bothStuck) cantPlayByDeck[deck].bothStuckCount++;
+    if (!byDeck[deck]) byDeck[deck] = { total: 0, wins: 0, losses: 0, cantPlayCount: 0, cantPlayAlone: 0, cantPlayGarnetCount: 0, cantPlayDuplicateCount: 0, cantPlayHTCount: 0, bothStuckCount: 0 };
+    byDeck[deck].total++;
+    if (m.result === 'win') byDeck[deck].wins++;
+    else if (m.result === 'loss') byDeck[deck].losses++;
+    if (m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck) byDeck[deck].cantPlayCount++;
+    if (m.cantPlay) byDeck[deck].cantPlayAlone++;
+    if (m.cantPlayGarnet) byDeck[deck].cantPlayGarnetCount++;
+    if (m.cantPlayDuplicate) byDeck[deck].cantPlayDuplicateCount++;
+    if (m.cantPlayHT) byDeck[deck].cantPlayHTCount++;
+    if (m.bothStuck) byDeck[deck].bothStuckCount++;
   });
+  return {
+    cantPlay: cantPlayAlone, cantPlayGarnet, cantPlayDuplicate, cantPlayHT,
+    totalCantPlay, cantPlayRate: pct(totalCantPlay, total),
+    bothStuck, bothStuckRate: pct(bothStuck, total),
+    gfTotal, gsTotal, byFirst, bySecond,
+    bothStuckDetail: { total: bothStuck, firstMove: bsFirstMove, firstMoveSelf: bsFirstMoveSelf, firstMoveOpp: bsFirstMoveOpp, surrender: bsSurrender, surrenderSelf: bsSurrenderSelf, surrenderOpp: bsSurrenderOpp, other: bsOther },
+    byDeck: Object.entries(byDeck).sort((a, b) => b[1].total - a[1].total).map(([deck, s]) => ({ deck, ...s, cantPlayRate: pct(s.cantPlayCount, s.total), winRate: pct(s.wins, s.wins + s.losses) }))
+  };
+}
 
-  // ── 掉线 / 超时 ──
+// ── 连接状态（掉线/超时）──
+function computeConnectivityStats(matches, total) {
   const disconnect = matches.filter(m => m.disconnect).length;
   const disconnectSelf = matches.filter(m => m.disconnect && m.disconnectWho === 'self').length;
   const disconnectOpponent = matches.filter(m => m.disconnect && m.disconnectWho === 'opponent').length;
   const timeout = matches.filter(m => m.timeout).length;
   const timeoutSelf = matches.filter(m => m.timeout && m.timeoutWho === 'self').length;
   const timeoutOpponent = matches.filter(m => m.timeout && m.timeoutWho === 'opponent').length;
-  // 超时 × 卡组
-  const timeoutSelfByDeck = {};
-  matches.filter(m => m.timeout && m.timeoutWho === 'self').forEach(m => {
+  const toMap = (filterFn, deckField) => {
+    const m = {};
+    matches.filter(filterFn).forEach(mt => {
+      const d = (mt[deckField] || '').trim();
+      if (!d) return;
+      if (!m[d]) m[d] = 0;
+      m[d]++;
+    });
+    return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([deck, count]) => ({ deck, count }));
+  };
+  return {
+    disconnect, disconnectSelf, disconnectOpponent, disconnectRate: pct(disconnect, total),
+    timeout, timeoutSelf, timeoutOpponent, timeoutRate: pct(timeout, total),
+    timeoutSelfByDeck: toMap(m => m.timeout && m.timeoutWho === 'self', 'myDeck'),
+    timeoutOppByDeck: toMap(m => m.timeout && m.timeoutWho === 'opponent', 'opponentDeck')
+  };
+}
+
+// ── 先手终场 ──
+function computeEndboardStats(firstMatches) {
+  const normal = firstMatches.filter(m => m.endboardState === 'normal').length;
+  const compromised = firstMatches.filter(m => m.endboardState === 'compromised').length;
+  const opponentDirectWin = m =>
+    m.endboardState === 'stopped' && (m.opponentRan || (m.disconnect && m.disconnectWho === 'opponent') || (m.timeout && m.timeoutWho === 'opponent') || (m.deckOut && m.deckOutWho === 'opponent'));
+  const trueStopped = firstMatches.filter(m => m.endboardState === 'stopped' && !opponentDirectWin(m)).length;
+  const opponentSurrendered = firstMatches.filter(m => opponentDirectWin(m)).length;
+  const surrender = firstMatches.filter(m => m.endboardState === 'surrender').length;
+  return { total: firstMatches.length, normal, compromised, stopped: trueStopped, surrender, opponentSurrendered, normalRate: pct(normal, firstMatches.length) };
+}
+
+// ── 后手突破 ──
+function computeBreakBoardStats(secondMatches) {
+  const yes = secondMatches.filter(m => m.brokeBoard === true || m.brokeBoard === 'true').length;
+  const no = secondMatches.filter(m => m.brokeBoard === false || m.brokeBoard === 'false').length;
+  const surrender = secondMatches.filter(m => m.brokeBoard === 'surrender').length;
+  const notNeeded = secondMatches.filter(m => m.brokeBoard === 'not_applicable').length;
+  const successWins = secondMatches.filter(m => (m.brokeBoard === true || m.brokeBoard === 'true') && m.result === 'win').length;
+  return { total: secondMatches.length, success: yes, failed: no, surrender, notNeeded, successWins, successRate: pct(yes, secondMatches.length), successWinRate: pct(successWins, yes) };
+}
+
+// ── 吓跑对手 ──
+function computeOpponentRanStats(matches) {
+  const ranMatches = matches.filter(m => m.opponentRan);
+  const byDeck = {};
+  ranMatches.forEach(m => {
     const deck = (m.myDeck || '').trim();
     if (!deck) return;
-    if (!timeoutSelfByDeck[deck]) timeoutSelfByDeck[deck] = 0;
-    timeoutSelfByDeck[deck]++;
+    if (!byDeck[deck]) byDeck[deck] = 0;
+    byDeck[deck]++;
   });
-  const timeoutOppByDeck = {};
-  matches.filter(m => m.timeout && m.timeoutWho === 'opponent').forEach(m => {
-    const deck = (m.opponentDeck || '').trim();
+  const first = ranMatches.filter(m => m.goingFirst);
+  const second = ranMatches.filter(m => !m.goingFirst);
+  const firstEndboard = {
+    normal: first.filter(m => m.endboardState === 'normal').length,
+    compromised: first.filter(m => m.endboardState === 'compromised').length,
+    stopped: first.filter(m => m.endboardState === 'stopped').length,
+    other: first.filter(m => m.endboardState && !['normal','compromised','stopped'].includes(m.endboardState)).length,
+    noEndboard: first.filter(m => !m.endboardState).length
+  };
+  const secondBroke = {
+    notNeeded: second.filter(m => m.brokeBoard === 'not_applicable').length,
+    success: second.filter(m => m.brokeBoard === true || m.brokeBoard === 'true').length,
+    failed: second.filter(m => m.brokeBoard === false || m.brokeBoard === 'false').length,
+    other: second.filter(m => m.brokeBoard && ![true,'true',false,'false','not_applicable'].includes(m.brokeBoard)).length,
+    noBroke: second.filter(m => !m.brokeBoard).length
+  };
+  return {
+    total: ranMatches.length, rate: pct(ranMatches.length, matches.length),
+    byDeck: Object.entries(byDeck).sort((a, b) => b[1] - a[1]).map(([deck, count]) => ({ deck, count })),
+    firstTotal: first.length, firstEndboard, secondTotal: second.length, secondBroke
+  };
+}
+
+// ── 严重失误 ──
+function computeMistakeStats(matches, total) {
+  const mMatches = matches.filter(m => m.mistake);
+  const wins = mMatches.filter(m => m.result === 'win').length;
+  const losses = mMatches.filter(m => m.result === 'loss').length;
+  const byDeck = {};
+  mMatches.forEach(m => {
+    const deck = (m.myDeck || '').trim();
     if (!deck) return;
-    if (!timeoutOppByDeck[deck]) timeoutOppByDeck[deck] = 0;
-    timeoutOppByDeck[deck]++;
+    if (!byDeck[deck]) byDeck[deck] = { total: 0, wins: 0, losses: 0 };
+    byDeck[deck].total++;
+    if (m.result === 'win') byDeck[deck].wins++;
+    else if (m.result === 'loss') byDeck[deck].losses++;
   });
+  return {
+    total: mMatches.length, rate: pct(mMatches.length, total), wins, losses, winRate: pct(wins, wins + losses),
+    byDeck: Object.entries(byDeck).sort((a, b) => b[1].total - a[1].total).map(([deck, s]) => ({ deck, ...s, winRate: pct(s.wins, s.wins + s.losses) }))
+  };
+}
 
-  // ── 对手大牌哥 ──
-  const bigHandMatches = matches.filter(m => m.opponentBigHand);
-  const bigHandTotal = bigHandMatches.length;
-  const bigHandFirst = bigHandMatches.filter(m => m.goingFirst).length;
-  const bigHandSecond = bigHandMatches.filter(m => !m.goingFirst).length;
-
-  // ── 对手 T0 动 ──
-  const opponentT0 = matches.filter(m => m.opponentT0).length;
-  const opponentT0Wins = matches.filter(m => m.opponentT0 && m.result === 'win').length;
-  const opponentT0Losses = matches.filter(m => m.opponentT0 && m.result === 'loss').length;
-  // T0 × 对手卡组
-  const opponentT0ByDeck = {};
-  matches.filter(m => m.opponentT0).forEach(m => {
+// ── 对手 T0 ──
+function computeOpponentT0Stats(matches) {
+  const t0 = matches.filter(m => m.opponentT0);
+  const wins = t0.filter(m => m.result === 'win').length;
+  const losses = t0.filter(m => m.result === 'loss').length;
+  const byDeck = {};
+  t0.forEach(m => {
     const deck = (m.opponentDeck || '').trim();
     if (!deck || deck === '未知') return;
-    if (!opponentT0ByDeck[deck]) opponentT0ByDeck[deck] = { total: 0, wins: 0, losses: 0 };
-    opponentT0ByDeck[deck].total++;
-    if (m.result === 'win') opponentT0ByDeck[deck].wins++;
-    else if (m.result === 'loss') opponentT0ByDeck[deck].losses++;
+    if (!byDeck[deck]) byDeck[deck] = { total: 0, wins: 0, losses: 0 };
+    byDeck[deck].total++;
+    if (m.result === 'win') byDeck[deck].wins++;
+    else if (m.result === 'loss') byDeck[deck].losses++;
   });
-
-  // ── 先手终场分布（仅先手对局） ──
-  const firstMatches = matches.filter(m => m.goingFirst);
-  const endboardNormal = firstMatches.filter(m => m.endboardState === 'normal').length;
-  const endboardCompromised = firstMatches.filter(m => m.endboardState === 'compromised').length;
-  // 先手终场没做出来、但对手以非正常方式"直接胜利"的情况（对方跑/掉线/超时/抽干）
-  const opponentDirectWin = m =>
-    m.endboardState === 'stopped' && (
-      m.opponentRan ||
-      (m.disconnect && m.disconnectWho === 'opponent') ||
-      (m.timeout && m.timeoutWho === 'opponent') ||
-      (m.deckOut && m.deckOutWho === 'opponent')
-    );
-  const endboardTrueStopped = firstMatches.filter(m => m.endboardState === 'stopped' && !opponentDirectWin(m)).length;
-  const opponentSurrendered = firstMatches.filter(m => opponentDirectWin(m)).length;
-  const endboardSurrender = firstMatches.filter(m => m.endboardState === 'surrender').length;
-
-  // ── 后手突破统计（仅后手对局） ──
-  const secondMatches = matches.filter(m => !m.goingFirst);
-  const brokeYes = secondMatches.filter(m => m.brokeBoard === true || m.brokeBoard === 'true').length;
-  const brokeNo = secondMatches.filter(m => m.brokeBoard === false || m.brokeBoard === 'false').length;
-  const brokeSurrender = secondMatches.filter(m => m.brokeBoard === 'surrender').length;
-  const brokeNotNeeded = secondMatches.filter(m => m.brokeBoard === 'not_applicable').length;
-  const brokeSuccessWins = secondMatches.filter(m => (m.brokeBoard === true || m.brokeBoard === 'true') && m.result === 'win').length;
-
-  // ── 提丰趣味统计 ──
-  const typhonMatches = matches.filter(m => m.typhonAppeared);
-  const typhonEnemyBlack = typhonMatches.filter(m => m.typhonWho === 'opponent' && m.result === 'win').length;
-  const typhonEnemyWhite = typhonMatches.filter(m => m.typhonWho === 'opponent' && m.result === 'loss').length;
-  const typhonSelfBlack = typhonMatches.filter(m => m.typhonWho === 'self' && m.result === 'loss').length;
-  const typhonSelfWhite = typhonMatches.filter(m => m.typhonWho === 'self' && m.result === 'win').length;
-
-  // ── 抽干牌组统计 ──
-  const deckOutMatches = matches.filter(m => m.deckOut);
-  const deckOutSelf = deckOutMatches.filter(m => m.deckOutWho === 'self').length;
-  const deckOutOpponent = deckOutMatches.filter(m => m.deckOutWho === 'opponent').length;
-  const deckOutSelfWins = deckOutMatches.filter(m => m.deckOutWho === 'self' && m.result === 'win').length;
-
-  // ── 严重失误统计 ──
-  const mistakeMatches = matches.filter(m => m.mistake);
-  const mistakeCount = mistakeMatches.length;
-  const mistakeWins = mistakeMatches.filter(m => m.result === 'win').length;
-  const mistakeLosses = mistakeMatches.filter(m => m.result === 'loss').length;
-  // 严重失误 × 自用卡组
-  const mistakeByDeck = {};
-  mistakeMatches.forEach(m => {
-    const deck = (m.myDeck || '').trim();
-    if (!deck) return;
-    if (!mistakeByDeck[deck]) mistakeByDeck[deck] = { total: 0, wins: 0, losses: 0 };
-    mistakeByDeck[deck].total++;
-    if (m.result === 'win') mistakeByDeck[deck].wins++;
-    else if (m.result === 'loss') mistakeByDeck[deck].losses++;
-  });
-
-  // ── 吓跑对手统计 ──
-  const opponentRanMatches = matches.filter(m => m.opponentRan);
-  const opponentRanCount = opponentRanMatches.length;
-  const opponentRanByDeck = {};
-  opponentRanMatches.forEach(m => {
-    const deck = (m.myDeck || '').trim();
-    if (!deck) return;
-    if (!opponentRanByDeck[deck]) opponentRanByDeck[deck] = 0;
-    opponentRanByDeck[deck]++;
-  });
-  // 吓跑对手 - 先手终场类型细分
-  const opponentRanFirst = opponentRanMatches.filter(m => m.goingFirst);
-  const opponentRanFirstEndboard = {
-    normal: opponentRanFirst.filter(m => m.endboardState === 'normal').length,
-    compromised: opponentRanFirst.filter(m => m.endboardState === 'compromised').length,
-    stopped: opponentRanFirst.filter(m => m.endboardState === 'stopped').length,
-    other: opponentRanFirst.filter(m => m.endboardState && m.endboardState !== 'normal' && m.endboardState !== 'compromised' && m.endboardState !== 'stopped').length,
-    noEndboard: opponentRanFirst.filter(m => !m.endboardState).length
+  return {
+    total: t0.length, wins, losses, winRate: pct(wins, wins + losses),
+    byDeck: Object.entries(byDeck).sort((a, b) => b[1].total - a[1].total).map(([deck, s]) => ({ deck, ...s, winRate: pct(s.wins, s.wins + s.losses) }))
   };
-  // 吓跑对手 - 后手突破类型细分
-  const opponentRanSecond = opponentRanMatches.filter(m => !m.goingFirst);
-  const opponentRanSecondBroke = {
-    notNeeded: opponentRanSecond.filter(m => m.brokeBoard === 'not_applicable').length,
-    success: opponentRanSecond.filter(m => m.brokeBoard === true || m.brokeBoard === 'true').length,
-    failed: opponentRanSecond.filter(m => m.brokeBoard === false || m.brokeBoard === 'false').length,
-    other: opponentRanSecond.filter(m => m.brokeBoard && m.brokeBoard !== 'not_applicable' && m.brokeBoard !== true && m.brokeBoard !== 'true' && m.brokeBoard !== false && m.brokeBoard !== 'false').length,
-    noBroke: opponentRanSecond.filter(m => !m.brokeBoard).length
-  };
+}
 
-  // ── 自用卡组统计 ──
-  const myDeckStats = {};
-  matches.filter(m => m.myDeck).forEach(m => {
-    const deck = m.myDeck.trim();
-    if (!deck) return;
-    if (!myDeckStats[deck]) myDeckStats[deck] = { wins: 0, losses: 0, draws: 0, abnormals: 0, total: 0 };
-    myDeckStats[deck].total++;
-    if (m.result === 'win') myDeckStats[deck].wins++;
-    else if (m.result === 'loss') myDeckStats[deck].losses++;
-    else if (m.result === 'draw') myDeckStats[deck].draws++;
-    else if (m.result === 'abnormal') myDeckStats[deck].abnormals++;
+// ── 卡组统计（通用：自用/对手）──
+function computeDeckGroupStats(matches, field) {
+  const m = {};
+  matches.filter(mt => mt[field]).forEach(mt => {
+    const d = mt[field].trim();
+    if (!d) return;
+    if (!m[d]) m[d] = { wins: 0, losses: 0, draws: 0, abnormals: 0, total: 0 };
+    m[d].total++;
+    if (mt.result === 'win') m[d].wins++;
+    else if (mt.result === 'loss') m[d].losses++;
+    else if (mt.result === 'draw') m[d].draws++;
+    else if (mt.result === 'abnormal') m[d].abnormals++;
   });
+  return Object.entries(m).sort((a, b) => b[1].total - a[1].total).map(([deck, s]) => ({ deck, ...s, winRate: pct(s.wins, s.wins + s.losses) }));
+}
 
-  // 对手卡组统计
-  const deckStats = {};
-  matches.filter(m => m.opponentDeck).forEach(m => {
-    const deck = m.opponentDeck.trim();
-    if (!deck) return;
-    if (!deckStats[deck]) deckStats[deck] = { wins: 0, losses: 0, draws: 0, abnormals: 0, total: 0 };
-    deckStats[deck].total++;
-    if (m.result === 'win') deckStats[deck].wins++;
-    else if (m.result === 'loss') deckStats[deck].losses++;
-    else if (m.result === 'draw') deckStats[deck].draws++;
-    else if (m.result === 'abnormal') deckStats[deck].abnormals++;
-  });
-
-  // ── 二维交叉统计：自己卡组 vs 对手卡组 ──
-  const matchupStats = {};
-  matches.forEach(m => {
-    const myDeck = (m.myDeck || '').trim();
-    const oppDeck = (m.opponentDeck || '').trim();
+// ── 二维交叉统计 ──
+function computeMatchupStats(matches) {
+  const m = {};
+  matches.forEach(mt => {
+    const myDeck = (mt.myDeck || '').trim();
+    const oppDeck = (mt.opponentDeck || '').trim();
     if (!myDeck || !oppDeck) return;
     const key = myDeck + ' ⚔️ ' + oppDeck;
-    if (!matchupStats[key]) {
-      matchupStats[key] = { myDeck, opponentDeck: oppDeck, wins: 0, losses: 0, draws: 0, abnormals: 0, total: 0 };
-    }
-    matchupStats[key].total++;
-    if (m.result === 'win') matchupStats[key].wins++;
-    else if (m.result === 'loss') matchupStats[key].losses++;
-    else if (m.result === 'draw') matchupStats[key].draws++;
-    else if (m.result === 'abnormal') matchupStats[key].abnormals++;
+    if (!m[key]) m[key] = { myDeck, opponentDeck: oppDeck, wins: 0, losses: 0, draws: 0, abnormals: 0, total: 0 };
+    m[key].total++;
+    if (mt.result === 'win') m[key].wins++;
+    else if (mt.result === 'loss') m[key].losses++;
+    else if (mt.result === 'draw') m[key].draws++;
+    else if (mt.result === 'abnormal') m[key].abnormals++;
   });
+  return Object.values(m).sort((a, b) => b.total - a.total).map(s => ({ ...s, winRate: pct(s.wins, s.wins + s.losses) }));
+}
 
-  const playable = wins + losses;
-
-  // ── 晋级赛 / 保级赛统计 ──
-  function computeTypeStats(typeMatches) {
-    const tWins = typeMatches.filter(m => m.result === 'win').length;
-    const tLosses = typeMatches.filter(m => m.result === 'loss').length;
-    const tTotal = tWins + tLosses;
-    if (tTotal === 0) return null;
-    // 硬币
-    const tCoin = typeMatches.filter(m => m.coinToss === true || m.coinToss === false);
-    const tCoinWins = tCoin.filter(m => m.coinToss === true).length;
-    // 先后手
-    const tFirst = typeMatches.filter(m => m.goingFirst);
-    const tFirstWins = tFirst.filter(m => m.result === 'win').length;
-    const tSecond = typeMatches.filter(m => !m.goingFirst);
-    const tSecondWins = tSecond.filter(m => m.result === 'win').length;
-    // 手坑（兼容新旧格式）
-    const tHTMatches = typeMatches.map(function(m) { return getMatchHandtraps(m); });
-    const tMaxxc = tHTMatches.filter(function(h) { return h.includes('gotMaxxc'); }).length;
-    const tDroll = tHTMatches.filter(function(h) { return h.includes('gotDroll'); }).length;
-    const tJellyfish = tHTMatches.filter(function(h) { return h.includes('gotJellyfish'); }).length;
-    const tLancea = tHTMatches.filter(function(h) { return h.includes('gotLancea'); }).length;
-    const tNibiru = tHTMatches.filter(function(h) { return h.includes('gotNibiru'); }).length;
-    const tDimension = tHTMatches.filter(function(h) { return h.includes('gotDimension'); }).length;
-    const tSmallHT = tHTMatches.filter(function(h) { return h.includes('_other'); }).length;
-    const tAnyG = tHTMatches.filter(function(h) { return h.includes('gotMaxxc') || h.includes('gotDroll') || h.includes('gotJellyfish'); }).length;
-    // 卡手
-    const tCantPlay = typeMatches.filter(m => m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck).length;
-    // 对手大牌
-    const tBigHand = typeMatches.filter(m => m.opponentBigHand).length;
-    // 对手卡组
-    const tOppDecks = {};
-    typeMatches.forEach(m => {
-      if (!m.opponentDeck) return;
-      const d = m.opponentDeck.trim();
-      if (!d) return;
-      if (!tOppDecks[d]) tOppDecks[d] = { total: 0, wins: 0, losses: 0 };
-      tOppDecks[d].total++;
-      if (m.result === 'win') tOppDecks[d].wins++;
-      else if (m.result === 'loss') tOppDecks[d].losses++;
-    });
-    return {
-      total: tTotal, wins: tWins, losses: tLosses,
-      winRate: tTotal > 0 ? ((tWins / tTotal) * 100).toFixed(1) : '0.0',
-      coinWinRate: tCoin.length > 0 ? ((tCoinWins / tCoin.length) * 100).toFixed(1) : '0.0',
-      firstWinRate: tFirst.length > 0 ? ((tFirstWins / tFirst.length) * 100).toFixed(1) : '0.0',
-      secondWinRate: tSecond.length > 0 ? ((tSecondWins / tSecond.length) * 100).toFixed(1) : '0.0',
-      handtrap: {
-        gotMaxxc: tMaxxc, gotDroll: tDroll, gotJellyfish: tJellyfish,
-        gotLancea: tLancea, gotNibiru: tNibiru, gotDimension: tDimension,
-        gotSmallHT: tSmallHT, gotAnyG: tAnyG,
-        // 动态手坑列表（供渲染端展示预设手坑）
-        presets: data.handtrapPresets || [],
-        counts: (function() {
-          var c = {};
-          (data.handtrapPresets || []).forEach(function(p) {
-            c[p.id] = tHTMatches.filter(function(h) { return h.includes(p.id); }).length;
-          });
-          c['_other'] = tSmallHT;
-          return c;
-        })()
-      },
-      cantPlayRate: tTotal > 0 ? ((tCantPlay / tTotal) * 100).toFixed(1) : '0.0',
-      bigHandRate: tTotal > 0 ? ((tBigHand / tTotal) * 100).toFixed(1) : '0.0',
-      oppDecks: Object.entries(tOppDecks)
-        .sort((a, b) => b[1].total - a[1].total)
-        .map(([d, s]) => ({ deck: d, ...s, winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0' }))
-    };
-  }
-  const promotionMatches = matches.filter(m => m.matchType === 'promotion');
-  const relegationMatches = matches.filter(m => m.matchType === 'relegation');
-  const rankedStats = {
-    promotion: computeTypeStats(promotionMatches),
-    relegation: computeTypeStats(relegationMatches)
+// ── 晋级/保级赛统计 ──
+function computeTypeStats(typeMatches) {
+  const tWins = typeMatches.filter(m => m.result === 'win').length;
+  const tLosses = typeMatches.filter(m => m.result === 'loss').length;
+  const tTotal = tWins + tLosses;
+  if (tTotal === 0) return null;
+  const tCoin = typeMatches.filter(m => m.coinToss === true || m.coinToss === false);
+  const tCoinWins = tCoin.filter(m => m.coinToss === true).length;
+  const tFirst = typeMatches.filter(m => m.goingFirst);
+  const tFirstWins = tFirst.filter(m => m.result === 'win').length;
+  const tSecond = typeMatches.filter(m => !m.goingFirst);
+  const tSecondWins = tSecond.filter(m => m.result === 'win').length;
+  const tHTMatches = typeMatches.map(m => getMatchHandtraps(m));
+  const tMaxxc = tHTMatches.filter(h => h.includes('gotMaxxc')).length;
+  const tDroll = tHTMatches.filter(h => h.includes('gotDroll')).length;
+  const tJellyfish = tHTMatches.filter(h => h.includes('gotJellyfish')).length;
+  const tLancea = tHTMatches.filter(h => h.includes('gotLancea')).length;
+  const tNibiru = tHTMatches.filter(h => h.includes('gotNibiru')).length;
+  const tDimension = tHTMatches.filter(h => h.includes('gotDimension')).length;
+  const tSmallHT = tHTMatches.filter(h => h.includes('_other')).length;
+  const tAnyG = tHTMatches.filter(h => h.includes('gotMaxxc') || h.includes('gotDroll') || h.includes('gotJellyfish')).length;
+  const tCantPlay = typeMatches.filter(m => m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck).length;
+  const tBigHand = typeMatches.filter(m => m.opponentBigHand).length;
+  const tOppDecks = {};
+  typeMatches.forEach(m => {
+    if (!m.opponentDeck) return;
+    const d = m.opponentDeck.trim();
+    if (!d) return;
+    if (!tOppDecks[d]) tOppDecks[d] = { total: 0, wins: 0, losses: 0 };
+    tOppDecks[d].total++;
+    if (m.result === 'win') tOppDecks[d].wins++;
+    else if (m.result === 'loss') tOppDecks[d].losses++;
+  });
+  const counts = {};
+  (data.handtrapPresets || []).forEach(p => { counts[p.id] = tHTMatches.filter(h => h.includes(p.id)).length; });
+  counts['_other'] = tSmallHT;
+  return {
+    total: tTotal, wins: tWins, losses: tLosses, winRate: pct(tWins, tTotal),
+    coinWinRate: pct(tCoinWins, tCoin.length), firstWinRate: pct(tFirstWins, tFirst.length),
+    secondWinRate: pct(tSecondWins, tSecond.length),
+    handtrap: { gotMaxxc: tMaxxc, gotDroll: tDroll, gotJellyfish: tJellyfish, gotLancea: tLancea, gotNibiru: tNibiru, gotDimension: tDimension, gotSmallHT: tSmallHT, gotAnyG: tAnyG, presets: data.handtrapPresets || [], counts },
+    cantPlayRate: pct(tCantPlay, tTotal), bigHandRate: pct(tBigHand, tTotal),
+    oppDecks: Object.entries(tOppDecks).sort((a, b) => b[1].total - a[1].total).map(([d, s]) => ({ deck: d, ...s, winRate: pct(s.wins, s.wins + s.losses) }))
   };
+}
 
-  // ── 硬币历史记录（供 streak 分析和返回共用）──
-  var coinHistory = matches.filter(function(m) { return m.coinToss === true || m.coinToss === false; }).map(function(m) {
-    return { coinToss: m.coinToss, result: m.result, goingFirst: m.goingFirst };
+/** 主统计函数 — 编排所有子函数 */
+function computeStats() {
+  const allMatches = data.matches || [];
+  const timeRange = data.timeRange || 'all';
+  const matches = filterMatchesByTimeRange(allMatches, timeRange);
+
+  const basic = computeBasicStats(matches);
+  const { total, wins, losses, draws, abnormals, winRate, gfAll, gsAll } = basic;
+
+  const gfWins = basic.goingFirst.filter(m => m.result === 'win').length;
+  const gsWins = basic.goingSecond.filter(m => m.result === 'win').length;
+
+  const coin = computeCoinStats(matches);
+
+  const last10 = matches.slice(-10).map(m => ({
+    result: m.result, goingFirst: m.goingFirst, opponentDeck: m.opponentDeck || '', coinToss: m.coinToss
+  }));
+
+  const handtrap = computeHandtrapStats(matches, total, data.handtrapPresets || [], data.handtrapConfig || {});
+  const handState = computeHandStateStats(matches, total, gfAll.length, gsAll.length);
+  const connectivity = computeConnectivityStats(matches, total);
+
+  const bigHandTotal = matches.filter(m => m.opponentBigHand).length;
+  const bigHandFirst = matches.filter(m => m.opponentBigHand && m.goingFirst).length;
+  const bigHandSecond = matches.filter(m => m.opponentBigHand && !m.goingFirst).length;
+
+  const typhonMatches = matches.filter(m => m.typhonAppeared);
+  const deckOutMatches = matches.filter(m => m.deckOut);
+
+  const resultHistory = matches.map(m => m.result);
+  const deckResults = {};
+  matches.forEach(m => {
+    const d = m.myDeck;
+    if (d && (m.result === 'win' || m.result === 'loss')) {
+      if (!deckResults[d]) deckResults[d] = [];
+      deckResults[d].push(m.result);
+    }
   });
 
   return {
-    total, wins, losses, draws, abnormals,
-    winRate: playable > 0 ? ((wins / playable) * 100).toFixed(1) : '0.0',
-    coin: {
-      total: coinMatches.length,
-      wins: coinWins,
-      losses: coinLosses,
-      winRate: coinMatches.length > 0 ? ((coinWins / coinMatches.length) * 100).toFixed(1) : '0.0',
-      // ── 硬币连正/连反分析 ──
-      streak: (function() {
-        var arr = coinHistory;
-        var n = arr.length;
-        if (n === 0) return { current: null, longest: 0, longestType: null, severity: '—', severityScore: 0, pValue: 1 };
-        // 扫描所有连续段
-        var curType = arr[0].coinToss;
-        var curLen = 1;
-        var maxLen = 1;
-        var maxType = curType;
-        for (var si = 1; si < n; si++) {
-          if (arr[si].coinToss === curType) {
-            curLen++;
-          } else {
-            curType = arr[si].coinToss;
-            curLen = 1;
-          }
-          if (curLen > maxLen) { maxLen = curLen; maxType = curType; }
-        }
-        // 当前连续（从尾部向前扫描）
-        var curCoin = arr[n - 1].coinToss;
-        var curStreak = 1;
-        for (var si2 = n - 2; si2 >= 0; si2--) {
-          if (arr[si2].coinToss === curCoin) curStreak++;
-          else break;
-        }
-        // 统计显著性：最长连续段长度 L 在 N 次抛掷中出现的概率
-        // 近似公式 P(最长连续 ≥ L) ≈ 1 - exp(-N / 2^(L+1))
-        var L = maxLen;
-        var pVal = 1;
-        if (n > 0 && L > 0) {
-          pVal = 1 - Math.exp(-n / Math.pow(2, L + 1));
-          if (pVal < 0) pVal = 0;
-        }
-        // 期望最长连续长度 ≈ log2(N) + 1/3
-        var expectedMax = Math.log2(n) + 0.333;
-        // 严重程度评分 0~100（基于与期望值的偏离程度）
-        var diff = L - expectedMax;
-        var score = Math.min(100, Math.max(0, Math.round((diff / (expectedMax > 3 ? 3 : 2)) * 100)));
-        // 严重程度等级：基于 severityScore（与展示颜色阈值对齐）
-        var severity;
-        if (score <= 20) severity = '正常';
-        else if (score <= 50) severity = '⚠️ 偏高';
-        else if (score <= 75) severity = '🔴 显著';
-        else severity = '🔥 异常';
-        // 极端情况：L 很小但 n 很大时 pVal 也小，但此时不视为异常
-        if (L <= 2) { severity = '正常'; score = 0; }
-        return {
-          current: { type: curCoin, length: curStreak },
-          longest: { type: maxType, length: maxLen },
-          severity: severity,
-          severityScore: score,
-          pValue: pVal,
-          expectedMax: expectedMax.toFixed(1)
-        };
-      })(),
-      // ── 硬币偏斜检测（总体比例是否偏离 50%）──
-      bias: (function() {
-        var h = coinWins, t = coinLosses, n = h + t;
-        if (n < 10) return { heads: h, tails: t, pct: '—', zScore: 0, severity: '—', severityScore: 0 };
-        var expected = n / 2;
-        var se = Math.sqrt(n) / 2;  // 标准误 = sqrt(n * 0.5 * 0.5)
-        var z = Math.abs(h - expected) / se;
-        var pct = ((h / n) * 100).toFixed(1);
-        var score = Math.min(100, Math.round((z / 4) * 100));
-        var severity;
-        if (score <= 20) severity = '正常';
-        else if (score <= 50) severity = '⚠️ 偏高';
-        else if (score <= 75) severity = '🔴 显著';
-        else severity = '🔥 异常';
-        return { heads: h, tails: t, pct: pct, zScore: z, severity: severity, severityScore: score };
-      })()
-    },
-    coinHistory: coinHistory,
-    resultHistory: matches.map(function(m) { return m.result; }),
-    deckResults: (function() {
-      var dr = {};
-      matches.forEach(function(m) {
-        var deck = m.myDeck;
-        if (deck && (m.result === 'win' || m.result === 'loss')) {
-          if (!dr[deck]) dr[deck] = [];
-          dr[deck].push(m.result);
-        }
-      });
-      return dr;
-    })(),
+    total, wins, losses, draws, abnormals, winRate,
+    coin: { ...coin, coinHistory: coin.coinHistory },
+    coinHistory: coin.coinHistory,
+    resultHistory, deckResults,
     goingFirst: {
-      total: goingFirst.length,
-      wins: gfWins,
-      losses: goingFirst.length - gfWins,
-      draws: gdDraws,
-      abnormals: gdAbnormals,
-      winRate: goingFirst.length > 0 ? ((gfWins / goingFirst.length) * 100).toFixed(1) : '0.0'
+      total: basic.goingFirst.length, wins: gfWins,
+      losses: basic.goingFirst.length - gfWins,
+      draws: gfAll.filter(m => m.result === 'draw').length,
+      abnormals: gfAll.filter(m => m.result === 'abnormal').length,
+      winRate: pct(gfWins, basic.goingFirst.length)
     },
     goingSecond: {
-      total: goingSecond.length,
-      wins: gsWins,
-      losses: goingSecond.length - gsWins,
-      draws: gsDraws,
-      abnormals: gsAbnormals,
-      winRate: goingSecond.length > 0 ? ((gsWins / goingSecond.length) * 100).toFixed(1) : '0.0'
+      total: basic.goingSecond.length, wins: gsWins,
+      losses: basic.goingSecond.length - gsWins,
+      draws: gsAll.filter(m => m.result === 'draw').length,
+      abnormals: gsAll.filter(m => m.result === 'abnormal').length,
+      winRate: pct(gsWins, basic.goingSecond.length)
     },
-    currentStreak: { type: streakType, count: streakCount },
-    last10,
-    // 新 v2.0 统计 ────────────────────────────────────────────────
-    handtrap: {
-      total: gotMaxxc + gotDroll + gotJellyfish + gotLancea + gotNibiru + gotDimension + gotSmallHT,
-      gotMaxxc, gotDroll, gotJellyfish, gotLancea, gotNibiru, gotAnyG, gotDimension, gotSmallHT,
-      maxxcRate: total > 0 ? ((gotMaxxc / total) * 100).toFixed(1) : '0.0',
-      anyGRate: total > 0 ? ((gotAnyG / total) * 100).toFixed(1) : '0.0',
-      nibiruRate: total > 0 ? ((gotNibiru / total) * 100).toFixed(1) : '0.0',
-      // 先后手细分（向后兼容，原有字段不变）
-      byFirst: { gotMaxxc: htByFirst['gotMaxxc']||0, gotDroll: htByFirst['gotDroll']||0, gotJellyfish: htByFirst['gotJellyfish']||0, gotLancea: htByFirst['gotLancea']||0, gotNibiru: htByFirst['gotNibiru']||0, gotDimension: htByFirst['gotDimension']||0, gotSmallHT: htByFirst['_other']||0, gotAnyG: matches.filter(m => getMatchHandtraps(m).some(id => ['gotMaxxc','gotDroll','gotJellyfish'].includes(id)) && m.goingFirst).length },
-      bySecond: { gotMaxxc: htBySecond['gotMaxxc']||0, gotDroll: htBySecond['gotDroll']||0, gotJellyfish: htBySecond['gotJellyfish']||0, gotLancea: htBySecond['gotLancea']||0, gotNibiru: htBySecond['gotNibiru']||0, gotDimension: htBySecond['gotDimension']||0, gotSmallHT: htBySecond['_other']||0, gotAnyG: matches.filter(m => getMatchHandtraps(m).some(id => ['gotMaxxc','gotDroll','gotJellyfish'].includes(id)) && !m.goingFirst).length },
-      // 新字段：预设列表 + 配置 + 动态计数
-      presets: data.handtrapPresets || [],
-      config: data.handtrapConfig || { largeIds: [], compactIds: [] },
-      counts: htCounts,
-      byFirstAll: htByFirst,
-      bySecondAll: htBySecond
-    },
-    handState: {
-      cantPlay, cantPlayGarnet, cantPlayDuplicate, cantPlayHT,
-      totalCantPlay,
-      cantPlayRate: total > 0 ? ((totalCantPlay / total) * 100).toFixed(1) : '0.0',
-      bothStuck,
-      bothStuckRate: total > 0 ? ((bothStuck / total) * 100).toFixed(1) : '0.0',
-      // 先后手细分
-      gfTotal, gsTotal,
-      byFirst: { cantPlay: cantPlayFirst, cantPlayGarnet: cantPlayGarnetFirst, cantPlayDuplicate: cantPlayDuplicateFirst, cantPlayHT: cantPlayHTFirst, bothStuck: bothStuckFirst, totalCantPlay: totalCantPlayFirst },
-      bySecond: { cantPlay: cantPlaySecond, cantPlayGarnet: cantPlayGarnetSecond, cantPlayDuplicate: cantPlayDuplicateSecond, cantPlayHT: cantPlayHTSecond, bothStuck: bothStuckSecond, totalCantPlay: totalCantPlaySecond },
-      // 互卡子选项详情
-      bothStuckDetail: {
-        total: bothStuck,
-        firstMove: bsFirstMove, firstMoveSelf: bsFirstMoveSelf, firstMoveOpp: bsFirstMoveOpp,
-        surrender: bsSurrender, surrenderSelf: bsSurrenderSelf, surrenderOpp: bsSurrenderOpp,
-        other: bsOther
-      },
-      // 各卡组明细
-      byDeck: Object.entries(cantPlayByDeck)
-        .sort((a, b) => b[1].total - a[1].total)
-        .map(([deck, s]) => ({
-          deck, ...s,
-          cantPlayRate: s.total > 0 ? ((s.cantPlayCount / s.total) * 100).toFixed(1) : '0.0',
-          winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0'
-        }))
-    },
-    connectivity: {
-      disconnect, disconnectSelf, disconnectOpponent,
-      disconnectRate: total > 0 ? ((disconnect / total) * 100).toFixed(1) : '0.0',
-      timeout, timeoutSelf, timeoutOpponent,
-      timeoutRate: total > 0 ? ((timeout / total) * 100).toFixed(1) : '0.0',
-      timeoutSelfByDeck: Object.entries(timeoutSelfByDeck)
-        .sort((a, b) => b[1] - a[1])
-        .map(([deck, count]) => ({ deck, count })),
-      timeoutOppByDeck: Object.entries(timeoutOppByDeck)
-        .sort((a, b) => b[1] - a[1])
-        .map(([deck, count]) => ({ deck, count }))
-    },
-    bigHand: {
-      total: bigHandTotal,
-      first: bigHandFirst,
-      second: bigHandSecond
-    },
-    opponentT0: {
-      total: opponentT0,
-      wins: opponentT0Wins,
-      losses: opponentT0Losses,
-      winRate: (opponentT0Wins + opponentT0Losses) > 0 ? ((opponentT0Wins / (opponentT0Wins + opponentT0Losses)) * 100).toFixed(1) : '0.0',
-      byDeck: Object.entries(opponentT0ByDeck)
-        .sort((a, b) => b[1].total - a[1].total)
-        .map(([deck, s]) => ({ deck, ...s,
-          winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0'
-        }))
-    },
-    endboard: {
-      total: firstMatches.length,
-      normal: endboardNormal,
-      compromised: endboardCompromised,
-      stopped: endboardTrueStopped,
-      surrender: endboardSurrender,
-      opponentSurrendered: opponentSurrendered,
-      normalRate: firstMatches.length > 0 ? ((endboardNormal / firstMatches.length) * 100).toFixed(1) : '0.0'
-    },
-    breakBoard: {
-      total: secondMatches.length,
-      success: brokeYes,
-      failed: brokeNo,
-      surrender: brokeSurrender,
-      notNeeded: brokeNotNeeded,
-      successWins: brokeSuccessWins,
-      successRate: secondMatches.length > 0 ? ((brokeYes / secondMatches.length) * 100).toFixed(1) : '0.0',
-      successWinRate: brokeYes > 0 ? ((brokeSuccessWins / brokeYes) * 100).toFixed(1) : '0.0'
-    },
-    myDeckStats: Object.entries(myDeckStats)
-      .sort((a, b) => b[1].total - a[1].total)
-      .map(([deck, s]) => ({
-        deck, ...s,
-        winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0'
-      })),
-    deckStats: Object.entries(deckStats)
-      .sort((a, b) => b[1].total - a[1].total)
-      .map(([deck, s]) => ({
-        deck, ...s,
-        winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0'
-      })),
-    // 严重失误统计
-    mistake: {
-      total: mistakeCount,
-      rate: total > 0 ? ((mistakeCount / total) * 100).toFixed(1) : '0.0',
-      wins: mistakeWins,
-      losses: mistakeLosses,
-      winRate: (mistakeWins + mistakeLosses) > 0 ? ((mistakeWins / (mistakeWins + mistakeLosses)) * 100).toFixed(1) : '0.0',
-      byDeck: Object.entries(mistakeByDeck)
-        .sort((a, b) => b[1].total - a[1].total)
-        .map(([deck, s]) => ({ deck, ...s,
-          winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0'
-        }))
-    },
-    // 吓跑对手统计
-    opponentRan: {
-      total: opponentRanCount,
-      rate: total > 0 ? ((opponentRanCount / total) * 100).toFixed(1) : '0.0',
-      byDeck: Object.entries(opponentRanByDeck)
-        .sort((a, b) => b[1] - a[1])
-        .map(([deck, count]) => ({ deck, count })),
-      // 先手细分：对手跑时场面状态
-      firstTotal: opponentRanFirst.length,
-      firstEndboard: opponentRanFirstEndboard,
-      // 后手细分：对手跑时突破状态
-      secondTotal: opponentRanSecond.length,
-      secondBroke: opponentRanSecondBroke
-    },
-    // 趣味统计
+    currentStreak: computeStreak(matches),
+    last10, handtrap, handState, connectivity,
+    bigHand: { total: bigHandTotal, first: bigHandFirst, second: bigHandSecond },
+    opponentT0: computeOpponentT0Stats(matches),
+    endboard: computeEndboardStats(gfAll),
+    breakBoard: computeBreakBoardStats(gsAll),
+    myDeckStats: computeDeckGroupStats(matches, 'myDeck'),
+    deckStats: computeDeckGroupStats(matches, 'opponentDeck'),
+    mistake: computeMistakeStats(matches, total),
+    opponentRan: computeOpponentRanStats(matches),
     typhon: {
       total: typhonMatches.length,
-      enemyBlack: typhonEnemyBlack,
-      enemyWhite: typhonEnemyWhite,
-      selfBlack: typhonSelfBlack,
-      selfWhite: typhonSelfWhite
+      enemyBlack: typhonMatches.filter(m => m.typhonWho === 'opponent' && m.result === 'win').length,
+      enemyWhite: typhonMatches.filter(m => m.typhonWho === 'opponent' && m.result === 'loss').length,
+      selfBlack: typhonMatches.filter(m => m.typhonWho === 'self' && m.result === 'loss').length,
+      selfWhite: typhonMatches.filter(m => m.typhonWho === 'self' && m.result === 'win').length
     },
     deckOut: {
       total: deckOutMatches.length,
-      self: deckOutSelf,
-      opponent: deckOutOpponent,
-      selfWinRate: deckOutSelf > 0 ? ((deckOutSelfWins / deckOutSelf) * 100).toFixed(1) : '0.0'
+      self: deckOutMatches.filter(m => m.deckOutWho === 'self').length,
+      opponent: deckOutMatches.filter(m => m.deckOutWho === 'opponent').length,
+      selfWins: deckOutMatches.filter(m => m.deckOutWho === 'self' && m.result === 'win').length
     },
-    matchupStats: Object.entries(matchupStats)
-      .sort((a, b) => b[1].total - a[1].total)
-      .map(([key, s]) => ({
-        myDeck: s.myDeck, opponentDeck: s.opponentDeck, ...s,
-        winRate: (s.wins + s.losses) > 0 ? ((s.wins / (s.wins + s.losses)) * 100).toFixed(1) : '0.0'
-      })),
-    rankedStats
+    matchupStats: computeMatchupStats(matches),
+    rankedStats: {
+      promotion: computeTypeStats(matches.filter(m => m.matchType === 'promotion')),
+      relegation: computeTypeStats(matches.filter(m => m.matchType === 'relegation'))
+    }
   };
 }
 
@@ -1006,10 +945,11 @@ ipcMain.handle('stats:get-stats', () => {
 });
 
 ipcMain.handle('stats:add-match', (event, matchData) => {
+  const cleaned = sanitizeMatchData(matchData || {});
   const match = {
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
-    ...matchData
+    ...cleaned
   };
   data.matches.push(match);
   saveData();
@@ -1045,7 +985,12 @@ ipcMain.handle('stats:import-json', (event, jsonStr) => {
     if (!parsed.matches || !Array.isArray(parsed.matches)) {
       return { success: false, error: '无效的数据格式' };
     }
-    data = parsed;
+    const MAX_MATCHES = 100000;
+    if (parsed.matches.length > MAX_MATCHES) {
+      return { success: false, error: '数据量过大（最多 ' + MAX_MATCHES + ' 条）' };
+    }
+    // 只覆盖对局数据，保留预设等配置
+    data.matches = parsed.matches.map(sanitizeMatchData);
     saveData();
     notifyWindows();
     return { success: true };
@@ -1062,8 +1007,15 @@ ipcMain.handle('stats:reset-matches', () => {
 });
 
 ipcMain.handle('shell:open-external', (event, url) => {
-  const { shell } = require('electron');
-  shell.openExternal(url);
+  try {
+    const u = new URL(url);
+    const allowed = ['github.com', 'raw.githubusercontent.com'];
+    if (!allowed.includes(u.hostname)) return;
+    if (u.protocol !== 'https:') return;
+    shell.openExternal(url);
+  } catch (e) {
+    console.error('拒绝打开不安全的 URL:', url);
+  }
 });
 
 ipcMain.handle('app:get-version', () => {
@@ -1119,8 +1071,9 @@ ipcMain.handle('presets:get-all', () => {
 });
 
 ipcMain.handle('presets:add', (event, name) => {
-  const n = name.trim();
+  const n = (name || '').trim();
   if (!n) return { success: false, error: '名称不能为空' };
+  if (n.length > 100) return { success: false, error: '名称过长（最多100字符）' };
   if (!data.deckPresets) data.deckPresets = [];
   if (data.deckPresets.includes(n)) return { success: false, error: '已存在' };
   data.deckPresets.push(n);
@@ -1141,8 +1094,9 @@ ipcMain.handle('presets:rename', (event, { oldName, newName }) => {
   if (!data.deckPresets) return { success: false };
   const idx = data.deckPresets.indexOf(oldName);
   if (idx === -1) return { success: false, error: '未找到' };
-  const n = newName.trim();
+  const n = (newName || '').trim();
   if (!n) return { success: false, error: '名称不能为空' };
+  if (n.length > 100) return { success: false, error: '名称过长（最多100字符）' };
   data.deckPresets[idx] = n;
   saveData();
   return { success: true, presets: data.deckPresets };
@@ -1154,8 +1108,9 @@ ipcMain.handle('mydeck:get-all', () => {
 });
 
 ipcMain.handle('mydeck:add', (event, name) => {
-  const n = name.trim();
+  const n = (name || '').trim();
   if (!n) return { success: false, error: '名称不能为空' };
+  if (n.length > 100) return { success: false, error: '名称过长（最多100字符）' };
   if (!data.myDeckPresets) data.myDeckPresets = [];
   if (data.myDeckPresets.includes(n)) return { success: false, error: '已存在' };
   data.myDeckPresets.push(n);
@@ -1176,8 +1131,9 @@ ipcMain.handle('mydeck:rename', (event, { oldName, newName }) => {
   if (!data.myDeckPresets) return { success: false };
   const idx = data.myDeckPresets.indexOf(oldName);
   if (idx === -1) return { success: false, error: '未找到' };
-  const n = newName.trim();
+  const n = (newName || '').trim();
   if (!n) return { success: false, error: '名称不能为空' };
+  if (n.length > 100) return { success: false, error: '名称过长（最多100字符）' };
   data.myDeckPresets[idx] = n;
   saveData();
   return { success: true, presets: data.myDeckPresets };
@@ -1191,7 +1147,9 @@ ipcMain.handle('handtrap:get-all', () => {
 ipcMain.handle('handtrap:add', (event, { id, label }) => {
   const l = (label || '').trim();
   if (!l) return { success: false, error: '名称不能为空' };
+  if (l.length > 100) return { success: false, error: '名称过长（最多100字符）' };
   if (!id) return { success: false, error: 'ID 不能为空' };
+  if (id.length > 50) return { success: false, error: 'ID 过长' };
   if (!data.handtrapPresets) data.handtrapPresets = [];
   if (data.handtrapPresets.some(p => p.id === id)) return { success: false, error: '已存在' };
   data.handtrapPresets.push({ id, label: l });

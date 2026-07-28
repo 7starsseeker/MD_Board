@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MD Stats - 详细统计</title>
   <link rel="stylesheet" href="style.css">
@@ -642,6 +643,12 @@
       function winCls(rate) { var v = parseFloat(rate); return v > 50 ? 'good' : v < 50 ? 'bad' : ''; }
       function winColor(rate) { var v = parseFloat(rate); return v > 50 ? '#4cd964' : v < 50 ? '#ff3b30' : '#e8e8f0'; }
 
+      function escapeHtml(str) {
+        if (typeof str !== 'string') return str;
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+
       // ═══ 概览大数字 ═══
       function renderHero(stats) {
         document.getElementById('hero-row').innerHTML =
@@ -753,7 +760,7 @@
         presets.forEach(function(p) {
           var cFirst = bf[p.id] || 0;
           var cSecond = bs[p.id] || 0;
-          html += '<div class="stat-row"><span class="label">' + p.label + '</span><span class="value">先 ' + cFirst + ' / 后 ' + cSecond + '</span></div>';
+          html += '<div class="stat-row"><span class="label">' + escapeHtml(p.label) + '</span><span class="value">先 ' + cFirst + ' / 后 ' + cSecond + '</span></div>';
         });
         // _other
         html += '<div class="stat-row"><span class="label">其他手坑</span><span class="value">先 ' + (bf['_other']||0) + ' / 后 ' + (bs['_other']||0) + '</span></div>';
@@ -794,7 +801,7 @@
             var rate = parseFloat(d.cantPlayRate) || 0;
             var color = rate > 30 ? '#ff3b30' : (rate > 15 ? '#ffd700' : '#4cd964');
             html += '<div class="stat-row" style="font-size:11px">' +
-              '<span class="label" style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + d.deck + '</span>' +
+              '<span class="label" style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(d.deck) + '</span>' +
               '<span style="margin:0 4px;color:var(--text-dim)">' + d.total + '场</span>' +
               '<div class="bar-wrap" style="flex:1;min-width:50px;max-width:80px"><div class="bar-track" style="height:8px"><div class="bar-fill" style="width:' + rate + '%;background:' + color + '"></div></div></div>' +
               '<span class="value" style="font-size:10px;min-width:32px;color:' + color + '">' + d.cantPlayRate + '%</span>' +
@@ -841,7 +848,7 @@
         if (m.byDeck && m.byDeck.length > 0) {
           html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span style="font-size:11px;color:var(--accent);font-weight:600">各卡组严重失误分布</span></div>';
           m.byDeck.forEach(function(d) {
-            html += '<div class="stat-row"><span class="label">' + d.deck + '</span><span class="value" style="font-size:11px;color:var(--text-dim)">' + d.total + ' 次</span><span style="font-size:12px;font-weight:700;font-family:var(--font-mono)">' + d.winRate + '%</span></div>';
+            html += '<div class="stat-row"><span class="label">' + escapeHtml(d.deck) + '</span><span class="value" style="font-size:11px;color:var(--text-dim)">' + d.total + ' 次</span><span style="font-size:12px;font-weight:700;font-family:var(--font-mono)">' + d.winRate + '%</span></div>';
           });
         }
         el.innerHTML = html;
@@ -881,7 +888,7 @@
           html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span style="font-size:11px;color:var(--accent);font-weight:600">按自己卡组分布</span></div>';
           html += '<table class="deck-table"><thead><tr><th>卡组</th><th style="text-align:center">吓跑次数</th></tr></thead><tbody>';
           or.byDeck.forEach(function(d) {
-            html += '<tr><td class="deck-name">' + d.deck + '</td><td style="text-align:center;color:#ffd700;font-weight:700">' + d.count + '</td></tr>';
+            html += '<tr><td class="deck-name">' + escapeHtml(d.deck) + '</td><td style="text-align:center;color:#ffd700;font-weight:700">' + d.count + '</td></tr>';
           });
           html += '</tbody></table>';
         }
@@ -903,7 +910,7 @@
         if (t.byDeck && t.byDeck.length > 0) {
           html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><span style="font-size:11px;color:var(--accent);font-weight:600">遇到T0动最多的对手卡组</span></div>';
           t.byDeck.forEach(function(d) {
-            html += '<div class="stat-row"><span class="label">' + d.deck + '</span><span class="value" style="font-size:11px;color:var(--text-dim)">' + d.total + ' 次</span><span style="font-size:12px;font-weight:700;font-family:var(--font-mono)">' + d.winRate + '%</span></div>';
+            html += '<div class="stat-row"><span class="label">' + escapeHtml(d.deck) + '</span><span class="value" style="font-size:11px;color:var(--text-dim)">' + d.total + ' 次</span><span style="font-size:12px;font-weight:700;font-family:var(--font-mono)">' + d.winRate + '%</span></div>';
           });
         }
         el.innerHTML = html;
@@ -966,13 +973,13 @@
         if (con.timeoutSelfByDeck && con.timeoutSelfByDeck.length > 0) {
           html += '<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:5px"><span style="font-size:11px;color:var(--accent);font-weight:600">自己超时用的卡组</span></div>';
           con.timeoutSelfByDeck.forEach(function(d) {
-            html += '<div class="stat-row"><span class="label">' + d.deck + '</span><span class="value">' + d.count + ' 次</span></div>';
+            html += '<div class="stat-row"><span class="label">' + escapeHtml(d.deck) + '</span><span class="value">' + d.count + ' 次</span></div>';
           });
         }
         if (con.timeoutOppByDeck && con.timeoutOppByDeck.length > 0) {
           html += '<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:5px"><span style="font-size:11px;color:var(--accent);font-weight:600">对手超时用的卡组</span></div>';
           con.timeoutOppByDeck.forEach(function(d) {
-            html += '<div class="stat-row"><span class="label">' + d.deck + '</span><span class="value">' + d.count + ' 次</span></div>';
+            html += '<div class="stat-row"><span class="label">' + escapeHtml(d.deck) + '</span><span class="value">' + d.count + ' 次</span></div>';
           });
         }
         el.innerHTML = html;
@@ -1377,7 +1384,7 @@
         decks.forEach(function(d) {
           var pct = maxTotal > 0 ? (d.total / maxTotal * 100) : 0;
           html += '<tr>' +
-            '<td class="deck-name">' + d.deck + '</td>' +
+            '<td class="deck-name">' + escapeHtml(d.deck) + '</td>' +
             '<td style="text-align:center">' + d.total + '</td>' +
             '<td style="text-align:center;color:#4cd964">' + d.wins + '</td>' +
             '<td style="text-align:center;color:#ff3b30">' + d.losses + '</td>' +
@@ -1419,14 +1426,14 @@
           var subLosses = items.reduce(function(s, m) { return s + m.losses; }, 0);
           var subRate = (subWins + subLosses) > 0 ? ((subWins / (subWins + subLosses)) * 100).toFixed(1) : '0.0';
           html += '<div style="margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
-            '<span style="font-weight:700;font-size:13px;color:var(--accent-bright)">🃏 ' + myDeck + '</span>' +
+            '<span style="font-weight:700;font-size:13px;color:var(--accent-bright)">🃏 ' + escapeHtml(myDeck) + '</span>' +
             '<span style="font-size:11px;color:var(--text-dim)">共 ' + subTotal + ' 场 · 胜率 </span><span style="font-weight:700;font-size:12px;color:' + winColor(subRate) + '">' + subRate + '%</span></div>' +
             '<table class="deck-table"><thead><tr><th>对手卡组</th><th style="text-align:center">总</th><th style="text-align:center;color:#4cd964">W</th><th style="text-align:center;color:#ff3b30">L</th><th style="text-align:left">胜率</th></tr></thead><tbody>';
           items.forEach(function(m) {
             var wr = (m.wins + m.losses) > 0 ? ((m.wins / (m.wins + m.losses)) * 100).toFixed(1) : '0.0';
             var barW = (m.wins + m.losses) > 0 ? (m.wins / (m.wins + m.losses) * 100) : 0;
             html += '<tr>' +
-              '<td style="color:var(--text-dim)">' + m.opponentDeck + '</td>' +
+              '<td style="color:var(--text-dim)">' + escapeHtml(m.opponentDeck) + '</td>' +
               '<td style="text-align:center">' + m.total + '</td>' +
               '<td style="text-align:center;color:#4cd964">' + m.wins + '</td>' +
               '<td style="text-align:center;color:#ff3b30">' + m.losses + '</td>' +
@@ -1476,7 +1483,7 @@
           if (data.oppDecks && data.oppDecks.length > 0) {
             h += '<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span style="font-size:11px;color:var(--accent);font-weight:600">对手卡组分布</span></div>';
             data.oppDecks.forEach(function(d) {
-              h += '<div class="stat-row"><span class="label">' + d.deck + '</span><span class="value">' + d.wins + 'W ' + d.losses + 'L</span><span style="font-size:12px;font-weight:700;font-family:var(--font-mono);color:' + winColor(d.winRate) + '">' + d.winRate + '%</span></div>';
+              h += '<div class="stat-row"><span class="label">' + escapeHtml(d.deck) + '</span><span class="value">' + d.wins + 'W ' + d.losses + 'L</span><span style="font-size:12px;font-weight:700;font-family:var(--font-mono);color:' + winColor(d.winRate) + '">' + d.winRate + '%</span></div>';
             });
           }
           h += '</div>';
