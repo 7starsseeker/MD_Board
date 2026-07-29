@@ -215,17 +215,20 @@ function renderHandtrapPie(canvas, stats, options) {
   var compactIds = (cfg.compactIds || []).filter(function(id) { return presets.some(function(p) { return p.id === id; }); });
   var otherIds = presets.filter(function(p) { return largeIds.indexOf(p.id) < 0 && compactIds.indexOf(p.id) < 0; }).map(function(p) { return p.id; });
   var orderedIds = largeIds.concat(compactIds).concat(otherIds);
+  var visibleIds = largeIds.concat(compactIds);
 
   var labels = [];
   var values = [];
-  orderedIds.forEach(function(id) {
+  visibleIds.forEach(function(id) {
     var p = presets.find(function(x) { return x.id === id; });
     labels.push(p ? p.label : id);
     values.push(counts[id] || 0);
   });
-  // _other 最后
+  // _other + 第3级预设数据
+  var otherTotal = counts['_other'] || 0;
+  otherIds.forEach(function(id) { otherTotal += (counts[id] || 0); });
   labels.push('其他手坑');
-  values.push(counts['_other'] || 0);
+  values.push(otherTotal);
 
   var total = values.reduce(function(a,b){return a+b;}, 0);
   if (total === 0) { canvas._chart = null; return null; }
@@ -266,14 +269,15 @@ function renderHandtrapPie(canvas, stats, options) {
   if (info) {
     info.className = 'chart-info active';
     var infoHtml = infoSection('精确计数');
-    orderedIds.forEach(function(id) {
+    var visibleIds = largeIds.concat(compactIds);
+    visibleIds.forEach(function(id) {
       var p = presets.find(function(x) { return x.id === id; });
       if (!p) return;
       infoHtml += infoRow(p.label, (counts[id]||0) + ' 次');
     });
     infoHtml += infoRow('其他手坑', (counts['_other']||0) + ' 次');
     infoHtml += infoSection('先后手细分');
-    orderedIds.forEach(function(id) {
+    visibleIds.forEach(function(id) {
       var p = presets.find(function(x) { return x.id === id; });
       if (!p) return;
       infoHtml += infoRow(p.label, '先 ' + (bfAll[id]||0) + ' / 后 ' + (bsAll[id]||0));
@@ -1759,11 +1763,16 @@ function renderRankedStats(canvas, stats, options) {
   function buildBlock(data, icon, label, color) {
     if (!data) return '';
     var ht = data.handtrap;
-    // 手坑摘要（动态）
+    // 手坑摘要（仅显示 large + compact 级别）
     var htPresets = ht.presets || [];
     var htCounts = ht.counts || {};
+    var htCfg = ht.config || { largeIds: [], compactIds: [] };
+    var visibleSet = {};
+    (htCfg.largeIds || []).forEach(function(id) { visibleSet[id] = true; });
+    (htCfg.compactIds || []).forEach(function(id) { visibleSet[id] = true; });
     var htSummaryParts = [];
     htPresets.forEach(function(p) {
+      if (!visibleSet[p.id]) return;
       var cnt = htCounts[p.id] || 0;
       htSummaryParts.push(p.label + ' ' + cnt);
     });

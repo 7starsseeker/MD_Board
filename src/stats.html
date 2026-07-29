@@ -758,9 +758,12 @@
 
         // 先后手细分
         html += '<div style="margin-top:5px;border-top:1px solid var(--border);padding-top:5px"><span style="font-size:11px;color:var(--accent);font-weight:600">先后手细分</span></div>';
-        presets.forEach(function(p) {
-          var cFirst = bf[p.id] || 0;
-          var cSecond = bs[p.id] || 0;
+        var visibleIds = largeIds.concat(compactIds);
+        visibleIds.forEach(function(id) {
+          var p = presets.find(function(x) { return x.id === id; });
+          if (!p) return;
+          var cFirst = bf[id] || 0;
+          var cSecond = bs[id] || 0;
           html += '<div class="stat-row"><span class="label">' + escapeHtml(p.label) + '</span><span class="value">先 ' + cFirst + ' / 后 ' + cSecond + '</span></div>';
         });
         // _other
@@ -1469,16 +1472,22 @@
             '<div class="stat-row"><span class="label">后手胜率</span><span class="value ' + winCls(data.secondWinRate) + '">' + data.secondWinRate + '%</span></div>' +
             '<div class="stat-row"><span class="label">卡手率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(data.cantPlayRate) + '%"></div></div><span class="value bad">' + data.cantPlayRate + '%</span></div></div>' +
             '<div class="stat-row"><span class="label">对手大牌率</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill red" style="width:' + parseFloat(data.bigHandRate) + '%"></div></div><span class="value bad">' + data.bigHandRate + '%</span></div></div>';
-          // 吃手坑情况（动态）
+          // 吃手坑情况（仅显示 large + compact 级别）
           var ht = data.handtrap;
           var htPresets = ht.presets || [];
           var htCounts = ht.counts || {};
+          var htCfg = ht.config || { largeIds: [], compactIds: [] };
+          var visibleSet = {};
+          (htCfg.largeIds || []).forEach(function(id) { visibleSet[id] = true; });
+          (htCfg.compactIds || []).forEach(function(id) { visibleSet[id] = true; });
+          var otherTotal = htCounts['_other'] || 0;
           var htSection = '<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span style="font-size:11px;color:var(--accent);font-weight:600">吃手坑情况</span></div>';
           htPresets.forEach(function(p) {
+            if (!visibleSet[p.id]) { otherTotal += (htCounts[p.id] || 0); return; }
             var cnt = htCounts[p.id] || 0;
             htSection += '<div class="stat-row"><span class="label">' + p.label + '</span><span class="value">' + cnt + ' 次</span></div>';
           });
-          htSection += '<div class="stat-row"><span class="label">其他手坑</span><span class="value">' + (htCounts['_other'] || 0) + ' 次</span></div>';
+          htSection += '<div class="stat-row"><span class="label">其他手坑</span><span class="value">' + otherTotal + ' 次</span></div>';
           h += htSection;
           // 对手卡组分布（详细统计显示全部）
           if (data.oppDecks && data.oppDecks.length > 0) {

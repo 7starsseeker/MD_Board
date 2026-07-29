@@ -6,5 +6,9 @@ release/
 Thumbs.db
 .reasonix/
 
+# Project spec/docs (not for public)
+封面设计/
+报告规范/
+
 # Build logs
 build-log.txt

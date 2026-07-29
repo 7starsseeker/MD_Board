@@ -163,6 +163,23 @@ function loadData() {
         const moved = data.handtrapConfig.largeIds.splice(0);
         data.handtrapConfig.compactIds = [...new Set([...(data.handtrapConfig.compactIds || []), ...moved])];
       }
+      // 数据迁移：旧格式 handtrap 布尔字段 → 统一 handtraps 数组
+      if (data.matches) {
+        var migrated = false;
+        data.matches.forEach(function(m) {
+          if (m.handtraps && Array.isArray(m.handtraps) && m.handtraps.length > 0) return;
+          var hts = [];
+          if (m.gotMaxxc) hts.push('gotMaxxc');
+          if (m.gotDroll) hts.push('gotDroll');
+          if (m.gotJellyfish) hts.push('gotJellyfish');
+          if (m.gotLancea) hts.push('gotLancea');
+          if (m.gotNibiru) hts.push('gotNibiru');
+          if (m.gotDimension) hts.push('gotDimension');
+          if (m.gotSmallHT) hts.push('_other');
+          if (hts.length > 0) { m.handtraps = hts; migrated = true; }
+        });
+        if (migrated) saveData();
+      }
       // 从 v2 迁移到 v3
       if (data.version === 2) {
         data.version = 3;
@@ -347,6 +364,19 @@ function computeHandtrapStats(matches, total, presets, htConfig) {
     htCounts[p.id] = matches.filter(m => getMatchHandtraps(m).includes(p.id)).length;
     htByFirst[p.id] = matches.filter(m => getMatchHandtraps(m).includes(p.id) && m.goingFirst).length;
     htBySecond[p.id] = matches.filter(m => getMatchHandtraps(m).includes(p.id) && !m.goingFirst).length;
+  });
+  // 基础7种ID独立保障：即使预设中被删除也能统计到旧数据
+  var baseFallbackIds = ['gotMaxxc','gotDroll','gotJellyfish','gotLancea','gotNibiru','gotDimension'];
+  baseFallbackIds.forEach(function(id) {
+    if (!(id in htCounts)) {
+      htCounts[id] = matches.filter(function(m) { return getMatchHandtraps(m).includes(id); }).length;
+    }
+    if (!(id in htByFirst)) {
+      htByFirst[id] = matches.filter(function(m) { return getMatchHandtraps(m).includes(id) && m.goingFirst; }).length;
+    }
+    if (!(id in htBySecond)) {
+      htBySecond[id] = matches.filter(function(m) { return getMatchHandtraps(m).includes(id) && !m.goingFirst; }).length;
+    }
   });
   const gotOther = matches.filter(m => getMatchHandtraps(m).includes('_other')).length;
   const allPresetIds = new Set(presets.map(p => p.id));
@@ -636,7 +666,7 @@ function computeTypeStats(typeMatches) {
     total: tTotal, wins: tWins, losses: tLosses, winRate: pct(tWins, tTotal),
     coinWinRate: pct(tCoinWins, tCoin.length), firstWinRate: pct(tFirstWins, tFirst.length),
     secondWinRate: pct(tSecondWins, tSecond.length),
-    handtrap: { gotMaxxc: tMaxxc, gotDroll: tDroll, gotJellyfish: tJellyfish, gotLancea: tLancea, gotNibiru: tNibiru, gotDimension: tDimension, gotSmallHT: tSmallHT, gotAnyG: tAnyG, presets: data.handtrapPresets || [], counts },
+    handtrap: { gotMaxxc: tMaxxc, gotDroll: tDroll, gotJellyfish: tJellyfish, gotLancea: tLancea, gotNibiru: tNibiru, gotDimension: tDimension, gotSmallHT: tSmallHT, gotAnyG: tAnyG, presets: data.handtrapPresets || [], counts: counts, config: data.handtrapConfig || { largeIds: [], compactIds: [] } },
     cantPlayRate: pct(tCantPlay, tTotal), bigHandRate: pct(tBigHand, tTotal),
     oppDecks: Object.entries(tOppDecks).sort((a, b) => b[1].total - a[1].total).map(([d, s]) => ({ deck: d, ...s, winRate: pct(s.wins, s.wins + s.losses) }))
   };
@@ -1055,18 +1085,24 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   // ── 手坑统计 ──
   md += '---\n\n';
   md += '## 🛡️ 吃手坑统计\n\n';
+  md += '> 如某字段对应的预设已被删除，行末标注⚠️（该数据归入其他手坑）。\n\n';
   const ht = stats.handtrap;
   md += `| 手坑 | 次数 | 占比 |\n| --- | --- | --- |\n`;
-  md += `| G | ${ht.gotMaxxc} | ${ht.maxxcRate}% |\n`;
-  md += `| 任一 G | ${ht.gotAnyG} | ${ht.anyGRate}% |\n`;
-  md += `| 锁鸟 | ${ht.gotDroll} | -\n`;
-  md += `| 水母 | ${ht.gotJellyfish} | -\n`;
-  md += `| 渊兽 | ${ht.gotLancea} | -\n`;
-  md += `| 陨石 | ${ht.gotNibiru} | ${ht.nibiruRate}% |\n`;
-  md += `| 次元 | ${ht.gotDimension} | -\n`;
-  md += `| 小手坑 | ${ht.gotSmallHT} | -\n`;
+  // 基础手坑（硬编码，确保所有字段都导出）
+  var activePresetIds = {};
+  (ht.presets || []).forEach(function(p) { activePresetIds[p.id] = true; });
+  function noteIfDeleted(id) { return activePresetIds[id] ? '' : ' ⚠️（预设已删除，数据归入其他手坑）'; }
+  md += `| 鸟G | ${ht.gotDroll} | -${noteIfDeleted('gotDroll')}\n`;
+  md += `| 水母G | ${ht.gotJellyfish} | -${noteIfDeleted('gotJellyfish')}\n`;
+  md += `| 锁鸟 | ${ht.gotLancea} | -${noteIfDeleted('gotLancea')}\n`;
+  md += `| 陨石 | ${ht.gotNibiru} | ${ht.nibiruRate}%${noteIfDeleted('gotNibiru')}\n`;
+  md += `| 大宇宙人/次元系 | ${ht.gotDimension} | -${noteIfDeleted('gotDimension')}\n`;
+  md += `| 其他手坑 | ${ht.gotSmallHT} | -\n`;
+  // 预设：仅输出非基础的自定义手坑
+  var baseIds = ['gotMaxxc','gotDroll','gotJellyfish','gotLancea','gotNibiru','gotDimension'];
   if (ht.presets && ht.presets.length > 0) {
     ht.presets.forEach(function(p) {
+      if (baseIds.indexOf(p.id) >= 0) return;
       const cnt = (ht.counts && ht.counts[p.id]) || 0;
       if (cnt > 0) {
         md += `| ${p.label} | ${cnt} | -\n`;
@@ -1074,7 +1110,7 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
     });
   }
   md += '\n';
-  md += '> **算法**: 逐场提取 handtraps 数组, 按 ID 统计出现次数除以总对局数得占比。gotAnyG = 含 G/锁鸟/水母任一的场次\n\n';
+  md += '> **算法**: 逐场提取 handtraps 数组, 按 ID 统计出现次数除以总对局数得占比。gotAnyG = 含 G/鸟G/水母任一的场次。\n\n';
 
   // ── 手牌与卡手统计 ──
   md += '---\n\n';
@@ -1406,7 +1442,47 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   md += '\n';
 
   md += '---\n\n';
-  md += `*由 MD Stats v${require('./package.json').version} 自动生成*\n`;
+  md += `*由 MD Stats v${require('./package.json').version} 自动生成*\n\n`;
+
+  // ── AI 分析规范附录 ──
+  md += '---\n\n';
+  md += '## 🤖 AI 综合分析规范\n\n';
+  md += '以下内容供 AI 分析时参考，包含统计口径说明、分析方法和报告样式要求。\n\n';
+  md += '### 1. 字段与内部ID对应\n\n';
+  md += '| 导出显示 | 内部字段ID |\n';
+  md += '| --- | --- |\n';
+  md += '| 鸟G | `gotDroll` |\n';
+  md += '| 水母G | `gotJellyfish` |\n';
+  md += '| 锁鸟 | `gotLancea` |\n';
+  md += '| 陨石 | `gotNibiru` |\n';
+  md += '| 大宇宙人/次元系 | `gotDimension` |\n';
+  md += '| 其他手坑 | `gotSmallHT` / `_other` |\n';
+  md += '| 卡组件（cantPlayGarnet） | — |\n';
+  md += '| 以下为预设明细（所有当前条目，标签与统计面板一致） | 依实际预设 |\n\n';
+  md += '> 基础字段为硬编码输出，预设仅补充非基础自定义手坑。若对应预设已被删除，行末有⚠️标注，该数据归入其他手坑。\n\n';
+  md += '### 2. 分析方法\n\n';
+  md += '**投币公平性**：用 Z 检验（|观察-预期|/标准误），分数≤20 正常 / ≤50 ⚠️ 偏高 / ≤75 🔴 严重 / >75 🔥 极端。\n\n';
+  md += '**连胜/连败补偿**：按对局顺序扫描连续胜负，统计 ≥4 连胜/连败后的下一局胜率、卡手率、投币正率。\n\n';
+  md += '**升降段倾斜**：分别统计晋级赛（matchType=promotion）和保级赛（matchType=relegation）的投币正率、胜率、卡手率，对比差距。\n\n';
+  md += '**硬币序列分析**：统计先手（正）之间的后手间隔数分布，识别"孤立先手"（反→正→反）和"后手连压"（连反≥4）模式。\n\n';
+  md += '**时段分析**：按月内时段（月初1-10日/月中11-20日/月末21-31日）分组统计胜率、先手率、卡手率。\n\n';
+  md += '**吃手坑影响**：计算各手坑出现时的胜率与全局均值对比。注意"G系列任一"（gotAnyG）= 增殖的G/鸟G/水母G 任一种，按场次计不累加。\n';
+  md += '基础字段为硬编码输出，预设仅补充非基础的自定义手坑。若某字段对应预设已被删除，行末会标注⚠️，该数据在面板中归入"其他手坑"。\n\n';
+  md += '### 3. 注意事项\n\n';
+  md += '- **AI 必须直接读取本文件中的全部数据进行现场分析**，包括从「对局明细」表格中逐行提取胜负序列、硬币序列、卡手标记等，自行计算连胜连败补偿、投币间隔分布等聚合统计。**禁止**使用外部脚本或工具来解析表格。\n';
+  md += '- **不要复用旧分析的战术结论到新数据**：每次新数据应重新分析，不要照搬之前的卡组点评。\n';
+  md += '- 基础字段为硬编码输出，预设仅补充非基础自定义手坑。已删除预设的字段行末有⚠️标注。\n';
+  md += '- 对手掉线标记对局全部对应胜利（系统判赢）。\n';
+  md += '- 卡组战术分析（如"某卡组不太怕某手坑"等点评）属于本次分析的主观判断，新数据应基于新数据重新评估。\n\n';
+  md += '### 4. HTML 报告生成指南\n\n';
+  md += '生成 HTML 报告时遵循以下规范，确保风格统一：\n\n';
+  md += '**整体**：零依赖纯 HTML + CSS，无外部字体/CDN，双击即开。背景 `#f6f5f1`，文字 `#1a1a2e`。\n\n';
+  md += '**Header**：渐变背景 `linear-gradient(135deg,#0a1f3d,#1a3a5c)`，白色文字居中。标题 `font-weight:800`，关键数字大字居中展示。\n\n';
+  md += '**Section卡片**：白底 `border-radius:8px` `box-shadow:0 1px 4px rgba(0,0,0,.04)`，边框 `1px solid #e5e2da`，间距 `1.5em`。h2 左侧 4px 红色竖条（`#e8453e`）。\n\n';
+  md += '**表格**：全宽 `border-collapse:collapse`，表头 `#f0ede8`，行交替色 `tr:nth-child(even){background:#faf9f6}`，字号 `clamp(.72rem,.85vw,.8rem)`。\n\n';
+  md += '**标记**：`.tag-r`红 `.tag-g`绿 `.tag-y`黄 `.tag-b`蓝 `.tag-gr`灰。`.alert`黄底左黄条，`.callout`深蓝底白字，`.highlight-box`浅红边框，`.code`深色底代码块，`.lil-note`灰色小字，`.grid-2`/`.grid-3`网格布局。\n\n';
+  md += '**章节顺序**：①数据总览 ②投币序列分析 ③连胜/连败补偿效应 ④晋级赛vs保级赛 ⑤卡手率与吃手坑 ⑥自身卡组胜率 ⑦月初/月中/月末时段分析 ⑧实战影响分析 ⑨综合结论与嫌疑评级\n\n';
+  md += '**颜色**：绿色好 `#27ae60`，红色差 `#c0392b`。\n\n';
 
   const { canceled, filePath } = await dialog.showSaveDialog({
     title: '导出统计报告',
