@@ -1453,6 +1453,7 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   md += '### 1. 字段与内部ID对应\n\n';
   md += '| 导出显示 | 内部字段ID |\n';
   md += '| --- | --- |\n';
+  md += '| 增殖的G | `gotMaxxc` |\n';
   md += '| 鸟G | `gotDroll` |\n';
   md += '| 水母G | `gotJellyfish` |\n';
   md += '| 锁鸟 | `gotLancea` |\n';
@@ -1460,7 +1461,13 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   md += '| 大宇宙人/次元系 | `gotDimension` |\n';
   md += '| 其他手坑 | `gotSmallHT` / `_other` |\n';
   md += '| 卡废件（cantPlayGarnet） | — |\n';
-  md += '| 以下为预设明细（所有当前条目，标签与统计面板一致） | 依实际预设 |\n\n';
+  const presets = data.handtrapPresets || [];
+  if (presets.length > 0) {
+    presets.forEach(p => {
+      md += `| ${p.label} | \`${p.id}\` |\n`;
+    });
+  }
+  md += '\n';
   md += '> 基础字段为硬编码输出，预设仅补充非基础自定义手坑。若对应预设已被删除，行末有⚠️标注，该数据归入其他手坑。\n';
   md += '> **⚠️ 后端字段名仅供参考，不要反推卡牌身份**：后端字段 `gotDroll` / `gotLancea` 命名不准确，不要借此推测对应卡牌的效果或原因。`gotDroll` 对应的是鸟G（多多迷宝系列中的长尾山雀），`gotLancea` 对应的是锁鸟（小丑与锁鸟）。**禁止**根据字段名猜测卡牌效果、原作系列或机制原因，全部以统计面板中的前端显示名为准。\n\n';
   md += '**卡手类型说明**：\n';
