@@ -169,7 +169,7 @@ function loadData() {
         data.matches.forEach(function(m) {
           if (m.handtraps && Array.isArray(m.handtraps) && m.handtraps.length > 0) return;
           var hts = [];
-          if (m.gotMaxxc) hts.push('gotMaxxc');
+          if (m.gotMaxxc || m.gotMaxxC) hts.push('gotMaxxc');
           if (m.gotDroll) hts.push('gotDroll');
           if (m.gotJellyfish) hts.push('gotJellyfish');
           if (m.gotLancea) hts.push('gotLancea');
@@ -179,6 +179,20 @@ function loadData() {
           if (hts.length > 0) { m.handtraps = hts; migrated = true; }
         });
         if (migrated) saveData();
+      }
+      // 数据修复：补偿旧版 gotMaxxC（大写C）字段名遗留问题
+      // 对于已有 handtraps 数组但漏掉了 gotMaxxc 的对局，从旧布尔字段补回
+      if (data.matches) {
+        var fixed = false;
+        data.matches.forEach(function(m) {
+          if (m.gotMaxxC && (!m.handtraps || m.handtraps.indexOf('gotMaxxc') < 0)) {
+            if (!m.handtraps) m.handtraps = [];
+            m.handtraps.push('gotMaxxc');
+            m.gotMaxxc = true;
+            fixed = true;
+          }
+        });
+        if (fixed) saveData();
       }
       // 从 v2 迁移到 v3
       if (data.version === 2) {
@@ -261,7 +275,7 @@ function getMatchHandtraps(match) {
   }
   // 旧数据回退
   const result = [];
-  if (match.gotMaxxc) result.push('gotMaxxc');
+  if (match.gotMaxxc || match.gotMaxxC) result.push('gotMaxxc');
   if (match.gotDroll) result.push('gotDroll');
   if (match.gotJellyfish) result.push('gotJellyfish');
   if (match.gotLancea) result.push('gotLancea');
@@ -1092,6 +1106,7 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   var activePresetIds = {};
   (ht.presets || []).forEach(function(p) { activePresetIds[p.id] = true; });
   function noteIfDeleted(id) { return activePresetIds[id] ? '' : ' ⚠️（预设已删除，数据归入其他手坑）'; }
+  md += `| 增殖的G | ${ht.gotMaxxc} | ${ht.maxxcRate}%${noteIfDeleted('gotMaxxc')}\n`;
   md += `| 鸟G | ${ht.gotDroll} | -${noteIfDeleted('gotDroll')}\n`;
   md += `| 水母G | ${ht.gotJellyfish} | -${noteIfDeleted('gotJellyfish')}\n`;
   md += `| 锁鸟 | ${ht.gotLancea} | -${noteIfDeleted('gotLancea')}\n`;
