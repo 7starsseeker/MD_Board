@@ -1460,10 +1460,11 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   md += '| 陨石 | `gotNibiru` |\n';
   md += '| 大宇宙人/次元系 | `gotDimension` |\n';
   md += '| 其他手坑 | `gotSmallHT` / `_other` |\n';
-  md += '| 卡废件（cantPlayGarnet） | — |\n';
-  const presets = data.handtrapPresets || [];
-  if (presets.length > 0) {
-    presets.forEach(p => {
+  const BASE_HT_IDS = ['gotMaxxc','gotDroll','gotJellyfish','gotLancea','gotNibiru','gotDimension','gotSmallHT','_other'];
+  const customPresets = (data.handtrapPresets || []).filter(p => !BASE_HT_IDS.includes(p.id));
+  if (customPresets.length > 0) {
+    md += '| 以下为自定义手坑预设 | |\n';
+    customPresets.forEach(p => {
       md += `| ${p.label} | \`${p.id}\` |\n`;
     });
   }
