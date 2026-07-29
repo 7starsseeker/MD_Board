@@ -1119,18 +1119,18 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   md += `| 类型 | 次数 | 占比 |\n| --- | --- | --- |\n`;
   md += `| 卡手合计 | ${hs.totalCantPlay} | ${hs.cantPlayRate}% |\n`;
   md += `| 动不了 | ${hs.cantPlay} | -\n`;
-  md += `| 卡组件 | ${hs.cantPlayGarnet} | -\n`;
-  md += `| 卡复数 | ${hs.cantPlayDuplicate} | -\n`;
-  md += `| 卡手坑 | ${hs.cantPlayHT} | -\n`;
+  md += `| 卡废件 | ${hs.cantPlayGarnet} | -\n`;
+  md += `| 卡同名牌 | ${hs.cantPlayDuplicate} | -\n`;
+  md += `| 卡后手牌 | ${hs.cantPlayHT} | -\n`;
   md += `| 互卡 | ${hs.bothStuck} | ${hs.bothStuckRate}% |\n`;
 
   // 先后手卡手
   md += '\n**先后手卡手**:\n\n';
   md += `| 项目 | 先手 | 后手 |\n| --- | --- | --- |\n`;
   md += `| 动不了 | ${hs.byFirst.cantPlay} | ${hs.bySecond.cantPlay} |\n`;
-  md += `| 卡组件 | ${hs.byFirst.cantPlayGarnet} | ${hs.bySecond.cantPlayGarnet} |\n`;
-  md += `| 卡复数 | ${hs.byFirst.cantPlayDuplicate} | ${hs.bySecond.cantPlayDuplicate} |\n`;
-  md += `| 卡手坑 | ${hs.byFirst.cantPlayHT} | ${hs.bySecond.cantPlayHT} |\n`;
+  md += `| 卡废件 | ${hs.byFirst.cantPlayGarnet} | ${hs.bySecond.cantPlayGarnet} |\n`;
+  md += `| 卡同名牌 | ${hs.byFirst.cantPlayDuplicate} | ${hs.bySecond.cantPlayDuplicate} |\n`;
+  md += `| 卡后手牌 | ${hs.byFirst.cantPlayHT} | ${hs.bySecond.cantPlayHT} |\n`;
   md += `| 互卡 | ${hs.byFirst.bothStuck} | ${hs.bySecond.bothStuck} |\n`;
 
   md += '> **算法**: 各类型卡手标记位统计; 卡手率 = 任一类卡手对局数/总对局*100%。byDeck 按自用卡组分组\n\n';
@@ -1385,9 +1385,9 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
       var htStr = (function(){ var hts = getMatchHandtraps(m); return hts.length > 0 ? hts.map(function(h) { return h.replace('got', ''); }).join(',') : '—'; })();
       var cantPlayDetail = [];
       if (m.cantPlay) cantPlayDetail.push('动不了');
-      if (m.cantPlayGarnet) cantPlayDetail.push('卡组件');
-      if (m.cantPlayDuplicate) cantPlayDetail.push('卡复数');
-      if (m.cantPlayHT) cantPlayDetail.push('卡手坑');
+      if (m.cantPlayGarnet) cantPlayDetail.push('卡废件');
+      if (m.cantPlayDuplicate) cantPlayDetail.push('卡同名牌');
+      if (m.cantPlayHT) cantPlayDetail.push('卡后手牌');
       if (m.bothStuck) cantPlayDetail.push('互卡');
       var cantPlay = cantPlayDetail.length > 0 ? cantPlayDetail.join('/') : '—';
       var mistake = m.mistake ? 'Y' : '—';
@@ -1427,7 +1427,7 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   md += '| 自用卡组 | 自己使用的卡组 | 🃏 自用卡组统计 | 自由文本 |\n';
   md += '| 对手卡组 | 对手使用的卡组 | 🎴 对手卡组统计 · ⚔️ 对位交叉 | 自由文本 |\n';
   md += '| 手坑 | 吃到的手坑列表 | 🛡️ 吃手坑统计 | 手坑 ID 列表, 逗号分隔 |\n';
-  md += '| 卡手 | 是否卡手 | 🃏 手牌与卡手统计 | Y=卡手 / —=正常; 细分: cantPlay/动不了, cantPlayGarnet/卡组件, cantPlayDuplicate/卡复数, cantPlayHT/卡手坑, bothStuck/互卡 |\n';
+  md += '| 卡手 | 是否卡手 | 🃏 手牌与卡手统计 | Y=卡手 / —=正常; 细分: cantPlay/动不了, cantPlayGarnet/卡废件, cantPlayDuplicate/卡同名牌, cantPlayHT/卡后手牌, bothStuck/互卡 |\n';
   md += '| 失误 | 是否出现严重失误 | 💢 严重失误统计 | Y=有 / —=无 |\n';
   md += '| 终场/突破 | 先手终场或后手突破 | 🏗️ 先手终场 · 🔨 后手突破 | 先手: normal/compromised/stopped/surrender; 后手: true/false/surrender/not_applicable |\n';
   md += '| 备注 | 附加说明 | — | 自由文本 |\n';
@@ -1457,9 +1457,15 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   md += '| 陨石 | `gotNibiru` |\n';
   md += '| 大宇宙人/次元系 | `gotDimension` |\n';
   md += '| 其他手坑 | `gotSmallHT` / `_other` |\n';
-  md += '| 卡组件（cantPlayGarnet） | — |\n';
+  md += '| 卡废件（cantPlayGarnet） | — |\n';
   md += '| 以下为预设明细（所有当前条目，标签与统计面板一致） | 依实际预设 |\n\n';
   md += '> 基础字段为硬编码输出，预设仅补充非基础自定义手坑。若对应预设已被删除，行末有⚠️标注，该数据归入其他手坑。\n\n';
+  md += '**卡手类型说明**：\n';
+  md += '- **动不了**：关键组件全无，完全无法展开\n';
+  md += '- **卡废件**：不希望开局被自然抽到的牌，应由卡组效果调度，抽到后难以处理\n';
+  md += '- **卡同名牌**：上手多张同名牌，同名卡一回合通常只能用一次，多张即纯卡手\n';
+  md += '- **卡后手牌**：先手时上手多张只有后手才有用的牌（如手坑、解场牌等）\n';
+  md += '- **互卡**：双方都出现卡手情况\n\n';
   md += '### 2. 分析方法\n\n';
   md += '**投币公平性**：用 Z 检验（|观察-预期|/标准误），分数≤20 正常 / ≤50 ⚠️ 偏高 / ≤75 🔴 严重 / >75 🔥 极端。\n\n';
   md += '**连胜/连败补偿**：按对局顺序扫描连续胜负，统计 ≥4 连胜/连败后的下一局胜率、卡手率、投币正率。\n\n';
