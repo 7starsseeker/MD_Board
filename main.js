@@ -1259,18 +1259,20 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
 
   if (stats.typhon && stats.typhon.total > 0) {
     const t = stats.typhon;
+    const black = t.enemyBlack + t.selfBlack;
+    const white = t.enemyWhite + t.selfWhite;
+    const blackRate = (black / (black + white) * 100).toFixed(1);
     md += `**提丰登场**: ${t.total} 次\n`;
-    md += `- 对手出提丰输了: ${t.enemyBlack} 次\n`;
-    md += `- 对手出提丰赢了: ${t.enemyWhite} 次\n`;
-    md += `- 自己出提丰输了: ${t.selfBlack} 次\n`;
-    md += `- 自己出提丰赢了: ${t.selfWhite} 次\n\n`;
+    md += `- 🖤 提丰黑子（出提丰且输）: ${black} 次（${blackRate}%）\n`;
+    md += `- 🤍 提丰白子（出提丰且赢）: ${white} 次\n`;
+    md += `- 明细：对手出提丰输了 ${t.enemyBlack} · 对手出提丰赢了 ${t.enemyWhite} · 自己出提丰输了 ${t.selfBlack} · 自己出提丰赢了 ${t.selfWhite}\n\n`;
   }
 
   if (stats.deckOut && stats.deckOut.total > 0) {
     const d = stats.deckOut;
     md += `**抽干牌组**: ${d.total} 次（自己 ${d.self} / 对手 ${d.opponent}）\n\n`;
   }
-  md += '> **算法**: 大牌=opponentBigHand; 提丰=typhonAppeared; 抽干=deckOut。分别统计次数, 提丰+抽干区分己方/对方\n\n';
+  md += '> **算法**: 大牌=opponentBigHand; 提丰=typhonAppeared; 抽干=deckOut。分别统计次数, 提丰+抽干区分己方/对方\n';
 
   // ── 自用卡组统计 ──
   if (stats.myDeckStats && stats.myDeckStats.length > 0) {
@@ -1437,7 +1439,7 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   md += '| 对手T0 | 对手在自己先攻回合发动了效果（手坑/特殊召唤等） | ⚡ 对手 T0 动统计 | boolean |\n';
   md += '| 掉线 | 是否有人掉线 | 📡 连接状态 | boolean; 区分 self/opponent |\n';
   md += '| 超时 | 是否有人超时 | 📡 连接状态 | boolean; 区分 self/opponent |\n';
-  md += '| 提丰登场 | 是否有人召唤提丰 | 🃏 其他统计 | boolean; 区分 self/opponent |\n';
+  md += '| 提丰登场 | 是否有人召唤提丰——黑子=出提丰且输，白子=出提丰且赢 | 🃏 其他统计 | boolean; 区分 self/opponent |\n';
   md += '| 抽干牌组 | 是否有人牌组抽空 | 🃏 其他统计 | boolean; 区分 self/opponent |\n';
   md += '\n';
 
@@ -1500,6 +1502,11 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   md += '**吃手坑影响**：计算各手坑出现时的胜率与全局均值对比。注意"G系列任一"（gotAnyG）= 增殖的G/鸟G/水母G 任一种，按场次计不累加。\n';
   md += '基础字段为硬编码输出，预设仅补充非基础的自定义手坑。若某字段对应预设已被删除，行末会标注⚠️，该数据在面板中归入"其他手坑"。\n\n';
   md += '**对手强度分析**：连胜/连败后对手段位变化趋势；晋级赛/保级赛中对手段位分布 vs 普通对局；连败后对手卡组克制倾向\n\n';
+  md += '**提丰数据分析**：提丰统计源于社区"提丰黑子"梗——玩家在对局不利或即将落败时召唤提丰整活，通常无助于提升胜率。\n';
+  md += '- 提丰黑子 = 出提丰且该局输了的人（对手出提丰输 = enemyBlack，自己出提丰输 = selfBlack）\n';
+  md += '- 提丰白子 = 出提丰且该局赢了的人（对手出提丰赢 = enemyWhite，自己出提丰赢 = selfWhite）\n';
+  md += '- 分析时应关注：提丰黑子比例（被黑次数/总登场次数）是否显著偏高，若黑子远多于白子则佐证"提丰是败局整活"的社区共识\n';
+  md += '- 对比自己 vs 对手的提丰黑子率，判断自己是白子多还是黑子多（黑子率低=自己更可能只是赢爽了随手拉个提丰）\n\n';
   md += '---\n';
   md += '**第二部分：系统公平性评估（对应第⑨章）**\n\n';
   md += '在前述数据特征分析的基础上，评估游戏王 MD 的系统机制是否在对战公平各维度产生干预。从以下维度分析，每个维度给出评级（🟢 无证据 / 🟡 中度嫌疑 / 🔴 高度嫌疑）：\n';
