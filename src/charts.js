@@ -1739,7 +1739,7 @@ function renderMatchupChart(canvas, stats, options) {
       var subWins = items.reduce(function(s, m) { return s + m.wins; }, 0);
       var subLosses = items.reduce(function(s, m) { return s + m.losses; }, 0);
       var subRate = (subWins + subLosses) > 0 ? (subWins / (subWins + subLosses) * 100).toFixed(1) : '0.0';
-      ihtml += '<div style="margin-top:3px;font-weight:700;font-size:10px;color:var(--accent)">' + myDeck + ' (' + subTotal + '·' + subRate + '%)</div>';
+      ihtml += '<div style="margin-top:3px;font-weight:700;font-size:10px;color:var(--accent)">' + escapeHtml(myDeck) + ' (' + subTotal + '·' + subRate + '%)</div>';
       items.forEach(function(m) {
         var wr = (m.wins + m.losses) > 0 ? (m.wins / (m.wins + m.losses) * 100).toFixed(1) : '0.0';
         ihtml += infoRow(m.opponentDeck, m.wins + 'W ' + m.losses + 'L ' + wr + '%');
@@ -1774,7 +1774,7 @@ function renderRankedStats(canvas, stats, options) {
     htPresets.forEach(function(p) {
       if (!visibleSet[p.id]) return;
       var cnt = htCounts[p.id] || 0;
-      htSummaryParts.push(p.label + ' ' + cnt);
+      htSummaryParts.push(escapeHtml(p.label) + ' ' + cnt);
     });
     var otherCnt = htCounts['_other'] || 0;
     if (otherCnt > 0) htSummaryParts.push('其他 ' + otherCnt);

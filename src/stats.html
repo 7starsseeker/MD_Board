@@ -736,7 +736,7 @@
           var cnt = counts[id] || 0;
           var rate = t > 0 ? (cnt / t * 100).toFixed(1) : '0.0';
           var barW = parseFloat(rate);
-          largeHtml += '<div class="stat-row"><span class="label" style="font-size:14px;font-weight:700">' + p.label + '</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill purple" style="width:' + barW + '%"></div></div><span class="value" style="font-size:15px;font-weight:800">' + cnt + '<span style="font-size:11px;font-weight:400;color:var(--text-dim)"> (' + rate + '%)</span></span></div></div>';
+          largeHtml += '<div class="stat-row"><span class="label" style="font-size:14px;font-weight:700">' + escapeHtml(p.label) + '</span><div class="bar-wrap"><div class="bar-track"><div class="bar-fill purple" style="width:' + barW + '%"></div></div><span class="value" style="font-size:15px;font-weight:800">' + cnt + '<span style="font-size:11px;font-weight:400;color:var(--text-dim)"> (' + rate + '%)</span></span></div></div>';
         });
 
         // compact 区（一行小字）
@@ -745,7 +745,7 @@
           var p = presets.find(function(x) { return x.id === id; });
           if (!p) return;
           var cnt = counts[id] || 0;
-          compactParts.push(p.label + ' ' + cnt);
+          compactParts.push(escapeHtml(p.label) + ' ' + cnt);
         });
         var compactHtml = compactParts.length > 0 ? '<div style="margin-top:4px;padding:2px 0;font-size:12px;color:var(--text-dim);border-top:1px solid var(--border)">' + compactParts.join(' · ') + '</div>' : '';
 
@@ -1485,7 +1485,7 @@
           htPresets.forEach(function(p) {
             if (!visibleSet[p.id]) { otherTotal += (htCounts[p.id] || 0); return; }
             var cnt = htCounts[p.id] || 0;
-            htSection += '<div class="stat-row"><span class="label">' + p.label + '</span><span class="value">' + cnt + ' 次</span></div>';
+            htSection += '<div class="stat-row"><span class="label">' + escapeHtml(p.label) + '</span><span class="value">' + cnt + ' 次</span></div>';
           });
           htSection += '<div class="stat-row"><span class="label">其他手坑</span><span class="value">' + otherTotal + ' 次</span></div>';
           h += htSection;

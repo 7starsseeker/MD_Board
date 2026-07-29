@@ -365,7 +365,7 @@
           var p = presets.find(function(x) { return x.id === id; });
           if (!p) return;
           var cnt = counts[id] || 0;
-          otherParts.push(p.label + ' ' + cnt);
+          otherParts.push(escapeHtml(p.label) + ' ' + cnt);
         });
         var otherTotal = counts['_other'] || 0;
         presets.forEach(function(p) {
