@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('mdStats', {
   addMatch: (matchData) => ipcRenderer.invoke('stats:add-match', matchData),
   updateMatch: (id, updates) => ipcRenderer.invoke('stats:update-match', { id, updates }),
   deleteMatch: (id) => ipcRenderer.invoke('stats:delete-match', id),
+  openEditMatch: (id) => ipcRenderer.invoke('edit-match:open', id),
   resetMatches: () => ipcRenderer.invoke('stats:reset-matches'),
   openStatsWindow: () => ipcRenderer.invoke('stats:open-window'),
   openChartWindow: () => ipcRenderer.invoke('chart:open-window'),
@@ -17,6 +18,10 @@ contextBridge.exposeInMainWorld('mdStats', {
   exportJSON: () => ipcRenderer.invoke('stats:export-json'),
   importJSON: (jsonStr) => ipcRenderer.invoke('stats:import-json', jsonStr),
   exportMD: (params) => ipcRenderer.invoke('stats:export-md', params),
+
+  // ── 数据目录位置 ──
+  getDataDir: () => ipcRenderer.invoke('stats:get-data-dir'),
+  setDataDir: (location) => ipcRenderer.invoke('stats:set-data-dir', location),
 
   // ── 实时通知 ──
   onStatsUpdate: (callback) => {

@@ -10,25 +10,88 @@ function escapeHtml(str) {
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-/** 清洗单条对局数据中的字符串字段 */
+/** 对局字段白名单 — 防止通过导入/更新注入未知字段 */
+const MATCH_FIELDS = new Set([
+  'result','goingFirst','coinToss','matchType','myDeck','opponentDeck',
+  'opponentBigHand','handtraps','gotMaxxc','gotDroll','gotJellyfish','gotLancea','gotNibiru','gotDimension','gotSmallHT',
+  'mistake','opponentRan','opponentT0','disconnect','disconnectWho','timeout','timeoutWho',
+  'cantPlay','cantPlayGarnet','cantPlayDuplicate','cantPlayHT','bothStuck',
+  'firstMover','moverWho','surrenderWho','typhonAppeared','typhonWho','deckOut','deckOutWho',
+  'endboardState','brokeBoard','otk','endboardInteraction'
+]);
+
+/** 字符串字段及最大长度 */
+const STRING_FIELDS = {
+  opponentDeck: 100, myDeck: 100, timestamp: 40,
+  disconnectWho: 10, timeoutWho: 10, firstMover: 10, moverWho: 10,
+  surrenderWho: 10, typhonWho: 10, deckOutWho: 10, endboardState: 20,
+  endboardInteraction: 10, matchType: 10
+};
+
+/** 布尔字段 */
+const BOOL_FIELDS = ['goingFirst','coinToss','opponentBigHand','gotMaxxc','gotDroll','gotJellyfish','gotLancea','gotNibiru','gotDimension','gotSmallHT','mistake','opponentRan','opponentT0','disconnect','timeout','cantPlay','cantPlayGarnet','cantPlayDuplicate','cantPlayHT','bothStuck','typhonAppeared','deckOut','otk'];
+
+const ALLOWED_RESULTS = ['win', 'loss', 'draw', 'abnormal'];
+const ALLOWED_BROKE_BOARD = [true, false, 'true', 'false', 'surrender', 'not_applicable'];
+
+/** 清洗单条对局数据：白名单字段 + 类型/长度校验 */
 function sanitizeMatchData(m) {
-  const MAX_DECK_LEN = 100;
-  const MAX_NOTES_LEN = 500;
-  const allowedResults = ['win', 'loss', 'draw', 'abnormal'];
-  const safe = { ...m };
-  if (typeof safe.opponentDeck === 'string') safe.opponentDeck = safe.opponentDeck.slice(0, MAX_DECK_LEN);
-  if (typeof safe.myDeck === 'string') safe.myDeck = safe.myDeck.slice(0, MAX_DECK_LEN);
-  if (typeof safe.notes === 'string') safe.notes = safe.notes.slice(0, MAX_NOTES_LEN);
-  if (safe.result && !allowedResults.includes(safe.result)) safe.result = 'abnormal';
-  if (safe.handtraps && !Array.isArray(safe.handtraps)) safe.handtraps = [];
+  if (!m || typeof m !== 'object' || Array.isArray(m)) return {};
+  const safe = {};
+  for (const f of MATCH_FIELDS) {
+    if (m[f] === undefined || m[f] === null) continue;
+    safe[f] = m[f];
+  }
+  for (const [f, max] of Object.entries(STRING_FIELDS)) {
+    if (safe[f] !== undefined) safe[f] = String(safe[f]).slice(0, max);
+  }
+  for (const f of BOOL_FIELDS) {
+    if (safe[f] === undefined) continue;
+    safe[f] = !!safe[f];
+  }
+  if (safe.result && !ALLOWED_RESULTS.includes(safe.result)) safe.result = 'abnormal';
+  if (safe.handtraps !== undefined) {
+    if (!Array.isArray(safe.handtraps)) safe.handtraps = [];
+    else safe.handtraps = safe.handtraps.filter(x => typeof x === 'string').slice(0, 20);
+  }
+  if (safe.brokeBoard !== undefined && !ALLOWED_BROKE_BOARD.includes(safe.brokeBoard)) safe.brokeBoard = null;
   return safe;
 }
 
 // ── 数据管理 ──────────────────────────────────────────────────────────────
 
-/** 数据目录（系统临时目录） */
+/** 数据目录位置配置（存 userData 固定位置，不随数据目录变化） */
+const DATA_DIR_CONFIG_FILE = () => path.join(app.getPath('userData'), 'data-dir.json');
+const DATA_DIR_LOCATIONS = ['temp', 'userData', 'exe'];
+
+/** 读取数据目录配置：'temp' | 'userData' | 'exe'，默认 'userData' */
+function getDataDirLocation() {
+  try {
+    if (fs.existsSync(DATA_DIR_CONFIG_FILE())) {
+      const loc = JSON.parse(fs.readFileSync(DATA_DIR_CONFIG_FILE(), 'utf-8')).location;
+      if (DATA_DIR_LOCATIONS.includes(loc)) return loc;
+    }
+  } catch (e) { /* ignore */ }
+  return 'userData';
+}
+
+/** 数据目录具体路径 */
+function getDataDirPath(loc) {
+  const base = loc === 'temp' ? app.getPath('temp')
+    : loc === 'exe' ? path.dirname(app.getPath('exe'))
+    : app.getPath('userData');
+  return path.join(base, 'md-stats-data');
+}
+
+/** 数据目录：按配置定位；目标位置无数据但旧 %TEMP% 有残留时回退读取，避免数据丢失 */
 function getRuntimeDir() {
-  return path.join(app.getPath('temp'), 'md-stats-data');
+  const dir = getDataDirPath(getDataDirLocation());
+  try {
+    if (fs.existsSync(path.join(dir, 'stats.json'))) return dir;
+    const oldDir = path.join(app.getPath('temp'), 'md-stats-data');
+    if (getDataDirLocation() !== 'temp' && fs.existsSync(path.join(oldDir, 'stats.json'))) return oldDir;
+  } catch (e) { /* ignore */ }
+  return dir;
 }
 
 const RUNTIME_DATA = () => path.join(getRuntimeDir(), 'stats.json');
@@ -83,34 +146,43 @@ function selfDecrypt(buffer) {
   return d2.update(encData) + d2.final('utf-8');
 }
 
-/** 兼容旧版：从密钥文件读取（迁移用） */
-function readLegacyKey() {
-  try {
-    const keyFile = path.join(app.getPath('userData'), '.md-stats-key');
-    if (fs.existsSync(keyFile)) return fs.readFileSync(keyFile);
-  } catch (e) { /* ignore */ }
-  return null;
-}
-
-/** AES-256-GCM 解密（旧版密钥文件格式） */
-function legacyDecrypt(encrypted, key) {
-  if (!key) return encrypted.toString('utf-8');
-  const iv = encrypted.slice(0, 16);
-  const tag = encrypted.slice(16, 32);
-  const ciphertext = encrypted.slice(32);
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(tag);
-  return decipher.update(ciphertext) + decipher.final('utf-8');
-}
-
 let data = { matches: [], version: 4, deckPresets: [], myDeckPresets: [], handtrapPresets: [], handtrapConfig: { largeIds: [], compactIds: [] }, cycleConfig: null, timeRange: 'all', selectedDate: null, customStart: null, customEnd: null };
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
-/** 加载数据：三级回退链 — 自包含解密 → 旧密钥文件 → 明文 */
+/** 复制数据文件（加密文件直接复制，无需解密） */
+function copyDataFiles(srcDir, dstDir) {
+  ensureDir(dstDir);
+  for (const f of ['stats.json', 'window-state.json', '.tip-dismissed']) {
+    const src = path.join(srcDir, f);
+    if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dstDir, f));
+  }
+}
+
+/** 一次性迁移：首次启动将 %TEMP% 旧数据复制到配置目标目录并删除旧目录 */
+function migrateDataDir() {
+  const newDir = getDataDirPath(getDataDirLocation());
+  const oldDir = path.join(app.getPath('temp'), 'md-stats-data');
+  try {
+    // 目标位置无数据且旧位置有 → 复制
+    if (!fs.existsSync(path.join(newDir, 'stats.json')) && fs.existsSync(path.join(oldDir, 'stats.json'))) {
+      copyDataFiles(oldDir, newDir);
+    }
+    // 目标位置已有数据（迁移完成或原本就在）→ 删除旧目录
+    if (fs.existsSync(path.join(newDir, 'stats.json')) && oldDir !== newDir) {
+      fs.rmSync(oldDir, { recursive: true, force: true });
+    }
+  } catch (e) {
+    // 迁移失败不阻塞启动：getRuntimeDir 会回退到旧位置继续读旧数据
+    console.error('数据目录迁移失败（将继续使用旧位置）:', e.message);
+  }
+}
+
+/** 加载数据：自包含解密 → 明文（回退） */
 function loadData() {
+  migrateDataDir(); // 一次性迁移旧 %TEMP% 数据到 userData
   const runtimeDir = getRuntimeDir();
   ensureDir(runtimeDir);
 
@@ -124,22 +196,11 @@ function loadData() {
         const plaintext = selfDecrypt(buffer);
         parsed = JSON.parse(plaintext);
       } catch (e1) {
-        // 2) 旧密钥文件解密（兼容迁移）
+        // 2) 明文读取（最旧的未加密格式）
         try {
-          const legacyKey = readLegacyKey();
-          if (legacyKey) {
-            const plaintext = legacyDecrypt(buffer, legacyKey);
-            parsed = JSON.parse(plaintext);
-          } else {
-            throw new Error('no legacy key');
-          }
-        } catch (e2) {
-          // 3) 明文读取（最旧的未加密格式）
-          try {
-            parsed = JSON.parse(buffer.toString('utf-8'));
-          } catch (e3) {
-            throw new Error('数据文件损坏，无法解析');
-          }
+          parsed = JSON.parse(buffer.toString('utf-8'));
+        } catch (e3) {
+          throw new Error('数据文件损坏，无法解析');
         }
       }
       data = parsed || data;
@@ -206,6 +267,16 @@ function loadData() {
         data.cycleConfig = getDefaultCycleConfig();
         saveData();
       }
+      // 数据自愈：补齐缺失的 id/timestamp（防止历史损坏数据导致列表 NaN/无法编辑）
+      if (data.matches) {
+        var healed = false;
+        data.matches.forEach(function(m) {
+          if (!m || typeof m !== 'object') return;
+          if (!m.id) { m.id = crypto.randomUUID(); healed = true; }
+          if (!m.timestamp) { m.timestamp = new Date().toISOString(); healed = true; }
+        });
+        if (healed) saveData();
+      }
     }
   } catch (e) {
     console.error('读取数据文件失败:', e.message);
@@ -217,7 +288,7 @@ function saveData() {
     const plaintext = JSON.stringify(data, null, 2);
     const encrypted = selfEncrypt(plaintext);
     ensureDir(getRuntimeDir());
-    fs.writeFileSync(RUNTIME_DATA(), encrypted);
+    fs.writeFileSync(RUNTIME_DATA(), encrypted, { mode: 0o600 });
   } catch (e) {
     console.error('保存数据文件失败:', e.message);
   }
@@ -791,7 +862,7 @@ function loadWindowState() {
 
 function saveWindowState(state) {
   try {
-    fs.writeFileSync(WINDOW_STATE_FILE, JSON.stringify(state), 'utf-8');
+    fs.writeFileSync(WINDOW_STATE_FILE, JSON.stringify(state), { encoding: 'utf-8', mode: 0o600 });
   } catch (e) {}
 }
 
@@ -811,7 +882,8 @@ function createDisplayWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true
     }
   });
 
@@ -866,7 +938,8 @@ function createControlWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true
     }
   });
 
@@ -921,13 +994,40 @@ ipcMain.handle('stats:open-window', () => {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true
     }
   });
 
   statsWin.loadFile(path.join(__dirname, 'src', 'stats.html'));
 
   statsWin.on('closed', () => { statsWin = null; });
+});
+
+// ── 对局编辑窗口 ─────────────────────────────────────────────────────
+let editWin = null;
+
+ipcMain.handle('edit-match:open', (event, id) => {
+  if (typeof id !== 'string' || !id) return;
+  if (editWin && !editWin.isDestroyed()) {
+    editWin.focus();
+    return;
+  }
+  editWin = new BrowserWindow({
+    width: 700,
+    height: 800,
+    frame: false,
+    resizable: true,
+    title: 'MD Stats - 编辑对局',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+  editWin.loadFile(path.join(__dirname, 'src', 'control.html'), { query: { edit: id } });
+  editWin.on('closed', () => { editWin = null; });
 });
 
 // ── 独立图表窗口 ─────────────────────────────────────────────────────────
@@ -950,7 +1050,8 @@ ipcMain.handle('chart:open-window', () => {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true
     }
   });
 
@@ -1002,9 +1103,20 @@ ipcMain.handle('stats:add-match', (event, matchData) => {
 });
 
 ipcMain.handle('stats:update-match', (event, { id, updates }) => {
+  if (typeof id !== 'string' || !updates || typeof updates !== 'object' || Array.isArray(updates)) {
+    return { success: false, error: '无效参数' };
+  }
   const idx = data.matches.findIndex(m => m.id === id);
   if (idx === -1) return { success: false, error: '未找到该对局' };
-  data.matches[idx] = { ...data.matches[idx], ...updates };
+  // 白名单：仅允许更新已知字段，禁止篡改 id/timestamp
+  const clean = {};
+  for (const k of Object.keys(updates)) {
+    if (MATCH_FIELDS.has(k)) clean[k] = updates[k];
+  }
+  if (Object.keys(clean).length === 0) return { success: false, error: '没有可更新的字段' };
+  // 补回系统字段(id/timestamp 不在白名单,sanitize 会丢弃,需显式保留)
+  const original = data.matches[idx];
+  data.matches[idx] = { ...sanitizeMatchData({ ...original, ...clean }), id: original.id, timestamp: original.timestamp };
   saveData();
   notifyWindows();
   return { success: true };
@@ -1388,8 +1500,8 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   md += '## 📋 对局明细\n\n';
   if (matches.length > 0) {
     md += `共 ${matches.length} 场对局\n\n`;
-    md += `| # | 时间 | 结果 | 先后手 | 硬币 | 自用卡组 | 对手卡组 | 手坑 | 卡手 | 失误 | 类型 | 对手 | 状态 | 其他 | 终场/突破 | 备注 |\n`;
-    md += `| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n`;
+    md += `| # | 时间 | 结果 | 先后手 | 硬币 | 自用卡组 | 对手卡组 | 手坑 | 卡手 | 失误 | 类型 | 对手 | 状态 | 其他 | 终场/突破 |\n`;
+    md += `| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n`;
     var maxRows = matches.length;
     for (var i = matches.length - maxRows; i < matches.length; i++) {
       var m = matches[i];
@@ -1423,8 +1535,7 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
       if (m.deckOut) otherFlags.push((m.deckOutWho === 'self' ? '己' : '对') + '抽干');
       var otherStr = otherFlags.length > 0 ? otherFlags.join('/') : '—';
       var endBrk = m.goingFirst ? (m.endboardState || '—') : (m.brokeBoard || '—');
-      var notes = (m.notes || '').substring(0, 30).replace(/\|/g, '\\|');
-      md += `| ${i + 1} | ${ts} | ${res} | ${gf} | ${coin} | ${myD} | ${opD} | ${htStr} | ${cantPlay} | ${mistake} | ${matchType} | ${oppStr} | ${connStr} | ${otherStr} | ${endBrk} | ${notes} |\n`;
+      md += `| ${i + 1} | ${ts} | ${res} | ${gf} | ${coin} | ${myD} | ${opD} | ${htStr} | ${cantPlay} | ${mistake} | ${matchType} | ${oppStr} | ${connStr} | ${otherStr} | ${endBrk} |\n`;
     }
     md += '\n';
   } else {
@@ -1447,7 +1558,6 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   md += '| 卡手 | 是否卡手 | 🃏 手牌与卡手统计 | Y=卡手 / —=正常; 细分: cantPlay/动不了, cantPlayGarnet/卡废件, cantPlayDuplicate/卡同名牌, cantPlayHT/卡后手牌, bothStuck/互卡 |\n';
   md += '| 失误 | 是否出现严重失误 | 💢 严重失误统计 | Y=有 / —=无 |\n';
   md += '| 终场/突破 | 先手终场或后手突破 | 🏗️ 先手终场 · 🔨 后手突破 | 先手: normal/compromised/stopped/surrender; 后手: true/false/surrender/not_applicable |\n';
-  md += '| 备注 | 附加说明 | — | 自由文本 |\n';
   md += '| 晋级/保级 | 是否为晋级/保级赛 | 🏆 晋级/保级赛 | promotion=晋级赛 / relegation=保级赛 |\n';
   md += '| 对手大牌 | 对手手牌质量极佳 | 🃏 其他统计 | boolean |\n';
   md += '| 吓跑对手 | 对手提前投降 | 🏃 吓跑对手统计 | boolean |\n';
@@ -1610,6 +1720,11 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
 
 ipcMain.handle('stats:import-json', (event, jsonStr) => {
   try {
+    if (typeof jsonStr !== 'string') return { success: false, error: '无效的数据格式' };
+    const MAX_JSON_SIZE = 5 * 1024 * 1024;
+    if (jsonStr.length > MAX_JSON_SIZE) {
+      return { success: false, error: '数据文件过大（最大 5MB）' };
+    }
     const parsed = JSON.parse(jsonStr);
     if (!parsed.matches || !Array.isArray(parsed.matches)) {
       return { success: false, error: '无效的数据格式' };
@@ -1618,13 +1733,48 @@ ipcMain.handle('stats:import-json', (event, jsonStr) => {
     if (parsed.matches.length > MAX_MATCHES) {
       return { success: false, error: '数据量过大（最多 ' + MAX_MATCHES + ' 条）' };
     }
-    // 只覆盖对局数据，保留预设等配置
-    data.matches = parsed.matches.map(sanitizeMatchData);
+    // 只覆盖对局数据，保留预设等配置；重写 id 防止恶意 id 注入，保留原始 timestamp
+    data.matches = parsed.matches.map(m => {
+      const cleaned = sanitizeMatchData(m);
+      cleaned.id = crypto.randomUUID();
+      if (typeof m.timestamp === 'string' && m.timestamp) cleaned.timestamp = m.timestamp.slice(0, 40);
+      return cleaned;
+    });
     saveData();
     notifyWindows();
     return { success: true };
   } catch (e) {
     return { success: false, error: 'JSON 解析失败' };
+  }
+});
+
+ipcMain.handle('stats:get-data-dir', () => {
+  const location = getDataDirLocation();
+  return { location, path: getRuntimeDir(), defaultPath: getDataDirPath(location) };
+});
+
+ipcMain.handle('stats:set-data-dir', (event, location) => {
+  if (!DATA_DIR_LOCATIONS.includes(location)) {
+    return { success: false, error: '无效的位置' };
+  }
+  const oldDir = getRuntimeDir();
+  const newDir = getDataDirPath(location);
+  if (oldDir === newDir) {
+    return { success: true, moved: false, location, path: newDir };
+  }
+  try {
+    saveData(); // 确保内存数据已写入当前目录
+    copyDataFiles(oldDir, newDir); // 复制数据到新位置
+    fs.writeFileSync(DATA_DIR_CONFIG_FILE(), JSON.stringify({ location }), { encoding: 'utf-8', mode: 0o600 });
+    // 复制成功且新位置已有数据 → 删除旧目录
+    if (fs.existsSync(path.join(newDir, 'stats.json'))) {
+      fs.rmSync(oldDir, { recursive: true, force: true });
+    }
+    saveData(); // 写入新位置
+    notifyWindows();
+    return { success: true, moved: true, location, path: getRuntimeDir() };
+  } catch (e) {
+    return { success: false, error: '切换失败: ' + e.message };
   }
 });
 
@@ -1643,7 +1793,7 @@ ipcMain.handle('shell:open-external', (event, url) => {
     if (u.protocol !== 'https:') return;
     shell.openExternal(url);
   } catch (e) {
-    console.error('拒绝打开不安全的 URL:', url);
+    console.error('已拒绝打开不安全的链接');
   }
 });
 
@@ -1656,22 +1806,30 @@ ipcMain.handle('stats:get-time-range', () => {
   return data.timeRange || 'all';
 });
 
+/** 校验日期字符串（YYYY-MM-DD 或 null） */
+function isValidDateStr(v) {
+  return v === null || v === undefined || (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v));
+}
+
 ipcMain.handle('stats:set-time-range', (event, range, selectedDate, customStart, customEnd) => {
-  if (['all', 'today', 'week', 'month', 'custom'].includes(range)) {
-    data.timeRange = range;
-    data.selectedDate = selectedDate || null;
-    if (range === 'custom') {
-      data.customStart = customStart || null;
-      data.customEnd = customEnd || null;
-    } else {
-      data.customStart = null;
-      data.customEnd = null;
-    }
-    saveData();
-    notifyWindows();
-    return { success: true };
+  if (!['all', 'today', 'week', 'month', 'custom'].includes(range)) {
+    return { success: false, error: '无效的时间范围' };
   }
-  return { success: false, error: '无效的时间范围' };
+  if (!isValidDateStr(selectedDate) || !isValidDateStr(customStart) || !isValidDateStr(customEnd)) {
+    return { success: false, error: '无效的日期格式' };
+  }
+  data.timeRange = range;
+  data.selectedDate = selectedDate || null;
+  if (range === 'custom') {
+    data.customStart = customStart || null;
+    data.customEnd = customEnd || null;
+  } else {
+    data.customStart = null;
+    data.customEnd = null;
+  }
+  saveData();
+  notifyWindows();
+  return { success: true };
 });
 
 ipcMain.handle('stats:get-available-dates', () => {
@@ -1700,7 +1858,8 @@ ipcMain.handle('presets:get-all', () => {
 });
 
 ipcMain.handle('presets:add', (event, name) => {
-  const n = (name || '').trim();
+  if (typeof name !== 'string') return { success: false, error: '无效参数' };
+  const n = name.trim();
   if (!n) return { success: false, error: '名称不能为空' };
   if (n.length > 100) return { success: false, error: '名称过长（最多100字符）' };
   if (!data.deckPresets) data.deckPresets = [];
@@ -1719,11 +1878,14 @@ ipcMain.handle('presets:delete', (event, name) => {
   return { success: true, presets: data.deckPresets };
 });
 
-ipcMain.handle('presets:rename', (event, { oldName, newName }) => {
+ipcMain.handle('presets:rename', (event, arg) => {
+  if (!arg || typeof arg !== 'object') return { success: false, error: '无效参数' };
+  const { oldName, newName } = arg;
+  if (typeof oldName !== 'string' || typeof newName !== 'string') return { success: false, error: '无效参数' };
   if (!data.deckPresets) return { success: false };
   const idx = data.deckPresets.indexOf(oldName);
   if (idx === -1) return { success: false, error: '未找到' };
-  const n = (newName || '').trim();
+  const n = newName.trim();
   if (!n) return { success: false, error: '名称不能为空' };
   if (n.length > 100) return { success: false, error: '名称过长（最多100字符）' };
   data.deckPresets[idx] = n;
@@ -1737,7 +1899,8 @@ ipcMain.handle('mydeck:get-all', () => {
 });
 
 ipcMain.handle('mydeck:add', (event, name) => {
-  const n = (name || '').trim();
+  if (typeof name !== 'string') return { success: false, error: '无效参数' };
+  const n = name.trim();
   if (!n) return { success: false, error: '名称不能为空' };
   if (n.length > 100) return { success: false, error: '名称过长（最多100字符）' };
   if (!data.myDeckPresets) data.myDeckPresets = [];
@@ -1756,11 +1919,14 @@ ipcMain.handle('mydeck:delete', (event, name) => {
   return { success: true, presets: data.myDeckPresets };
 });
 
-ipcMain.handle('mydeck:rename', (event, { oldName, newName }) => {
+ipcMain.handle('mydeck:rename', (event, arg) => {
+  if (!arg || typeof arg !== 'object') return { success: false, error: '无效参数' };
+  const { oldName, newName } = arg;
+  if (typeof oldName !== 'string' || typeof newName !== 'string') return { success: false, error: '无效参数' };
   if (!data.myDeckPresets) return { success: false };
   const idx = data.myDeckPresets.indexOf(oldName);
   if (idx === -1) return { success: false, error: '未找到' };
-  const n = (newName || '').trim();
+  const n = newName.trim();
   if (!n) return { success: false, error: '名称不能为空' };
   if (n.length > 100) return { success: false, error: '名称过长（最多100字符）' };
   data.myDeckPresets[idx] = n;
@@ -1773,8 +1939,11 @@ ipcMain.handle('handtrap:get-all', () => {
   return (data.handtrapPresets || []);
 });
 
-ipcMain.handle('handtrap:add', (event, { id, label }) => {
-  const l = (label || '').trim();
+ipcMain.handle('handtrap:add', (event, arg) => {
+  if (!arg || typeof arg !== 'object') return { success: false, error: '无效参数' };
+  const { id, label } = arg;
+  if (typeof label !== 'string' || typeof id !== 'string') return { success: false, error: '无效参数' };
+  const l = label.trim();
   if (!l) return { success: false, error: '名称不能为空' };
   if (l.length > 100) return { success: false, error: '名称过长（最多100字符）' };
   if (!id) return { success: false, error: 'ID 不能为空' };
@@ -1801,11 +1970,14 @@ ipcMain.handle('handtrap:delete', (event, id) => {
   return { success: true, presets: data.handtrapPresets, config: cfg };
 });
 
-ipcMain.handle('handtrap:rename', (event, { id, newLabel }) => {
+ipcMain.handle('handtrap:rename', (event, arg) => {
+  if (!arg || typeof arg !== 'object') return { success: false, error: '无效参数' };
+  const { id, newLabel } = arg;
+  if (typeof id !== 'string' || typeof newLabel !== 'string') return { success: false, error: '无效参数' };
   if (!data.handtrapPresets) return { success: false };
   const idx = data.handtrapPresets.findIndex(p => p.id === id);
   if (idx === -1) return { success: false, error: '未找到' };
-  const l = (newLabel || '').trim();
+  const l = newLabel.trim();
   if (!l) return { success: false, error: '名称不能为空' };
   data.handtrapPresets[idx].label = l;
   saveData();
@@ -1813,7 +1985,10 @@ ipcMain.handle('handtrap:rename', (event, { id, newLabel }) => {
   return { success: true, presets: data.handtrapPresets };
 });
 
-ipcMain.handle('handtrap:set-display', (event, { id, display }) => {
+ipcMain.handle('handtrap:set-display', (event, arg) => {
+  if (!arg || typeof arg !== 'object') return { success: false, error: '无效参数' };
+  const { id, display } = arg;
+  if (typeof id !== 'string') return { success: false, error: '无效参数' };
   // display: 'large' | 'compact' | null (null=归入other)
   // 最多3个大字显示
   const MAX_LARGE = 3;
@@ -1876,11 +2051,32 @@ ipcMain.handle('cycle:get-config', () => {
 });
 
 ipcMain.handle('cycle:save-config', (event, config) => {
-  data.cycleConfig = config;
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
+    return { success: false, error: '无效的配置' };
+  }
+  const duration = Number(config.duration);
+  if (!Number.isFinite(duration) || duration < 1 || duration > 3600) {
+    return { success: false, error: '无效的轮播间隔' };
+  }
+  const KNOWN_TYPES = new Set(getDefaultCycleConfig().items.map(i => i.type));
+  const items = Array.isArray(config.items) ? config.items : [];
+  const cleanItems = items.slice(0, 50).map(item => {
+    if (!item || typeof item !== 'object') return null;
+    const type = typeof item.type === 'string' ? item.type : '';
+    if (!KNOWN_TYPES.has(type)) return null;
+    const clean = {
+      type,
+      enabled: !!item.enabled,
+      label: typeof item.label === 'string' ? item.label.slice(0, 50) : ''
+    };
+    if (typeof item.deck === 'string') clean.deck = item.deck.slice(0, 100);
+    return clean;
+  }).filter(Boolean);
+  data.cycleConfig = { duration, items: cleanItems };
   saveData();
-  // 通知 cycle 窗口更新
+  // 通知 cycle 窗口更新（使用清洗后的配置）
   if (cycleWin && !cycleWin.isDestroyed()) {
-    cycleWin.webContents.send('cycle:config-updated', config);
+    cycleWin.webContents.send('cycle:config-updated', data.cycleConfig);
   }
   return { success: true };
 });
@@ -1909,7 +2105,8 @@ ipcMain.handle('cycle:open-window', () => {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true
     }
   });
 
@@ -1952,12 +2149,21 @@ function showStartupTip() {
   if (choice === 0) {
     // 不再提示
     try {
-      fs.writeFileSync(TIP_DISMISSED_FILE(), '', 'utf-8');
+      fs.writeFileSync(TIP_DISMISSED_FILE(), '', { encoding: 'utf-8', mode: 0o600 });
     } catch(e) {}
   }
 }
 
 // ── 应用生命周期 ──────────────────────────────────────────────────────────
+
+// 防御：禁止渲染进程打开新窗口或跳转外部页面（XSS 兜底）
+app.on('web-contents-created', (event, contents) => {
+  contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  contents.on('will-navigate', (event, url) => {
+    if (url !== contents.getURL()) event.preventDefault();
+  });
+});
+
 app.whenReady().then(() => {
   loadData();
   createDisplayWindow();

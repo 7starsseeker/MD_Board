@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MD Stats - 控制面板</title>
   <link rel="stylesheet" href="style.css">
@@ -101,6 +101,7 @@
     .match-item .match-actions button { background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:14px; padding:2px; }
     .match-item .match-actions button:hover { color:var(--text); }
     .match-item .match-actions .btn-del:hover { color:var(--loss); }
+    .match-item .match-actions .btn-edit:hover { color:var(--accent); }
     .match-empty { text-align:center; padding:20px; color:var(--text-dim); font-size:13px; }
     .match-empty .emoji { font-size:28px; display:block; margin-bottom:6px; }
 
@@ -132,6 +133,7 @@
       <button class="btn btn-sm" id="btn-open-chart" title="图表" style="background:none;border:none;color:#e8e8f0;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📈</button>
       <button class="btn btn-sm" id="btn-export" title="导出数据" style="background:none;border:none;color:#e8e8f0;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📤</button>
       <button class="btn btn-sm" id="btn-import" title="导入数据" style="background:none;border:none;color:#e8e8f0;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📥</button>
+      <button class="btn btn-sm" id="btn-datadir" title="数据目录位置" style="background:none;border:none;color:#e8e8f0;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">📁</button>
       <button class="btn btn-sm" id="btn-reset" title="重置所有数据" style="background:none;border:none;color:#e8e8f0;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">🗑</button>
       <button class="btn btn-sm" id="btn-about" title="关于" style="background:none;border:none;color:#e8e8f0;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px">ℹ️</button>
       <button class="close-btn" id="btn-close-control" title="关闭" style="background:none;border:none;color:#e8e8f0;cursor:pointer;font-size:14px;padding:2px 8px;border-radius:4px">✕</button>
@@ -468,7 +470,7 @@
   </div>
 
   <!-- ═══ 对局记录 ═══ -->
-  <div class="card">
+  <div class="card" id="match-list-card">
     <div class="card-title">📋 对局记录</div>
     <div class="match-list" id="match-list">
       <div class="match-empty"><span class="emoji">🎴</span>还没有对局记录</div>
@@ -544,6 +546,22 @@
     </div>
   </div>
 
+  <!-- ═══ 数据目录位置 ═══ -->
+  <div class="modal-overlay" id="modal-datadir">
+    <div class="modal-box" style="max-width:400px">
+      <h2>📁 数据目录位置</h2>
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:6px">选择存档文件的保存位置。切换后现有数据会自动迁移到新位置，并删除旧位置的数据。</p>
+      <label style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;font-size:13px;cursor:pointer"><input type="radio" name="datadir-radio" value="temp" style="margin-top:3px;flex-shrink:0;width:auto"><span>临时文件夹（%TEMP% / 可能被系统清理）</span></label>
+      <label style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;font-size:13px;cursor:pointer"><input type="radio" name="datadir-radio" value="userData" style="margin-top:3px;flex-shrink:0;width:auto"><span>用户数据目录（AppData / 推荐）</span></label>
+      <label style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;font-size:13px;cursor:pointer"><input type="radio" name="datadir-radio" value="exe" style="margin-top:3px;flex-shrink:0;width:auto"><span>程序同目录（便携模式）</span></label>
+      <div id="datadir-path" style="font-size:11px;color:var(--text-dim);margin-top:6px;word-break:break-all"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="datadir-confirm">✓ 切换位置</button>
+        <button class="btn" id="datadir-close">取消</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ 关于 ═══ -->
   <div class="modal-overlay" id="about-overlay">
     <div class="modal-box" style="max-width:320px">
@@ -578,6 +596,23 @@
   <script>
     var api = window.mdStats;
     if (!api) { document.body.innerHTML = '<div style="padding:40px;text-align:center;color:#ff3b30">API 加载失败</div>'; throw new Error('API not available'); }
+
+    // ── 编辑模式：?edit=<id> 时单独窗口编辑单条对局 ──
+    var EDIT_MATCH_ID = null;
+    (function() {
+      try { EDIT_MATCH_ID = new URLSearchParams(location.search).get('edit'); } catch (e) {}
+      if (EDIT_MATCH_ID) {
+        // 隐藏非录入 UI，仅保留录入表单
+        ['time-range-card', 'cycle-panel-card', 'mydeck-stats-card', 'match-list-card'].forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el) el.style.display = 'none';
+        });
+        var titleEl = document.querySelector('.card-title');
+        if (titleEl) titleEl.textContent = '✏️ 编辑对局';
+        var clearBtn = document.getElementById('btn-clear');
+        if (clearBtn) clearBtn.style.display = 'none';
+      }
+    })();
 
     // ═══════════════════════════════════════════════════════════════════════
     //  状态
@@ -614,8 +649,7 @@
       opponentRan: false,
       typhonWho: 'opponent',
       deckOut: false,
-      deckOutWho: 'opponent',
-      notes: ''
+      deckOutWho: 'opponent'
     };
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1382,7 +1416,7 @@
       });
       // 旧字段向后兼容
       var htOld = { gotMaxxc: handtrapIds.indexOf('gotMaxxc') >= 0, gotDroll: handtrapIds.indexOf('gotDroll') >= 0, gotJellyfish: handtrapIds.indexOf('gotJellyfish') >= 0, gotLancea: handtrapIds.indexOf('gotLancea') >= 0, gotNibiru: handtrapIds.indexOf('gotNibiru') >= 0, gotDimension: handtrapIds.indexOf('gotDimension') >= 0 };
-      await api.addMatch({
+      var payload = {
         result: state.result,
         goingFirst: state.goingFirst,
         coinToss: state.coinToss,
@@ -1421,8 +1455,15 @@
         brokeBoard: !state.goingFirst ? state.brokeBoard : null,
         otk: (!state.goingFirst && state.brokeBoard === true) ? state.otk : null,
         endboardInteraction: (!state.goingFirst && state.brokeBoard === true && !state.otk) ? state.endboardInteraction : null
-      });
-      clearForm();
+      };
+      if (EDIT_MATCH_ID) {
+        // 编辑模式：更新该条对局并关闭窗口
+        await api.updateMatch(EDIT_MATCH_ID, payload);
+        window.close();
+      } else {
+        await api.addMatch(payload);
+        clearForm();
+      }
     });
 
     // ── 清空 ──
@@ -1496,6 +1537,173 @@
       document.getElementById('input-draw').title = '';
       updateConditionalSections();
       document.getElementById('match-normal').classList.add('active');
+    }
+
+    // ── 编辑模式：将已有对局回填到表单 ──
+    function fillForm(match) {
+      clearForm();
+      state.result = match.result || null;
+      state.goingFirst = (match.goingFirst === true || match.goingFirst === false) ? match.goingFirst : null;
+      state.coinToss = (match.coinToss === true || match.coinToss === false) ? match.coinToss : null;
+      state.matchType = (match.matchType === 'promotion' || match.matchType === 'relegation') ? match.matchType : 'normal';
+      state.myDeck = match.myDeck || '';
+      state.opponentDeck = match.opponentDeck || '';
+      state.opponentBigHand = !!match.opponentBigHand;
+      state.mistake = !!match.mistake;
+      state.opponentRan = !!match.opponentRan;
+      state.opponentT0 = !!match.opponentT0;
+      state.disconnect = !!match.disconnect;
+      state.disconnectWho = match.disconnectWho || null;
+      state.timeout = !!match.timeout;
+      state.timeoutWho = match.timeoutWho || null;
+      state.cantPlay = !!match.cantPlay;
+      state.cantPlayGarnet = !!match.cantPlayGarnet;
+      state.cantPlayDuplicate = !!match.cantPlayDuplicate;
+      state.cantPlayHT = !!match.cantPlayHT;
+      state.bothStuck = !!match.bothStuck;
+      state.firstMover = match.firstMover || null;
+      state.moverWho = match.moverWho || null;
+      state.surrenderWho = match.surrenderWho || null;
+      state.endboardState = match.endboardState || null;
+      state.brokeBoard = (match.brokeBoard === true || match.brokeBoard === false || match.brokeBoard === 'true' || match.brokeBoard === 'false')
+        ? (match.brokeBoard === 'true' ? true : match.brokeBoard === 'false' ? false : match.brokeBoard)
+        : ((match.brokeBoard === 'surrender' || match.brokeBoard === 'not_applicable') ? match.brokeBoard : null);
+      state.otk = (match.otk === true || match.otk === false) ? match.otk : null;
+      state.endboardInteraction = match.endboardInteraction || null;
+      state.typhonAppeared = !!match.typhonAppeared;
+      state.typhonWho = match.typhonWho || 'opponent';
+      state.deckOut = !!match.deckOut;
+      state.deckOutWho = match.deckOutWho || 'opponent';
+
+      // 手坑：新数组 + 旧布尔字段兼容
+      state.handtraps = {};
+      var hts = (Array.isArray(match.handtraps) ? match.handtraps.slice() : []);
+      [['gotMaxxc','gotMaxxc'],['gotDroll','gotDroll'],['gotJellyfish','gotJellyfish'],['gotLancea','gotLancea'],['gotNibiru','gotNibiru'],['gotDimension','gotDimension']].forEach(function(p) {
+        if (match[p[0]] && hts.indexOf(p[1]) < 0) hts.push(p[1]);
+      });
+      hts.forEach(function(id) { if (id !== '_other') state.handtraps[id] = true; });
+      state.gotSmallHT = !!match.gotSmallHT || hts.indexOf('_other') >= 0;
+      if (Object.keys(state.handtraps).length > 0 || state.gotSmallHT) {
+        document.getElementById('chk-ht-master').checked = true;
+        document.getElementById('sub-handtraps').style.display = 'block';
+        Object.keys(state.handtraps).forEach(function(id) {
+          var cb = document.getElementById('ht-' + id);
+          if (cb) cb.checked = true;
+        });
+        document.getElementById('chk-small-ht').checked = state.gotSmallHT;
+      }
+
+      // 结果（含异常）
+      if (state.result === 'abnormal') {
+        document.getElementById('btn-abnormal-toggle').classList.add('active');
+        document.getElementById('input-win').style.opacity = '0.3';
+        document.getElementById('input-win').style.pointerEvents = 'none';
+        document.getElementById('input-win').title = '异常状态，不可设为胜';
+        document.getElementById('input-loss').style.opacity = '0.3';
+        document.getElementById('input-loss').style.pointerEvents = 'none';
+        document.getElementById('input-loss').title = '异常状态，不可设为负';
+        document.getElementById('input-draw').style.opacity = '0.3';
+        document.getElementById('input-draw').style.pointerEvents = 'none';
+        document.getElementById('input-draw').title = '异常状态，不可设为平局';
+        document.getElementById('input-deck').disabled = true;
+        document.getElementById('input-deck').value = '未知';
+        document.getElementById('section-match-conditions').style.display = 'none';
+      } else if (state.result) {
+        var rbtn = state.result === 'win' ? document.getElementById('input-win') : state.result === 'loss' ? document.getElementById('input-loss') : document.getElementById('input-draw');
+        rbtn.classList.add('active');
+      }
+      // 先后手/硬币/对局类型
+      if (state.goingFirst === true) document.getElementById('input-first').classList.add('active');
+      else if (state.goingFirst === false) document.getElementById('input-second').classList.add('active');
+      if (state.coinToss === true) document.getElementById('input-coin-win').classList.add('active');
+      else if (state.coinToss === false) document.getElementById('input-coin-loss').classList.add('active');
+      if (state.matchType === 'promotion') document.getElementById('match-promotion').classList.add('active');
+      else if (state.matchType === 'relegation') document.getElementById('match-relegation').classList.add('active');
+      else document.getElementById('match-normal').classList.add('active');
+      // 卡组
+      document.getElementById('input-mydeck').value = state.myDeck;
+      document.getElementById('input-deck').value = state.opponentDeck;
+
+      // 复选框
+      document.getElementById('chk-big-hand').checked = state.opponentBigHand;
+      document.getElementById('chk-mistake').checked = state.mistake;
+      document.getElementById('chk-opponent-ran').checked = state.opponentRan;
+      document.getElementById('chk-t0').checked = state.opponentT0;
+      // 掉线
+      if (state.disconnect) {
+        document.getElementById('chk-disconnect').checked = true;
+        document.getElementById('sub-disconnect').style.display = 'block';
+        if (state.disconnectWho) {
+          document.querySelectorAll('.disconnect-btn').forEach(function(b) { if (b.dataset.val === state.disconnectWho) b.classList.add('active'); });
+        }
+      }
+      // 超时
+      if (state.timeout) {
+        document.getElementById('chk-timeout').checked = true;
+        document.getElementById('sub-timeout').style.display = 'block';
+        if (state.timeoutWho) {
+          document.querySelectorAll('.timeout-btn').forEach(function(b) { if (b.dataset.val === state.timeoutWho) b.classList.add('active'); });
+        }
+      }
+      // 卡手
+      if (state.cantPlay || state.cantPlayGarnet || state.cantPlayDuplicate || state.cantPlayHT) {
+        document.getElementById('chk-cant-master').checked = true;
+        document.getElementById('sub-cantplay').style.display = 'block';
+        document.getElementById('chk-cant-play').checked = state.cantPlay;
+        document.getElementById('chk-cant-garnet').checked = state.cantPlayGarnet;
+        document.getElementById('chk-cant-dup').checked = state.cantPlayDuplicate;
+        document.getElementById('chk-cant-ht').checked = state.cantPlayHT;
+      }
+      // 双方都动不了 + 最终情况
+      if (state.bothStuck) {
+        document.getElementById('chk-both-stuck').checked = true;
+        document.getElementById('section-firstmover').classList.add('visible');
+        if (state.firstMover === 'move') {
+          document.getElementById('firstmover-move').classList.add('active');
+          document.getElementById('sub-mover-who').style.display = 'block';
+          if (state.moverWho) document.querySelectorAll('.mover-btn').forEach(function(b) { if (b.dataset.val === state.moverWho) b.classList.add('active'); });
+        } else if (state.firstMover === 'surrender') {
+          document.getElementById('firstmover-surrender').classList.add('active');
+          document.getElementById('sub-surrender-who').style.display = 'block';
+          if (state.surrenderWho) document.querySelectorAll('.surrender-btn').forEach(function(b) { if (b.dataset.val === state.surrenderWho) b.classList.add('active'); });
+        } else if (state.firstMover === 'other') {
+          document.getElementById('firstmover-other').classList.add('active');
+        }
+      }
+      // 提丰
+      if (state.typhonAppeared) {
+        document.getElementById('chk-typhon').checked = true;
+        document.getElementById('sub-typhon').style.display = 'block';
+        if (state.typhonWho) document.querySelectorAll('.typhon-btn').forEach(function(b) { if (b.dataset.val === state.typhonWho) b.classList.add('active'); });
+      }
+      // 抽干
+      if (state.deckOut) {
+        document.getElementById('chk-deck-out').checked = true;
+        document.getElementById('sub-deck-out').style.display = 'block';
+        if (state.deckOutWho) document.querySelectorAll('.deckout-btn').forEach(function(b) { if (b.dataset.val === state.deckOutWho) b.classList.add('active'); });
+      }
+      // 终场/突破/OTK/残局
+      if (state.endboardState) {
+        var ebMap = { surrender: 'endboard-surrender', stopped: 'endboard-stopped', compromised: 'endboard-compromise', normal: 'endboard-normal' };
+        var ebBtn = document.getElementById(ebMap[state.endboardState]);
+        if (ebBtn) ebBtn.classList.add('active');
+      }
+      if (state.brokeBoard !== null && state.brokeBoard !== undefined) {
+        var bbMap = { true: 'broke-yes', false: 'broke-no', surrender: 'broke-surrender', not_applicable: 'broke-unnecessary' };
+        var bbBtn = document.getElementById(bbMap[String(state.brokeBoard)]);
+        if (bbBtn) bbBtn.classList.add('active');
+      }
+      if (state.otk === true) document.getElementById('otk-yes').classList.add('active');
+      else if (state.otk === false) document.getElementById('otk-no').classList.add('active');
+      if (state.endboardInteraction === 'none') document.getElementById('interact-none').classList.add('active');
+      else if (state.endboardInteraction === 'some') document.getElementById('interact-some').classList.add('active');
+
+      // 联动刷新（顺序：条件区域 → 投降锁 → 特殊锁 → OTK → 互卡其他）
+      updateConditionalSections();
+      updateSurrenderLock();
+      updateSpecialLock();
+      updateOtkSection();
+      updateBothStuckOther();
     }
 
     // 快捷提交
@@ -1861,20 +2069,24 @@
         else if (m.brokeBoard === false) extras.push('未突破');
         else if (m.brokeBoard === 'not_applicable') extras.push('不需要突破');
         if (m.otk === true) extras.push('斩杀');
-        var notes = m.notes ? ' · ' + escapeHtml(m.notes.slice(0, 20) + (m.notes.length > 20 ? '…' : '')) : '';
         var date = new Date(m.timestamp);
         var timeStr = (date.getMonth()+1) + '/' + date.getDate() + ' ' + String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0');
         var extraStr = extras.length ? ' · ' + extras.join(' ') : '';
         var color = m.result === 'win' ? 'var(--win)' : (m.result === 'abnormal' || m.result === 'draw') ? '#e8e8f0' : 'var(--loss)';
         return '<div class="match-item"><span class="match-result" style="color:' + color + '">' + label + '</span>' +
           '<div class="match-info"><div><span class="match-deck">' + deck + '</span><span style="font-size:11px;color:var(--text-dim);margin-left:6px">' + going + '</span></div>' +
-          '<div class="match-meta">#' + idx + ' · ' + timeStr + extraStr + notes + '</div></div>' +
-          '<div class="match-actions"><button class="btn-del" data-id="' + m.id + '" title="删除">✕</button></div></div>';
+          '<div class="match-meta">#' + idx + ' · ' + timeStr + extraStr + '</div></div>' +
+          '<div class="match-actions"><button class="btn-edit" data-id="' + escapeHtml(String(m.id)) + '" title="编辑">✏️</button><button class="btn-del" data-id="' + escapeHtml(String(m.id)) + '" title="删除">✕</button></div></div>';
       }).join('');
       el.querySelectorAll('.btn-del').forEach(function(btn) {
         btn.addEventListener('click', async function(e) {
           var id = e.target.dataset.id;
           if (await confirmAsync('删除这条对局记录？')) await api.deleteMatch(id);
+        });
+      });
+      el.querySelectorAll('.btn-edit').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          api.openEditMatch(e.target.dataset.id);
         });
       });
     }
@@ -2059,6 +2271,32 @@
         var result = await api.importJSON(json);
         if (result.success) document.getElementById('modal-import').classList.remove('show');
         else alert('导入失败：' + result.error);
+      }
+    });
+
+    document.getElementById('btn-datadir').addEventListener('click', async function() {
+      var dd = await api.getDataDir();
+      document.querySelectorAll('input[name="datadir-radio"]').forEach(function(r) { r.checked = (r.value === dd.location); });
+      document.getElementById('datadir-path').textContent = '当前路径: ' + dd.path;
+      document.getElementById('modal-datadir').classList.add('show');
+    });
+    document.getElementById('datadir-close').addEventListener('click', function() {
+      document.getElementById('modal-datadir').classList.remove('show');
+    });
+    document.getElementById('datadir-confirm').addEventListener('click', async function() {
+      var sel = document.querySelector('input[name="datadir-radio"]:checked');
+      if (!sel) return;
+      var loc = sel.value;
+      var dd = await api.getDataDir();
+      if (loc === dd.location) { document.getElementById('modal-datadir').classList.remove('show'); return; }
+      if (await confirmAsync('切换到新位置后，现有数据会自动迁移过去，并删除旧位置的数据。确定切换？')) {
+        var result = await api.setDataDir(loc);
+        if (result.success) {
+          document.getElementById('modal-datadir').classList.remove('show');
+          alert('数据目录已切换到: ' + result.path);
+        } else {
+          alert('切换失败: ' + result.error);
+        }
       }
     });
 
@@ -2337,9 +2575,9 @@
         '<div style="font-size:11px;color:var(--text-dim);padding:4px 6px;margin-bottom:4px">自定义起止日期：</div>' +
         '<div style="display:flex;align-items:center;gap:6px;padding:4px 6px">' +
           '<span style="font-size:11px;color:var(--text-dim);white-space:nowrap">从</span>' +
-          '<input type="date" id="custom-start" value="' + s + '" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:4px;color:#e8e8f0;padding:4px 6px;font-size:12px">' +
+          '<input type="date" id="custom-start" value="' + escapeHtml(s) + '" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:4px;color:#e8e8f0;padding:4px 6px;font-size:12px">' +
           '<span style="font-size:11px;color:var(--text-dim);white-space:nowrap">到</span>' +
-          '<input type="date" id="custom-end" value="' + e + '" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:4px;color:#e8e8f0;padding:4px 6px;font-size:12px">' +
+          '<input type="date" id="custom-end" value="' + escapeHtml(e) + '" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:4px;color:#e8e8f0;padding:4px 6px;font-size:12px">' +
           '<button id="btn-custom-apply" class="btn btn-primary btn-sm" style="white-space:nowrap;flex-shrink:0">应用</button>' +
         '</div>';
       document.getElementById('btn-custom-apply').addEventListener('click', async function() {
@@ -2440,11 +2678,25 @@
     //  启动
     // ═══════════════════════════════════════════════════════════════════════
 
-    api.getAll().then(renderAll);
-    api.onStatsUpdate(function() {
+    if (EDIT_MATCH_ID) {
+      // 编辑模式：加载目标对局并回填
+      api.getAll().then(function(d) {
+        var m = (d.matches || []).find(function(x) { return x.id === EDIT_MATCH_ID; });
+        if (!m) { alert('未找到该对局记录'); window.close(); return; }
+        // 等待手坑预设复选框渲染完成后再回填（renderHandtrapCheckboxes 由异步 api 驱动）
+        setTimeout(function fillRetry() {
+          var htReady = document.querySelectorAll('#handtrap-checkboxes input[type=checkbox]').length > 0;
+          if (!htReady) { setTimeout(fillRetry, 100); return; }
+          fillForm(m);
+        }, 100);
+      });
+    } else {
       api.getAll().then(renderAll);
-      refreshTimeRangeUI();
-    });
+      api.onStatsUpdate(function() {
+        api.getAll().then(renderAll);
+        refreshTimeRangeUI();
+      });
+    }
 
     document.getElementById('btn-refresh-time').addEventListener('click', refreshTimeRangeUI);
 

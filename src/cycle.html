@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MD Stats - 循环显示</title>
   <link rel="stylesheet" href="style.css">
@@ -794,10 +794,11 @@
 
       RENDERERS.deckTrend = function(s, item) {
         var deckName = (item && item.deck) || '';
+        var dk = escapeHtml(deckName || '未选择卡组');
         var deckData = s.deckResults || {};
         var results = deckName ? deckData[deckName] : null;
         if (!results || results.length === 0) {
-          return { label: '—', subLabel: deckName || '未选择卡组', html: '<div class="big-value" style="color:#e8e8f0">—</div><div class="big-label">' + (deckName || '未选择卡组') + '</div>' };
+          return { label: '—', subLabel: deckName || '未选择卡组', html: '<div class="big-value" style="color:#e8e8f0">—</div><div class="big-label">' + dk + '</div>' };
         }
         var w = 0, t = results.length;
         for (var i = 0; i < results.length; i++) { if (results[i] === 'win') w++; }
@@ -814,13 +815,13 @@
           label: deckName + ' ' + wr + '%',
           subLabel: deckName + ' 胜率',
           html: '<div style="display:flex;flex-direction:column;align-items:center;width:100%">' +
-                  '<div style="font-size:11px;color:var(--text-dim);margin-bottom:1px">' + deckName + '</div>' +
+                  '<div style="font-size:11px;color:var(--text-dim);margin-bottom:1px">' + dk + '</div>' +
                   '<div style="font-size:36px;font-weight:800;color:#ffc832;line-height:1.1">' + wr + '%</div>' +
                   '<div style="font-size:10px;color:var(--text-dim);margin-top:2px">胜率</div>' +
                   '<div style="font-size:11px;color:var(--text-dim);margin-top:1px">' + t + ' 场 · 胜 ' + w + ' 负 ' + (t - w) + '</div>' +
                   '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:1px;margin:3px 0 1px">' + dots + '</div>' +
                 '</div>' +
-                '<div class="big-label">' + deckName + ' · 最近' + lastN + '场</div>'
+                '<div class="big-label">' + dk + ' · 最近' + lastN + '场</div>'
         };
       };
 

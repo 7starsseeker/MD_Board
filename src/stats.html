@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MD Stats - 详细统计</title>
   <link rel="stylesheet" href="style.css">
@@ -1291,7 +1291,7 @@
           wrapper.style.cssText = 'border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px';
           wrapper.innerHTML =
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
-              '<span style="font-size:12px;font-weight:600;color:' + color + '">' + deck + '</span>' +
+              '<span style="font-size:12px;font-weight:600;color:' + color + '">' + escapeHtml(deck) + '</span>' +
               '<span style="font-size:11px;color:var(--text-dim)">' + results.length + '场 · ' +
                 '<span style="font-weight:600;color:' + (parseFloat(points[points.length-1].rate) >= 50 ? '#4cd964' : '#ff3b30') + '">' + points[points.length-1].rate + '%</span></span>' +
             '</div>' +

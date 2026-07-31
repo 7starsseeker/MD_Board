@@ -17,12 +17,10 @@ function escapeHtml(str) {
 
 function sanitizeMatchData(m) {
   const MAX_DECK_LEN = 100;
-  const MAX_NOTES_LEN = 500;
   const allowedResults = ['win', 'loss', 'draw', 'abnormal'];
   const safe = { ...m };
   if (typeof safe.opponentDeck === 'string') safe.opponentDeck = safe.opponentDeck.slice(0, MAX_DECK_LEN);
   if (typeof safe.myDeck === 'string') safe.myDeck = safe.myDeck.slice(0, MAX_DECK_LEN);
-  if (typeof safe.notes === 'string') safe.notes = safe.notes.slice(0, MAX_NOTES_LEN);
   if (safe.result && !allowedResults.includes(safe.result)) safe.result = 'abnormal';
   if (safe.handtraps && !Array.isArray(safe.handtraps)) safe.handtraps = [];
   return safe;
@@ -189,12 +187,6 @@ describe('sanitizeMatchData', async () => {
     assert.equal(result.opponentDeck.length, 100);
   });
 
-  it('截断超长备注', () => {
-    const longNotes = 'B'.repeat(1000);
-    const result = sanitizeMatchData({ notes: longNotes });
-    assert.equal(result.notes.length, 500);
-  });
-
   it('非法 result 降级为 abnormal', () => {
     const result = sanitizeMatchData({ result: 'cheat' });
     assert.equal(result.result, 'abnormal');
@@ -212,11 +204,10 @@ describe('sanitizeMatchData', async () => {
   });
 
   it('正常数据不变', () => {
-    const input = { myDeck: '烙印', opponentDeck: '蛇眼', notes: 'good game', result: 'win', handtraps: ['gotMaxxc'] };
+    const input = { myDeck: '烙印', opponentDeck: '蛇眼', result: 'win', handtraps: ['gotMaxxc'] };
     const result = sanitizeMatchData(input);
     assert.equal(result.myDeck, '烙印');
     assert.equal(result.opponentDeck, '蛇眼');
-    assert.equal(result.notes, 'good game');
     assert.deepEqual(result.handtraps, ['gotMaxxc']);
   });
 });
