@@ -1617,6 +1617,8 @@
       else if (state.goingFirst === false) document.getElementById('input-second').classList.add('active');
       if (state.coinToss === true) document.getElementById('input-coin-win').classList.add('active');
       else if (state.coinToss === false) document.getElementById('input-coin-loss').classList.add('active');
+      // 对局类型：先清除全部 active（clearForm 会默认激活「普通」），再激活实际类型，避免两个按钮同时点亮
+      matchTypeBtns.forEach(function(btn) { btn.classList.remove('active'); });
       if (state.matchType === 'promotion') document.getElementById('match-promotion').classList.add('active');
       else if (state.matchType === 'relegation') document.getElementById('match-relegation').classList.add('active');
       else document.getElementById('match-normal').classList.add('active');
