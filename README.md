@@ -3,6 +3,29 @@
 一款专为**游戏王 Master Duel 主播/玩家**设计的**桌面统计叠加工具**。  
 手动录入每局数据，实时生成无边框统计面板，可直接放入直播画面。
 
+[![release](https://img.shields.io/github/v/release/7starsseeker/MD_Board?label=release&color=blue)](https://github.com/7starsseeker/MD_Board/releases/latest)
+[![downloads](https://img.shields.io/github/downloads/7starsseeker/MD_Board/total)](https://github.com/7starsseeker/MD_Board/releases)
+[![release date](https://img.shields.io/github/release-date/7starsseeker/MD_Board)](https://github.com/7starsseeker/MD_Board/releases)
+[![license: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
+[![platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078D6)](https://github.com/7starsseeker/MD_Board/releases)
+[![Electron](https://img.shields.io/badge/Electron-desktop-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
+[![Chart.js](https://img.shields.io/badge/Chart.js-v4.5.1-FF6384?logo=chart.js&logoColor=white)](https://www.chartjs.org/)
+[![last commit](https://img.shields.io/github/last-commit/7starsseeker/MD_Board)](https://github.com/7starsseeker/MD_Board/commits/master)
+
+---
+
+## 目录
+
+- [核心功能](#核心功能)
+- [使用说明](#使用说明)
+- [直播设置（B站直播姬 / OBS）](#直播设置b站直播姬--obs)
+- [数据存储](#数据存储)
+- [开发](#开发)
+- [技术栈](#技术栈)
+- [反馈与贡献](#反馈与贡献)
+- [致谢](#致谢)
+- [许可证](#许可证)
+
 ---
 
 ## 核心功能
@@ -71,7 +94,7 @@
 2. 勾选对局情况（手坑、卡手、掉线、超时、提丰、抽干牌组等折叠式菜单）
 3. ⚡ 异常 — 独立 toggle，选中时隐藏所有对局情况，锁定胜负结果
 4. 根据先后手选择终场情况或突破情况；双方都动不了时选择先动方/投降/其他
-4. 点击 **提交** 或按 **Enter**
+5. 点击 **提交** 或按 **Enter**
 
 > 提交后自己卡组自动保留，方便连续使用同一卡组。
 
@@ -152,6 +175,13 @@ npm run pack
 - [Electron](https://www.electronjs.org/) — 跨平台桌面应用框架
 - [Chart.js](https://www.chartjs.org/) v4.5.1 — 数据可视化图表
 - 原生 HTML / CSS / JavaScript — 无额外前端框架
+
+---
+
+## 反馈与贡献
+
+用着有问题、想要新的统计维度、或者对图表有建议，欢迎到 [Issues](https://github.com/7starsseeker/MD_Board/issues) 提。
+提 bug 时请顺手带上「详细统计窗口」里一键导出的 `.md` 报告（含原始对局明细），有它基本能直接定位到是哪一步算错了。
 
 ---
 
