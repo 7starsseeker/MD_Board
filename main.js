@@ -506,7 +506,7 @@ function computeHandStateStats(matches, total, gfTotal, gsTotal) {
   const totalCantPlay = matches.filter(m => m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck).length;
   // 先后手
   const byFirst = {
-    cantPlay: matches.filter(m => (m.cantPlay || m.bothStuck) && m.goingFirst).length,
+    cantPlay: matches.filter(m => m.cantPlay && m.goingFirst).length,
     cantPlayGarnet: matches.filter(m => m.cantPlayGarnet && m.goingFirst).length,
     cantPlayDuplicate: matches.filter(m => m.cantPlayDuplicate && m.goingFirst).length,
     cantPlayHT: matches.filter(m => m.cantPlayHT && m.goingFirst).length,
@@ -514,7 +514,7 @@ function computeHandStateStats(matches, total, gfTotal, gsTotal) {
     totalCantPlay: matches.filter(m => (m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck) && m.goingFirst).length
   };
   const bySecond = {
-    cantPlay: matches.filter(m => (m.cantPlay || m.bothStuck) && !m.goingFirst).length,
+    cantPlay: matches.filter(m => m.cantPlay && !m.goingFirst).length,
     cantPlayGarnet: matches.filter(m => m.cantPlayGarnet && !m.goingFirst).length,
     cantPlayDuplicate: matches.filter(m => m.cantPlayDuplicate && !m.goingFirst).length,
     cantPlayHT: matches.filter(m => m.cantPlayHT && !m.goingFirst).length,
@@ -589,9 +589,11 @@ function computeEndboardStats(firstMatches) {
   const opponentDirectWin = m =>
     m.opponentRan || (m.disconnect && m.disconnectWho === 'opponent') || (m.timeout && m.timeoutWho === 'opponent') || (m.deckOut && m.deckOutWho === 'opponent');
   const trueStopped = firstMatches.filter(m => m.endboardState === 'stopped' && !opponentDirectWin(m)).length;
+  const stoppedOppLeft = firstMatches.filter(m => m.endboardState === 'stopped' && opponentDirectWin(m)).length;
   const opponentSurrendered = firstMatches.filter(m => opponentDirectWin(m) && m.result === 'win').length;
   const surrender = firstMatches.filter(m => m.endboardState === 'surrender').length;
-  return { total: firstMatches.length, normal, compromised, stopped: trueStopped, surrender, opponentSurrendered, normalRate: pct(normal, firstMatches.length) };
+  const noEndboard = firstMatches.filter(m => !m.endboardState).length;
+  return { total: firstMatches.length, normal, compromised, stopped: trueStopped, stoppedOppLeft, surrender, noEndboard, opponentSurrendered, normalRate: pct(normal, firstMatches.length) };
 }
 
 // ── 后手突破 ──
@@ -600,8 +602,9 @@ function computeBreakBoardStats(secondMatches) {
   const no = secondMatches.filter(m => m.brokeBoard === false || m.brokeBoard === 'false').length;
   const surrender = secondMatches.filter(m => m.brokeBoard === 'surrender').length;
   const notNeeded = secondMatches.filter(m => m.brokeBoard === 'not_applicable').length;
+  const noRecord = secondMatches.filter(m => !(m.brokeBoard === true || m.brokeBoard === 'true' || m.brokeBoard === false || m.brokeBoard === 'false' || m.brokeBoard === 'surrender' || m.brokeBoard === 'not_applicable')).length;
   const successWins = secondMatches.filter(m => (m.brokeBoard === true || m.brokeBoard === 'true') && m.result === 'win').length;
-  return { total: secondMatches.length, success: yes, failed: no, surrender, notNeeded, successWins, successRate: pct(yes, secondMatches.length), successWinRate: pct(successWins, yes) };
+  return { total: secondMatches.length, success: yes, failed: no, surrender, notNeeded, noRecord, successWins, successRate: pct(yes, secondMatches.length), successWinRate: pct(successWins, yes) };
 }
 
 // ── 吓跑对手 ──
@@ -776,7 +779,7 @@ function computeStats() {
   }));
 
   const handtrap = computeHandtrapStats(matches, total, data.handtrapPresets || [], data.handtrapConfig || {});
-  const handState = computeHandStateStats(matches, total, gfAll.length, gsAll.length);
+  const handState = computeHandStateStats(matches, total, basic.goingFirst.length, basic.goingSecond.length);
   const connectivity = computeConnectivityStats(matches, total);
 
   const bigHandTotal = matches.filter(m => m.opponentBigHand).length;
@@ -819,8 +822,8 @@ function computeStats() {
     last10, handtrap, handState, connectivity,
     bigHand: { total: bigHandTotal, first: bigHandFirst, second: bigHandSecond },
     opponentT0: computeOpponentT0Stats(matches),
-    endboard: computeEndboardStats(gfAll),
-    breakBoard: computeBreakBoardStats(gsAll),
+    endboard: computeEndboardStats(basic.goingFirst),
+    breakBoard: computeBreakBoardStats(basic.goingSecond),
     myDeckStats: computeDeckGroupStats(matches, 'myDeck'),
     deckStats: computeDeckGroupStats(matches, 'opponentDeck'),
     mistake: computeMistakeStats(matches, total),
@@ -1194,19 +1197,19 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
     const c = stats.coin;
     md += `| 项目 | 数值 |\n| --- | --- |\n`;
     md += `| 总投币 | ${c.total} |\n`;
-    md += `| 正（先手） | ${c.wins} (${c.winRate}%) |\n`;
-    md += `| 反（后手） | ${c.losses} |\n`;
+    md += `| 正（投币赢） | ${c.wins} (${c.winRate}%) |\n`;
+    md += `| 反（投币输） | ${c.losses} |\n`;
     if (c.streak && c.streak.current) {
       const cur = c.streak.current;
       const ctLabel = cur.type === true ? '连正' : '连反';
       md += `| 当前${ctLabel} | ${cur.length} |\n`;
     }
     if (c.bias && c.bias.severity !== '—') {
-      md += `| 偏斜检测 | ${c.bias.severity} (分数: ${c.bias.severityScore}) |\n`;
+      md += `| 偏斜检测 | ${c.bias.severity} (分数: ${c.bias.severityScore}${typeof c.bias.zScore === 'number' ? `, Z=${c.bias.zScore.toFixed(2)}` : ''}) |\n`;
     }
     md += '\n';
   }
-  md += '> **算法**: 正=投币赢且先手; 反=投币输且后手。连正/连反分析从最近对局倒序扫描; 偏斜用 Z 检验 (|观察-预期|/标准误), 严重度：分数≤20正常/≤50⚠️/≤75🔴/>75🔥。期望最大连正=log₂(n)+0.333\n\n';
+  md += '> **算法**: 正=投币赢; 反=投币输（两者与先后手无关，投币赢家可选择先攻或后攻）。连正/连反分析从最近对局倒序扫描; 偏斜用 Z 检验 (|观察-预期|/标准误), 「分数」= round(Z / 4 × 100) 封顶 100，严重度：分数≤20正常/≤50⚠️/≤75🔴/>75🔥（等价于 Z≈0.8/2.0/3.0 三档）。期望最大连正=log₂(n)+0.333\n\n';
 
   // ── 手坑统计 ──
   md += '---\n\n';
@@ -1341,13 +1344,18 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
     const eb = stats.endboard;
     md += `| 终场质量 | 次数 | 占比 |\n| --- | --- | --- |\n`;
     md += `| 正常展开 | ${eb.normal} | ${eb.normalRate}% |\n`;
-    md += `| 妥协场 | ${eb.compromised} | -\n`;
-    md += `| 被停 | ${eb.stopped} | -\n`;
-    md += `| 直接投降 | ${eb.surrender} | -\n`;
-    md += `| 对手投 | ${eb.opponentSurrendered} | -\n`;
+    md += `| 妥协场 | ${eb.compromised} | ${pct(eb.compromised, eb.total)}% |\n`;
+    md += `| 被停（对局正常结束） | ${eb.stopped} | ${pct(eb.stopped, eb.total)}% |\n`;
+    md += `| 被停（对手直接退出） | ${eb.stoppedOppLeft} | ${pct(eb.stoppedOppLeft, eb.total)}% |\n`;
+    md += `| 直接投降 | ${eb.surrender} | ${pct(eb.surrender, eb.total)}% |\n`;
+    md += `| 未记录终场 | ${eb.noEndboard} | ${pct(eb.noEndboard, eb.total)}% |\n`;
+    md += `| **合计** | ${eb.total} | 100.0% |\n`;
     md += '\n';
+    if (eb.opponentSurrendered > 0) {
+      md += `> 其中 **对手投**（对手吓跑/掉线/超时/抽干且我胜）共 ${eb.opponentSurrendered} 局 —— 该口径与上表按终场质量的分类维度重叠，故不计入合计。\n\n`;
+    }
   }
-  md += '> **算法**: 正常展开率 = endboardState="normal"/先手总场*100%; 妥协/被停/投降/对手投各计数; 对手投 = opponentRan/对手掉线/对手超时/对手抽干 且结果为胜\n\n';
+  md += '> **算法**: 分母 = 先手总场（不含异常对局）。正常展开率 = endboardState="normal"/先手总场*100%; 「被停（对局正常结束）」= endboardState="stopped" 且对手未直接退出; 「被停（对手直接退出）」= endboardState="stopped" 且对手吓跑/掉线/超时/抽干; 「对手投」为叠加口径，不计入合计\n\n';
 
   // ── 后手突破 ──
   if (stats.breakBoard && stats.breakBoard.total > 0) {
@@ -1356,13 +1364,15 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
     const bb = stats.breakBoard;
     md += `| 项目 | 次数 | 占比 |\n| --- | --- | --- |\n`;
     md += `| 成功突破 | ${bb.success} | ${bb.successRate}% |\n`;
-    md += `| 突破失败 | ${bb.failed} | -\n`;
-    md += `| 投降 | ${bb.surrender} | -\n`;
-    md += `| 无需突破 | ${bb.notNeeded} | -\n`;
-    md += `| 突破后胜率 | ${bb.successWinRate}% | -\n`;
+    md += `| 突破失败 | ${bb.failed} | ${pct(bb.failed, bb.total)}% |\n`;
+    md += `| 投降 | ${bb.surrender} | ${pct(bb.surrender, bb.total)}% |\n`;
+    md += `| 无需突破 | ${bb.notNeeded} | ${pct(bb.notNeeded, bb.total)}% |\n`;
+    md += `| 无记录 | ${bb.noRecord} | ${pct(bb.noRecord, bb.total)}% |\n`;
+    md += `| **合计** | ${bb.total} | 100.0% |\n`;
     md += '\n';
+    md += `> 突破后胜率 = ${bb.successWinRate}%（成功突破且获胜 / 成功突破）\n\n`;
   }
-  md += '> **算法**: 突破成功率 = brokeBoard=true/后手总场*100%; 突破后胜率 = 突破成功且获胜/突破成功总场*100%\n\n';
+  md += '> **算法**: 分母 = 后手总场（不含异常对局）。突破成功率 = brokeBoard=true/后手总场*100%; 突破后胜率 = 突破成功且获胜/突破成功总场*100%; 「无记录」= brokeBoard 既非 true/false 也非 surrender/not_applicable（历史数据或未填写）\n\n';
 
   // ── 连接状态 ──
   md += '---\n\n';
@@ -1534,7 +1544,11 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
       if (m.typhonAppeared) otherFlags.push((m.typhonWho === 'self' ? '己' : '对') + '提丰');
       if (m.deckOut) otherFlags.push((m.deckOutWho === 'self' ? '己' : '对') + '抽干');
       var otherStr = otherFlags.length > 0 ? otherFlags.join('/') : '—';
-      var endBrk = m.goingFirst ? (m.endboardState || '—') : (m.brokeBoard || '—');
+      var endBrk = m.goingFirst
+        ? (m.endboardState || '—')
+        : (m.brokeBoard === true || m.brokeBoard === 'true' ? 'true'
+          : (m.brokeBoard === false || m.brokeBoard === 'false' ? 'false'
+            : (m.brokeBoard === 'surrender' || m.brokeBoard === 'not_applicable' ? m.brokeBoard : '—')));
       md += `| ${i + 1} | ${ts} | ${res} | ${gf} | ${coin} | ${myD} | ${opD} | ${htStr} | ${cantPlay} | ${mistake} | ${matchType} | ${oppStr} | ${connStr} | ${otherStr} | ${endBrk} |\n`;
     }
     md += '\n';
@@ -1551,13 +1565,13 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   md += '| 时间 | 对局发生时间 | — | ISO 格式 |\n';
   md += '| 结果 | 对局结果 | 📊 概览 · 先后手对比 | win=胜 / loss=负 / draw=平 / abnormal=异常 |\n';
   md += '| 先后手 | 是否先手 | ⚔️ 先后手对比 · 🏗️ 先手终场 · 🔨 后手突破 | 先手 / 后手 |\n';
-  md += '| 硬币 | 投币结果 | 🪙 硬币统计 | 正=先手 / 反=后手 |\n';
+  md += '| 硬币 | 投币结果 | 🪙 硬币统计 | 正=投币赢 / 反=投币输（与先后手无关） |\n';
   md += '| 自用卡组 | 自己使用的卡组 | 🃏 自用卡组统计 | 自由文本 |\n';
   md += '| 对手卡组 | 对手使用的卡组 | 🎴 对手卡组统计 · ⚔️ 对位交叉 | 自由文本 |\n';
   md += '| 手坑 | 吃到的手坑列表 | 🛡️ 吃手坑统计 | 手坑 ID 列表, 逗号分隔 |\n';
   md += '| 卡手 | 是否卡手 | 🃏 手牌与卡手统计 | Y=卡手 / —=正常; 细分: cantPlay/动不了, cantPlayGarnet/卡废件, cantPlayDuplicate/卡同名牌, cantPlayHT/卡后手牌, bothStuck/互卡 |\n';
   md += '| 失误 | 是否出现严重失误 | 💢 严重失误统计 | Y=有 / —=无 |\n';
-  md += '| 终场/突破 | 先手终场或后手突破 | 🏗️ 先手终场 · 🔨 后手突破 | 先手: normal/compromised/stopped/surrender; 后手: true/false/surrender/not_applicable |\n';
+  md += '| 终场/突破 | 先手终场或后手突破 | 🏗️ 先手终场 · 🔨 后手突破 | 先手: normal/compromised/stopped/surrender; 后手: true/false/surrender/not_applicable（明细中 false 会原样显示为 false） |\n';
   md += '| 晋级/保级 | 是否为晋级/保级赛 | 🏆 晋级/保级赛 | promotion=晋级赛 / relegation=保级赛 |\n';
   md += '| 对手大牌 | 对手手牌质量极佳 | 🃏 其他统计 | boolean |\n';
   md += '| 吓跑对手 | 对手提前投降 | 🏃 吓跑对手统计 | boolean |\n';
@@ -1604,7 +1618,7 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   md += '- **互卡**：双方都出现卡手情况\n\n';
   md += '### 2. 分析方法\n\n';
   md += '**第一部分：数据特征分析（对应第①—⑧章）** — 单纯分析数据反映的玩家和环境特征，不做归因判断。\n\n';
-  md += '**投币公平性**：用 Z 检验（|观察-预期|/标准误），分数≤20 正常 / ≤50 ⚠️ 偏高 / ≤75 🔴 严重 / >75 🔥 极端。附加游程检验（Runs Test）判断正反面序列是否呈现非随机聚类。\n';
+  md += '**投币公平性**：用 Z 检验（|观察-预期|/标准误），报告中「分数」= round(Z / 4 × 100) 封顶 100，分数≤20 正常 / ≤50 ⚠️ 偏高 / ≤75 🔴 严重 / >75 🔥 极端（等价于 Z≈0.8 / 2.0 / 3.0）。附加游程检验（Runs Test）判断正反面序列是否呈现非随机聚类。\n';
   md += '- **异常对局的硬币处理**：文档中标记为"abnormal"的对局指投完硬币、选完先后手后卡在进入流程，服务器异常退出，双方不计胜负。这些对局的硬币结果已计入统计（总投币 = 胜+负+平+abnormal），但不计入胜负统计。分析硬币序列时注意：\n';
   md += '  - 异常局前后硬币的连续性：异常局是否被视为"消耗"了一次硬币结果？检查异常局（尤其是先手异常）后当天内下一局的硬币是否偏向反面。\n';
   md += '  - 硬币统计完整性：由于异常局硬币已计入，总正率不受影响。但若异常局中先手（正）占比异常高，可能意味着"先手被浪费了"——玩家投到先手但因异常没打成，实际体验中被剥夺了一次先手机会。\n';
