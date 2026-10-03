@@ -1569,7 +1569,7 @@ ipcMain.handle('stats:export-md', async (event, { timeRange, selectedDate, custo
   md += '| 自用卡组 | 自己使用的卡组 | 🃏 自用卡组统计 | 自由文本 |\n';
   md += '| 对手卡组 | 对手使用的卡组 | 🎴 对手卡组统计 · ⚔️ 对位交叉 | 自由文本 |\n';
   md += '| 手坑 | 吃到的手坑列表 | 🛡️ 吃手坑统计 | 手坑 ID 列表, 逗号分隔 |\n';
-  md += '| 卡手 | 是否卡手 | 🃏 手牌与卡手统计 | Y=卡手 / —=正常; 细分: cantPlay/动不了, cantPlayGarnet/卡废件, cantPlayDuplicate/卡同名牌, cantPlayHT/卡后手牌, bothStuck/互卡 |\n';
+  md += '| 卡手 | 卡手细分 | 🃏 手牌与卡手统计 | —=未卡手; 若有卡手则列出全部细分标签（用 / 连接）: 动不了=cantPlay / 卡废件=cantPlayGarnet / 卡同名牌=cantPlayDuplicate / 卡后手牌=cantPlayHT / 互卡=bothStuck |\n';
   md += '| 失误 | 是否出现严重失误 | 💢 严重失误统计 | Y=有 / —=无 |\n';
   md += '| 终场/突破 | 先手终场或后手突破 | 🏗️ 先手终场 · 🔨 后手突破 | 先手: normal/compromised/stopped/surrender; 后手: true/false/surrender/not_applicable（明细中 false 会原样显示为 false） |\n';
   md += '| 晋级/保级 | 是否为晋级/保级赛 | 🏆 晋级/保级赛 | promotion=晋级赛 / relegation=保级赛 |\n';
