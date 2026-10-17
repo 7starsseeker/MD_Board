@@ -11,6 +11,7 @@
 [![Electron](https://img.shields.io/badge/Electron-desktop-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![Chart.js](https://img.shields.io/badge/Chart.js-v4.5.1-FF6384?logo=chart.js&logoColor=white)](https://www.chartjs.org/)
 [![last commit](https://img.shields.io/github/last-commit/7starsseeker/MD_Board)](https://github.com/7starsseeker/MD_Board/commits/master)
+[![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 
 ---
 
