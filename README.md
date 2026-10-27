@@ -189,8 +189,16 @@ npm run pack
 
 ## 致谢
 
-本项目的全部代码由 **Reasonix + DeepSeek** 协作生成。  
-Reasonix 是一个 AI 编程代理平台，通过与 DeepSeek 大语言模型的实时对话，根据需求描述逐步构建、调试和完善了整个应用。
+本项目的全部代码由 **AI 编程代理协作生成**，先后用过三个工具：
+
+- **早期 — Reasonix + DeepSeek**  
+  Reasonix 是一个 AI 编程代理平台，通过与 DeepSeek 大语言模型的实时对话，根据需求描述逐步构建、调试和完善了应用的基础部分。
+- **中途若干版本 — ZCODE**  
+  功能迭代阶段的开发工具。
+- **目前 — [DeepSeek Harness（dsh）](https://github.com/deepseek-ai/deepseek-harness)**  
+  v1.3.0 及之后的开发在 dsh 中进行（含统计口径核对、测试补齐与「其他手坑」修复）。
+
+没有这些工具，这个统计工具不可能被一个人写出来。
 
 ---
 
