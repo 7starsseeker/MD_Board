@@ -341,18 +341,20 @@ function filterMatchesByTimeRange(matches, range) {
 // ── 手坑兼容读取 ──────────────────────────────────────────────
 /** 从 match 中提取手坑 ID 数组（兼容新旧数据格式） */
 function getMatchHandtraps(match) {
-  if (match.handtraps && Array.isArray(match.handtraps) && match.handtraps.length > 0) {
-    return match.handtraps;
+  const hasArray = !!(match.handtraps && Array.isArray(match.handtraps) && match.handtraps.length > 0);
+  // '_other' 有两个来源（数组里的魔法 id / 独立的 gotSmallHT），不参与「数组优先」判定，最后合并
+  const result = hasArray ? match.handtraps.filter(id => id !== '_other') : [];
+  if (!hasArray) {
+    // 旧数据回退：仅当数组缺失/为空时读老布尔字段
+    if (match.gotMaxxc || match.gotMaxxC) result.push('gotMaxxc');
+    if (match.gotDroll) result.push('gotDroll');
+    if (match.gotJellyfish) result.push('gotJellyfish');
+    if (match.gotLancea) result.push('gotLancea');
+    if (match.gotNibiru) result.push('gotNibiru');
+    if (match.gotDimension) result.push('gotDimension');
   }
-  // 旧数据回退
-  const result = [];
-  if (match.gotMaxxc || match.gotMaxxC) result.push('gotMaxxc');
-  if (match.gotDroll) result.push('gotDroll');
-  if (match.gotJellyfish) result.push('gotJellyfish');
-  if (match.gotLancea) result.push('gotLancea');
-  if (match.gotNibiru) result.push('gotNibiru');
-  if (match.gotDimension) result.push('gotDimension');
-  if (match.gotSmallHT) result.push('_other');
+  // 「其他手坑」两侧取并集，任一为真即计入（此前数组非空时会漏掉 _other）
+  if (match.gotSmallHT || (hasArray && match.handtraps.indexOf('_other') >= 0)) result.push('_other');
   return result;
 }
 
@@ -468,9 +470,23 @@ function computeHandtrapStats(matches, total, presets, htConfig) {
   const deletedPresetCount = matches.filter(m =>
     getMatchHandtraps(m).some(id => id !== '_other' && !allPresetIds.has(id))
   ).length;
-  htCounts['_other'] = gotOther + deletedPresetCount;
-  htByFirst['_other'] = matches.filter(m => getMatchHandtraps(m).includes('_other') && m.goingFirst).length;
-  htBySecond['_other'] = matches.filter(m => getMatchHandtraps(m).includes('_other') && !m.goingFirst).length;
+  // 「其他手坑」口径 —— 只在这里定义一次，显示层一律直接读 counts['_other'] / byFirstAll / bySecondAll。
+  //   = 录入时勾的其他手坑 + 预设被删除后遗留的 id + 未单独显示（不在 largeIds/compactIds）的预设
+  // 与 total 的相加口径一致：有交集的对局按项次重复计（同一局既吃预设又吃其他手坑，记 2 项）。
+  const htCfg = htConfig || {};
+  const hiddenPresetIds = presets
+    .filter(p => (htCfg.largeIds || []).indexOf(p.id) < 0 && (htCfg.compactIds || []).indexOf(p.id) < 0)
+    .map(p => p.id);
+  let hiddenPresetCount = 0, hiddenPresetFirst = 0, hiddenPresetSecond = 0;
+  hiddenPresetIds.forEach(id => {
+    const hit = matches.filter(m => getMatchHandtraps(m).includes(id));
+    hiddenPresetCount += hit.length;
+    hiddenPresetFirst += hit.filter(m => m.goingFirst).length;
+    hiddenPresetSecond += hit.filter(m => !m.goingFirst).length;
+  });
+  htCounts['_other'] = gotOther + deletedPresetCount + hiddenPresetCount;
+  htByFirst['_other'] = matches.filter(m => getMatchHandtraps(m).includes('_other') && m.goingFirst).length + hiddenPresetFirst;
+  htBySecond['_other'] = matches.filter(m => getMatchHandtraps(m).includes('_other') && !m.goingFirst).length + hiddenPresetSecond;
   if (deletedPresetCount > 0) {
     htByFirst['_other'] += matches.filter(m =>
       getMatchHandtraps(m).some(id => id !== '_other' && !allPresetIds.has(id)) && m.goingFirst
@@ -482,7 +498,7 @@ function computeHandtrapStats(matches, total, presets, htConfig) {
   const gotMaxxc = htCounts['gotMaxxc'] || 0, gotDroll = htCounts['gotDroll'] || 0;
   const gotJellyfish = htCounts['gotJellyfish'] || 0, gotLancea = htCounts['gotLancea'] || 0;
   const gotNibiru = htCounts['gotNibiru'] || 0, gotDimension = htCounts['gotDimension'] || 0;
-  const gotSmallHT = gotOther;
+  const gotSmallHT = htCounts['_other'] || 0;
   const gotAnyG = matches.filter(m => getMatchHandtraps(m).some(id => ['gotMaxxc','gotDroll','gotJellyfish'].includes(id))).length;
   const anyGFirst = matches.filter(m => getMatchHandtraps(m).some(id => ['gotMaxxc','gotDroll','gotJellyfish'].includes(id)) && m.goingFirst).length;
   const anyGSecond = matches.filter(m => getMatchHandtraps(m).some(id => ['gotMaxxc','gotDroll','gotJellyfish'].includes(id)) && !m.goingFirst).length;
@@ -733,7 +749,7 @@ function computeTypeStats(typeMatches) {
   const tLancea = tHTMatches.filter(h => h.includes('gotLancea')).length;
   const tNibiru = tHTMatches.filter(h => h.includes('gotNibiru')).length;
   const tDimension = tHTMatches.filter(h => h.includes('gotDimension')).length;
-  const tSmallHT = tHTMatches.filter(h => h.includes('_other')).length;
+  let tSmallHT = tHTMatches.filter(h => h.includes('_other')).length;
   const tAnyG = tHTMatches.filter(h => h.includes('gotMaxxc') || h.includes('gotDroll') || h.includes('gotJellyfish')).length;
   const tCantPlay = typeMatches.filter(m => m.cantPlay || m.cantPlayGarnet || m.cantPlayDuplicate || m.cantPlayHT || m.bothStuck).length;
   const tBigHand = typeMatches.filter(m => m.opponentBigHand).length;
@@ -749,6 +765,13 @@ function computeTypeStats(typeMatches) {
   });
   const counts = {};
   (data.handtrapPresets || []).forEach(p => { counts[p.id] = tHTMatches.filter(h => h.includes(p.id)).length; });
+  // 与 computeHandtrapStats 同一口径：其他手坑 = 其他手坑 + 未单独显示的预设
+  const tCfg = data.handtrapConfig || {};
+  (data.handtrapPresets || []).forEach(p => {
+    if ((tCfg.largeIds || []).indexOf(p.id) < 0 && (tCfg.compactIds || []).indexOf(p.id) < 0) {
+      tSmallHT += (counts[p.id] || 0);
+    }
+  });
   counts['_other'] = tSmallHT;
   return {
     total: tTotal, wins: tWins, losses: tLosses, winRate: pct(tWins, tTotal),

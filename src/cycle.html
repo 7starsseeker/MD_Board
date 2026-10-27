@@ -367,12 +367,8 @@
           var cnt = counts[id] || 0;
           otherParts.push(escapeHtml(p.label) + ' ' + cnt);
         });
+        // counts['_other'] 已含未单独显示的预设（口径定义在 main.js computeHandtrapStats）
         var otherTotal = counts['_other'] || 0;
-        presets.forEach(function(p) {
-          if (largeIds.indexOf(p.id) < 0 && compactIds.indexOf(p.id) < 0) {
-            otherTotal += (counts[p.id] || 0);
-          }
-        });
         if (otherTotal > 0) otherParts.push('其他 ' + otherTotal);
 
         var detailHtml = otherParts.length > 0 ? '<div style="font-size:12px;color:var(--text-dim);text-align:center;margin-top:2px">' + otherParts.join(' · ') + '</div>' : '';

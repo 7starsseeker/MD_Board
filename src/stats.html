@@ -728,7 +728,6 @@
         var largeHtml = '';
         var largeIds = (cfg.largeIds || []).filter(function(id) { return presets.some(function(p) { return p.id === id; }); });
         var compactIds = (cfg.compactIds || []).filter(function(id) { return presets.some(function(p) { return p.id === id; }); });
-        var otherIds = presets.filter(function(p) { return largeIds.indexOf(p.id) < 0 && compactIds.indexOf(p.id) < 0; }).map(function(p) { return p.id; });
 
         largeIds.forEach(function(id) {
           var p = presets.find(function(x) { return x.id === id; });
@@ -749,9 +748,8 @@
         });
         var compactHtml = compactParts.length > 0 ? '<div style="margin-top:4px;padding:2px 0;font-size:12px;color:var(--text-dim);border-top:1px solid var(--border)">' + compactParts.join(' · ') + '</div>' : '';
 
-        // other 区
+        // other 区（counts['_other'] 已含未单独显示的预设，口径定义在 main.js computeHandtrapStats）
         var otherTotal = gotOther;
-        otherIds.forEach(function(id) { otherTotal += (counts[id] || 0); });
         var otherHtml = otherTotal > 0 ? '<div style="font-size:12px;color:var(--text-dim);padding:2px 0">其他手坑 ' + otherTotal + '</div>' : '';
 
         var html = largeHtml + compactHtml + otherHtml;
@@ -1483,7 +1481,7 @@
           var otherTotal = htCounts['_other'] || 0;
           var htSection = '<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px"><span style="font-size:11px;color:var(--accent);font-weight:600">吃手坑情况</span></div>';
           htPresets.forEach(function(p) {
-            if (!visibleSet[p.id]) { otherTotal += (htCounts[p.id] || 0); return; }
+            if (!visibleSet[p.id]) return;
             var cnt = htCounts[p.id] || 0;
             htSection += '<div class="stat-row"><span class="label">' + escapeHtml(p.label) + '</span><span class="value">' + cnt + ' 次</span></div>';
           });

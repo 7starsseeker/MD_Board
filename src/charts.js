@@ -224,9 +224,8 @@ function renderHandtrapPie(canvas, stats, options) {
     labels.push(p ? p.label : id);
     values.push(counts[id] || 0);
   });
-  // _other + 第3级预设数据
+  // counts['_other'] 已含未单独显示的预设（口径定义在 main.js computeHandtrapStats）
   var otherTotal = counts['_other'] || 0;
-  otherIds.forEach(function(id) { otherTotal += (counts[id] || 0); });
   labels.push('其他手坑');
   values.push(otherTotal);
 

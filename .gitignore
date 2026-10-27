@@ -9,6 +9,8 @@ Thumbs.db
 # Project spec/docs (not for public)
 封面设计/
 报告规范/
+# 自动化（读游戏内存）相关文档：仅本机保留，不进公开仓库
+docs/
 
 # Build logs
 build-log.txt

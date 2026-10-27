@@ -1067,7 +1067,6 @@
     bindCheckbox('chk-big-hand', 'opponentBigHand');
     bindCheckbox('chk-mistake', 'mistake');
     bindCheckbox('chk-t0', 'opponentT0');
-    bindCheckbox('chk-t0', 'opponentT0');
     // 一方掉线 - 自定义级联（互斥组）
     (function() {
       var el = document.getElementById('chk-disconnect');
@@ -1161,6 +1160,9 @@
         }
       });
     })();
+
+    // 其他手坑（v1.2.0 重构手坑面板时漏掉这条绑定，导致 2026-07-18 起勾选不写入 state）
+    bindCheckbox('chk-small-ht', 'gotSmallHT');
 
     // 提丰
     bindCheckbox('chk-typhon', 'typhonAppeared');
@@ -1414,6 +1416,8 @@
       Object.keys(state.handtraps).forEach(function(id) {
         if (state.handtraps[id]) handtrapIds.push(id);
       });
+      // 「其他手坑」是独立字段，但也必须进数组：统计层对非空数组走数组分支，不并入就永远读不到
+      if (state.gotSmallHT && handtrapIds.indexOf('_other') < 0) handtrapIds.push('_other');
       // 旧字段向后兼容
       var htOld = { gotMaxxc: handtrapIds.indexOf('gotMaxxc') >= 0, gotDroll: handtrapIds.indexOf('gotDroll') >= 0, gotJellyfish: handtrapIds.indexOf('gotJellyfish') >= 0, gotLancea: handtrapIds.indexOf('gotLancea') >= 0, gotNibiru: handtrapIds.indexOf('gotNibiru') >= 0, gotDimension: handtrapIds.indexOf('gotDimension') >= 0 };
       var payload = {
